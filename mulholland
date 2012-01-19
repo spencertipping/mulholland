@@ -638,7 +638,7 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('repl', <<'__');
-my @modules = qw|i i/tree i/parse i/js|;
+my @modules = qw|i i/tree i/parse i/rewrite|;
 my %filenames = map {$_ => temporary_name() . '.waul.sdoc'} @modules;
 file::write($filenames{$_}, retrieve("sdoc::waul::$_")) for @modules;
 
@@ -1658,44 +1658,6 @@ caterwaul.module('mulholland', 'js_all', function ($) {
   $.mulholland() = $.mulholland.parser.apply(this, arguments)});
 
 __
-meta::sdoc('waul::i/js', <<'__');
-Mulholland -> Javascript translation | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-Mulholland needs to be grounded somehow in order to be useful. At some point it may have other backends, but for the moment it supports a relatively direct rendering into Javascript. The
-mechanism for this is simple: we transform a few low-level Mulholland patterns into Javascript-specific idioms. You can think of this as being the equivalent of 'waul' for Mulholland code.
-
-caterwaul.module('mulholland.js', 'js_all', function ($) {
-
-Compile-time rewriting.
-All rewriting in Mulholland code is triggered using @-prefixed symbols. These are considered syntax markers and don't appear in compiled code. (This is important because Javascript can't
-handle @ symbols in source, at least not without E4X or some other monstrosity.) All rewriting rules are localized to a given expression tree in the source; there is no such thing as a
-toplevel rewrite.
-
-You can introduce anonymous rewriting rules as well as using shared ones. This is done by using the anonymous-rewriting operator @. So, for example:
-
-| foo + bar -@ foo /= baz +, bar /= bif
-  foo + bar -@ [foo = bar, bar = bif]           <- same thing, but with explicit grouping
-
-Compile-time rewrite sections can be nested for abstraction. In this case they apply outside-in. For example:
-
-| foo + bar -@ [foo = bif + baz, _x + bar = _x /@ [bif = bok]]
-
-Generating Javascript intrinsics.
-There are more and less creative ways to do this. The simplest is almost certainly to cast a regular word into an operator using a precedence/associativity prefix hint. For example, you can
-generate a for loop like this:
-
-| (i = 0; i < 10; i ++= 1) -for {stuff}
-
-You can also generate if/else and other block structures, though they won't have as much structure as they do in Caterwaul. In general, generating block structures isn't that challenging. The
-real problems come in when you want to use unary operators such as 'var' or '++'. To do this, you need to provide an artificial right-hand side that will later be deleted. For example:
-
-| x /= 10 -var _ -; _                   -> var x = 10
-
-  $.mulholland.js(t, parser) = null});
-
-__
 meta::sdoc('waul::i/parse', <<'__');
 Mulholland parser | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1720,14 +1682,14 @@ level, Mulholland supports these types of tokens:
   2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
   4. Brackets, which are any of [ ] ( ) { }
-  5. Operators, which are of the form /[^ \n\t\r.:,;()\[\]{}]+/ and are not identifiers
+  5. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
   6. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z$_@]*/
 
 It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 treats any Unicode character as the beginning of an identifier.
 
   -where [sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /((?:[$_@A-Za-z0-9\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|[^ \n\t\r.:,;()\[\]{}])[^ \n\t\r.:,;()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r0-9A-Za-z$_@]*)/,
+          lexer   = /((?:[$_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w$_@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -1818,6 +1780,45 @@ did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted
                                    pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
 
 __
+meta::sdoc('waul::i/rewrite', <<'__');
+Mulholland rewriter | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Mulholland code needs to be rewritten into something runnable in order to be at all useful. This module implements a general-purpose optimizing rewriter for this purpose. It takes as input a
+series of rewrite rules and returns a function that will rewrite a tree accordingly.
+
+caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
+
+Compile-time rewriting.
+All rewriting rules are localized to a given expression tree in the source; there is no such thing as a toplevel rewrite. You can introduce anonymous rewriting rules as well as using shared
+ones. This is done by using the anonymous-rewriting operator @. So, for example:
+
+| foo + bar -@ foo /= baz +, bar /= bif
+  foo + bar -@ [foo = bar, bar = bif]           <- same thing, but with explicit grouping
+
+Compile-time rewrite sections can be nested for abstraction. In this case they apply outside-in. For example:
+
+| foo + bar -@ [foo = bif + baz, _x + bar = _x -@ [bif = bok]]
+
+Generating Javascript intrinsics.
+There are more and less creative ways to do this. The simplest is almost certainly to cast a regular word into an operator using a precedence/associativity prefix hint. For example, you can
+generate a for loop like this:
+
+| (i = 0; i < 10; i ++= 1) -for {stuff}
+
+You can also generate if/else and other block structures, though they won't have as much structure as they do in Caterwaul. In general, generating block structures isn't that challenging. The
+real problems come in when you want to use unary operators such as 'var' or '++'. To do this, you need to provide an artificial right-hand side that will later be deleted. Mulholland reserves
+the _ symbol for this purpose. For example:
+
+| x /= 10 -var _ -; _                   -> var x = 10;
+
+Rewriting optimizations.
+Most of the time Mulholland spends compiling things is taken up by the rewriting process.
+
+});
+
+__
 meta::sdoc('waul::i/tree', <<'__');
 Mulholland syntax trees | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1838,8 +1839,9 @@ indexes into the symbol table.
   $.mulholland.syntax(table, table_i, result.prototype /-$.merge/ methods(table, table_i))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
   where [methods(table, table_i) = capture [
 
-    structure()    = '(#{table[this.data] -re [it == null ? this.data : it]}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
-    as_caterwaul() = new $.syntax(table[this.data] -re [it == null ? this.data : it], +this *[x.as_caterwaul()] -seq),
+    resolved_data() = table.hasOwnProperty(this.data) ? table[this.data] : this.data,
+    structure()    = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
+    as_caterwaul() = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
