@@ -1668,13 +1668,30 @@ mechanism for this is simple: we transform a few low-level Mulholland patterns i
 
 caterwaul.module('mulholland.js', 'js_all', function ($) {
 
-Javascript idioms.
-There are a few idioms in Javascript that don't map cleanly to Mulholland code. They are:
+Compile-time rewriting.
+All rewriting in Mulholland code is triggered using @-prefixed symbols. These are considered syntax markers and don't appear in compiled code. (This is important because Javascript can't
+handle @ symbols in source, at least not without E4X or some other monstrosity.) All rewriting rules are localized to a given expression tree in the source; there is no such thing as a
+toplevel rewrite.
 
-| 1. Calling and slicing. These need to be modeled as invocation or slice nodes in Javascript.
-  2. Function creation. This could be done in Mulholland using joins, but it's more straightforward to just come up with an idiom for it.
-  3. Variable definition within a function.
-  4. Nullary invocation and definition. This is denoted by joining to _.
+You can introduce anonymous rewriting rules as well as using shared ones. This is done by using the anonymous-rewriting operator @. So, for example:
+
+| foo + bar -@ foo /= baz +, bar /= bif
+  foo + bar -@ [foo = bar, bar = bif]           <- same thing, but with explicit grouping
+
+Compile-time rewrite sections can be nested for abstraction. In this case they apply outside-in. For example:
+
+| foo + bar -@ [foo = bif + baz, _x + bar = _x /@ [bif = bok]]
+
+Generating Javascript intrinsics.
+There are more and less creative ways to do this. The simplest is almost certainly to cast a regular word into an operator using a precedence/associativity prefix hint. For example, you can
+generate a for loop like this:
+
+| (i = 0; i < 10; i ++= 1) -for {stuff}
+
+You can also generate if/else and other block structures, though they won't have as much structure as they do in Caterwaul. In general, generating block structures isn't that challenging. The
+real problems come in when you want to use unary operators such as 'var' or '++'. To do this, you need to provide an artificial right-hand side that will later be deleted. For example:
+
+| x /= 10 -var _ -; _                   -> var x = 10
 
   $.mulholland.js(t, parser) = null});
 
@@ -1777,6 +1794,7 @@ did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted
           precedence(t)          = t.length === 1 ? t /!unshaded_precedence : t.charAt(0) /!shaded_precedence,
           unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,
           shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
+          operator_semantic(t)   = t.length === 1 ? t : t.substr(1),
 
           is_value(t)            = /^['"$_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
           node(op, x2, x1)       = new syntax(op, [x1, x2]),
@@ -1784,15 +1802,18 @@ did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted
           parse(ts)              = ts *!route -seq -re- pop_everything()
                            -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
 
-                                   defer(op) = operator_stack /~push/ op,                                     pop()        = use(operator_stack.pop()),
-                                   use(op)   = output /~push/ node(op /!intern, output.pop(), output.pop()),  pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
+                                   defer(op)    = operator_stack /~push/ op,
+                                   use(op)      = output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
 
-                                   route(t)  = t /!is_value ? binary('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
-                                                            : expect_value = !!decide(t),
+                                   pop()        = use(operator_stack.pop()),
+                                   pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
 
-                                   binary(o) = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
-                                   decide(o) = o /!closes_a_group ? (pop_until(opens_a_group), !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
-                                               o /!opens_a_group  ? (binary('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : binary(o),
+                                   route(t)     = t /!is_value ? binary('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
+                                                               : expect_value = !!decide(t),
+
+                                   binary(o)    = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
+                                   decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
+                                                  o /!opens_a_group  ? (binary('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : binary(o),
 
                                    pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
 
