@@ -1814,7 +1814,26 @@ the _ symbol for this purpose. For example:
 | x /= 10 -var _ -; _                   -> var x = 10;
 
 Rewriting optimizations.
-Most of the time Mulholland spends compiling things is taken up by the rewriting process.
+Most of the time Mulholland spends compiling things is taken up by the rewriting process, so a number of optimizations are implemented to make this fast. First, each rule is closed under
+transitivity with each other rule. This means that if x -> y and y -> z, then the rule 'x -> y' is replaced with 'x -> z'. This is quadratic in the number of rules that are present. For
+example, this is a case where transitivity would apply:
+
+| foo + bif = bar + bif                 <- this would be rewritten as foo + bif = 1 because bar + _x matches bar + bif
+  bar + _x = 1
+
+Unlike in Caterwaul, rewrites aren't applied recursively to subtrees; each rewrite is strongly contextualized to a specific node. If you wanted to simulate subtree rewriting, you would create
+a rule that explicitly distributes over various types of operators; for instance:
+
+| @seq(_xs@0)      = ...                        # base case
+  @seq(_x /_op _y) = @seq(_x) /_op @seq(_y)     # binary operator inductive case
+  @seq((_x))       = (@seq(_x))                 # transparency over () groups
+  @seq([_x])       = [@seq(_x)]                 # transparency over [] groups
+  @seq({_x})       = {@seq(_x)}                 # transparency over {} groups
+
+Because it's common to want various modes of transparency, Mulholland's standard library provides compile-time rewrite rules to do this for you:
+
+| @transparent-over-groups @seq(x)
+  @transparent-over-binary @seq(x)
 
 });
 
@@ -1888,17 +1907,17 @@ simple rule is that a pattern cannot have higher complexity than a target.
     complexity() = this._complexity === undefined ? this._complexity = 1 + this /[0][x0 + x.complexity()] /seq : this._complexity,
 
 Pattern matching and replacement.
-Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well, though the match maps are sparse arrays instead of variable
--> value objects. Unlike Caterwaul, a failed match returns the value 'false' instead of null or undefined. This allows you to inspect its match variables, all of which will be undefined. If
-passed into the replace() function, 'false' causes the receiver to be returned identically.
+Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well, though the match maps use numeric mapping rather than
+Caterwaul's string mapping. Unlike Caterwaul, a failed match returns the boolean value false instead of null or undefined. This allows you to inspect its match variables, all of which will be
+undefined. If passed into the replace() function, 'false' causes the receiver to be returned identically.
 
 The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
 positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
 
-    match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = [])) &&
+    match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
                            (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
-    replace(m)           = m[this.data] || this /~map/ "_.replace(m)".qf,
+    replace(m)           = m === false ? this : m[this.data] || this /~map/ "_.replace(m)".qf,
 
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null ? t : t.length === this.arity_constraint() && t : this.data === t.data && this.length === t.length,
