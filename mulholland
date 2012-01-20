@@ -1672,13 +1672,20 @@ and there are no patch-ups that need to be done. The algorithm is modified from 
 parse implicit joins (e.g. f x = x + 1: in this case, 'f x' is an implicit join with high precedence).
 
 caterwaul.module('mulholland.parser', 'js_all', function ($) {
-  $.mulholland.parser(table = {}, table_i = {}, next = 0, syntax = result.syntax = $.mulholland.syntax(table, table_i))(code) = code.toString() /!sdoc /!lex /!parse
+  $.mulholland.parser(table = {}, table_i = {}, next = 0, result /-$.merge/ statics())(code) = code.toString() /!sdoc /!lex /!parse
+
+Static data.
+You can access most of the internal state of a parser. You probably shouldn't poke around and change stuff, but you can at the very least inspect it and ask the parser questions. (For
+instance, you might want to know the precedence and associativity of a given operator.)
+
+  -where [statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
+          syntax    = $.mulholland.syntax(table, table_i),
 
 Lexer and token types.
 Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
 level, Mulholland supports these types of tokens:
 
-| 1. Identifiers, which have the form /[$_@A-Za-z0-9\x7f-\uffff][^ \n\t\r.:,;()\[\]{}]*/
+| 1. Identifiers, which have the form /[_@A-Za-z0-9\x7f-\uffff][^ \n\t\r.:,;()\[\]{}]*/
   2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
   4. Brackets, which are any of [ ] ( ) { }
@@ -1688,16 +1695,18 @@ level, Mulholland supports these types of tokens:
 It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 treats any Unicode character as the beginning of an identifier.
 
-  -where [sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /((?:[$_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w$_@]*)/,
+          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
+          lexer   = /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w$_@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
 Symbols are interned into integers for performance reasons. The overhead involved in doing this is relatively small and the speedup for rewrites is quite significant. These symbols are
 transparently rendered by the syntax nodes, whose constructor is already parameterized with the symbol table. Note, however, that this means you need to use the same parser for all trees that
-are backed by symbol tables, at least until you extern them by rendering into Caterwaul trees.
+are backed by symbol tables, at least until you render them into regular Caterwaul syntax trees. On the bright side, the syntax node constructor contains a reference to the parser that created
+it; so generally speaking you don't have to worry about it.
 
           intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
+          extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
 
 Operator composition.
 Operators in Mulholland are far more expressive than they are in most languages. Each operator has a well-defined precedence, but it is possible to modify it to have a different precedence or
@@ -1732,15 +1741,16 @@ Precedence and associativity table.
 The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
 
 | .             left    micro-operator, but can be used as a hint.
+  adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
+  ` ~(>)        right
   / *(>) %(<)   left
   \ :(>) !(<)   right
   - +(>)        left
-  adjoinment    left    no hinting possible, since this operator's existence is inferred.
   < >(>)        right
   &             left
-  ` ~(>)        right
   | ^(>)        left
   = ?(>)        right
+  $             right
   ,             left
   ;             left
 
@@ -1749,9 +1759,9 @@ Most of the implementation here is the classical shunting yard algorithm. The on
 an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
 did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
 
-          base_operators         = '\\. [/*%] [\\:!] [-+] # [<>] [`~] & \\^ \\| \\? = , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
+          base_operators         = '\\. # [`~] [/*%] [\\\\:!] [-+] [<>] & [|^] [=?] \\$ , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
           right_associative      = /^[\\:!<>`~=?(\[{]$/.qf,
-          shading                = '* 1 % -1 : 1 ! -1 + 1 > 1 ~ 1 ^ 1'.qh %v*[-x] -seq,
+          shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
 
           precedence(t)          = t.length === 1 ? t /!unshaded_precedence : t.charAt(0) /!shaded_precedence,
           unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,
@@ -1824,18 +1834,23 @@ example, this is a case where transitivity would apply:
 Unlike in Caterwaul, rewrites aren't applied recursively to subtrees; each rewrite is strongly contextualized to a specific node. If you wanted to simulate subtree rewriting, you would create
 a rule that explicitly distributes over various types of operators; for instance:
 
-| @seq(_xs@0)      = ...                        # base case
-  @seq(_x /_op _y) = @seq(_x) /_op @seq(_y)     # binary operator inductive case
-  @seq((_x))       = (@seq(_x))                 # transparency over () groups
-  @seq([_x])       = [@seq(_x)]                 # transparency over [] groups
-  @seq({_x})       = {@seq(_x)}                 # transparency over {} groups
+| @seq _xs@0         = ...                      # base case
+  @seq $@ _x /_op _y = @seq _x /_op @seq _y     # binary operator inductive case
+  @seq (_x)          = (@seq _x)                # transparency over () groups
+  @seq [_x]          = [@seq _x]                # transparency over [] groups
+  @seq {_x}          = {@seq _x}                # transparency over {} groups
 
 Because it's common to want various modes of transparency, Mulholland's standard library provides compile-time rewrite rules to do this for you:
 
-| @transparent-over-groups @seq(x)
-  @transparent-over-binary @seq(x)
+| @@*-groups $@ @seq x
+  @@*-binary $@ @seq x
 
-});
+  $.mulholland.rewriter(rules) = rewrite
+
+  -where [current_list        = +rules -seq,
+
+          rewrite_once(t)     = current_list |~![x[1].replace(x[0] /~match/ t)] |seq,
+          transitive_limit(t) = null]});
 
 __
 meta::sdoc('waul::i/tree', <<'__');
@@ -1855,15 +1870,23 @@ numerically-indexed children. However, the constructor protocol differs signific
 arguments. The first is the data, which is copied onto the node verbatim; the second is an array of children. The array of children can itself be a node. The data must be an integer that
 indexes into the symbol table.
 
-  $.mulholland.syntax(table, table_i, result.prototype /-$.merge/ methods(table, table_i))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
-  where [methods(table, table_i) = capture [
+  $.mulholland.syntax(parser, result.prototype /-$.merge/ methods(parser))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
+  where [methods(parser) = capture [
 
-    resolved_data() = table.hasOwnProperty(this.data) ? table[this.data] : this.data,
-    structure()    = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
-    as_caterwaul() = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
+    resolved_data() = parser.extern(this.data),
+    structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
+    as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
+
+Transformations.
+These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
+',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
+
+    flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
+    left_flatten(op)  = this.resolved_data() === op ? [this[0]] /~concat/ this[1].left_flatten(op)  : [this],
+    right_flatten(op) = this.resolved_data() === op ? this[0].right_flatten(op) /~concat/ [this[1]] : [this],
 
 Attributes.
 Attributes arise from the structure of an identifier. These are orthogonal to syntactic roles, which determine parse behavior; attributes determine purely semantic things like whether one
@@ -1909,7 +1932,7 @@ simple rule is that a pattern cannot have higher complexity than a target.
 Pattern matching and replacement.
 Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well, though the match maps use numeric mapping rather than
 Caterwaul's string mapping. Unlike Caterwaul, a failed match returns the boolean value false instead of null or undefined. This allows you to inspect its match variables, all of which will be
-undefined. If passed into the replace() function, 'false' causes the receiver to be returned identically.
+undefined. If passed into the replace() function, 'false' causes false to be returned. This allows replacement to be closed over match failure.
 
 The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
 positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
@@ -1917,7 +1940,7 @@ positives, we re-check at every match level. In Bloom filter space, A & B repres
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
                            (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
-    replace(m)           = m === false ? this : m[this.data] || this /~map/ "_.replace(m)".qf,
+    replace(m)           = m === false ? false : m[this.data] || this /~map/ "_.replace(m)".qf,
 
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null ? t : t.length === this.arity_constraint() && t : this.data === t.data && this.length === t.length,

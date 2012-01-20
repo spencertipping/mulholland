@@ -1229,8 +1229,8 @@ syn match  mh_sdoc_coerce        /^\s*|\(\s\|$\)/                    contained
 syn match  mh_wildcard           /_[^ \n\t\r.:,;()\[\]{}]\+/ contains=mh_arity_restriction
 syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
 syn match  mh_arity_restriction  /@\d/ contained
-syn match  mh_simple_op          /[^ \n\t\r$_@A-Za-z0-9.:,;()\[\]{}]/
-syn match  mh_complex_op         /[^ \n\t\r$_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]\+/
+syn match  mh_simple_op          /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}]/
+syn match  mh_complex_op         /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]\+/
 syn match  mh_single_string      /'\([^'\\]\|\\.\)*'[^ \n\t\r.:,;()\[\]{}]*/
 syn match  mh_double_string      /"\([^"\\]\|\\.\)*"[^ \n\t\r.:,;()\[\]{}]*/
 
