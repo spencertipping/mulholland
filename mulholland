@@ -1834,23 +1834,28 @@ example, this is a case where transitivity would apply:
 Unlike in Caterwaul, rewrites aren't applied recursively to subtrees; each rewrite is strongly contextualized to a specific node. If you wanted to simulate subtree rewriting, you would create
 a rule that explicitly distributes over various types of operators; for instance:
 
-| @seq _xs@0         = ...                      # base case
-  @seq $@ _x /_op _y = @seq _x /_op @seq _y     # binary operator inductive case
-  @seq (_x)          = (@seq _x)                # transparency over () groups
-  @seq [_x]          = [@seq _x]                # transparency over [] groups
-  @seq {_x}          = {@seq _x}                # transparency over {} groups
+| @seq _xs@0        = ...                       # base case
+  @seq $ _x /_op _y = @seq _x /_op @seq _y      # binary operator inductive case
+  @seq (_x)         = (@seq _x)                 # transparency over () groups
+  @seq [_x]         = [@seq _x]                 # transparency over [] groups
+  @seq {_x}         = {@seq _x}                 # transparency over {} groups
 
 Because it's common to want various modes of transparency, Mulholland's standard library provides compile-time rewrite rules to do this for you:
 
-| @@*-groups $@ @seq x
-  @@*-binary $@ @seq x
+| @@*-groups $ @seq x
+  @@*-binary $ @seq x
 
   $.mulholland.rewriter(rules) = rewrite
 
   -where [current_list        = +rules -seq,
 
-          rewrite_once(t)     = current_list |~![x[1].replace(x[0] /~match/ t)] |seq,
-          transitive_limit(t) = null]});
+          rewrite_once(t)     = current_list |~![x[1] /~replace/ x[0].match(t)] |seq,
+          fixed_point(t)      = t *~![x][r = x /!rewrite_once || r] -seq -re- r -where [r = null],
+          transitive_limit(r) = [r[0], fixed_point(r[1])],
+
+          uniq(rs)            = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
+          current_list        = uniq(current_list + current_list *transitive_limit -seq),
+          rewrite             = fixed_point]});
 
 __
 meta::sdoc('waul::i/tree', <<'__');
@@ -1936,6 +1941,8 @@ undefined. If passed into the replace() function, 'false' causes false to be ret
 
 The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
 positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
+
+Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
                            (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
