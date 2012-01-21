@@ -1872,7 +1872,7 @@ Because it's common to want various modes of transparency, Mulholland's standard
 
   -where [current_list        = +rules -seq,
 
-          rewrite_once(t)     = current_list |~![x[1] /~replace/ x[0].match(t)] |seq,
+          rewrite_once(t)     = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
           fixed_point(t)      = t *~![x][r = x /!rewrite_once || r] -seq -re- r -where [r = null],
           transitive_limit(r) = [r[0], fixed_point(r[1])],
 
