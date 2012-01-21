@@ -1870,20 +1870,25 @@ a rule that explicitly distributes over various types of operators; for instance
 
 Because it's common to want various modes of transparency, Mulholland's standard library provides compile-time rewrite rules to do this for you:
 
-| @@*-groups $ @seq x
-  @@*-binary $ @seq x
+| @*-groups $ @seq x
+  @*-binary $ @seq x
 
   $.mulholland.rewriter(rules) = rewrite
 
-  -where [current_list        = +rules -seq,
+  -where [current_list         = +rules -seq,
+          rewrote_something    = null,
 
-          rewrite_once(t)     = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
-          fixed_point(t)      = rewrite_once(t) -re [it ? fixed_point(it) : t],
-          transitive_limit(r) = r[1].constructor === Function ? r : [r[0], fixed_point(r[1])],
+          pattern_bloom()      = current_list /[0][x0 & x[0].bloom()] -seq,
+          pattern_complexity() = current_list /[Infinity][x0 /-Math.min/ x[0].complexity()] -seq,
+          rewrite_once(t)      = rewrote_something = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
 
-          uniq(rs)            = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
-          current_list        = uniq(current_list + current_list *transitive_limit -seq),
-          rewrite             = fixed_point]});
+          deep_rewriter(b = pattern_bloom(), c = pattern_complexity())(t) = (b & t.bloom()) === b && t.complexity() >= c ? t /~rmap/ rewrite_once : t,
+          fixed_point(r = deep_rewriter(), fix = result)(t)               = (rewrote_something = null, r(t) -re [rewrote_something ? fix(it) : it]),
+          transitive_limit(r)                                             = r[1].constructor === Function ? r : [r[0], fixed_point()(r[1])],
+
+          uniq(rs)             = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
+          current_list         = uniq(current_list + current_list *transitive_limit -seq),
+          rewrite              = fixed_point()]});
 
 __
 meta::sdoc('waul::i/tree', <<'__');
@@ -1913,6 +1918,7 @@ indexes into the symbol table.
 
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
+    rmap(f, ft = f(this))                        = ft || this /~map/ "_ /~rmap/ f".qf,
 
 Transformations.
 These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
@@ -1931,8 +1937,9 @@ identifier matches another. Mulholland supports the following cases:
   3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
   4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
 
-    is_wildcard()      = this._is_wildcard      === undefined ? this._is_wildcard      = /^_./.test(this.resolved_data())                            : this._is_wildcard,
-    arity_constraint() = this._arity_constraint === undefined ? this._arity_constraint = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._arity_constraint,
+    is_wildcard()   = this._is_wildcard   === undefined ? this._is_wildcard   = /^_./.test(this.resolved_data())                            : this._is_wildcard,
+    match_arity()   = this._match_arity   === undefined ? this._match_arity   = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._match_arity,
+    without_arity() = this._without_arity === undefined ? this._without_arity = this.resolved_data().replace(/@(\d+)$/, '')                 : this._without_arity,
 
 Bloom filters.
 Trees are annotated with 31-bit Bloom filters that indicate which elements are contained. These are used to quickly reject large subtrees that don't contain necessary pattern variables. The
@@ -1973,15 +1980,14 @@ positives, we re-check at every match level. In Bloom filter space, A & B repres
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
-    dfs(pattern, f)      = pattern /~can_match/ this && (f.call(this, pattern) || this /~map/ "_.dfs(pattern, f) || _".qf),
-
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
-                           (m[this.resolved_data()] ? m[this.resolved_data()] /~match/ t : m[this.resolved_data()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
+                           (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
     replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
 
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
-    level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null || t.length === this.arity_constraint() : this.data === t.data && this.length === t.length,
+    level_matches(t)     = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
+                                              : this.data === t.data && this.length === t.length,
     children_match(t, m) = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});
 
 __
@@ -2003,14 +2009,13 @@ At that point it is converted into Caterwaul and compiled or saved.
   $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', x.as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
   $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
 
-  $.mulholland.mh(source) = source /!parse /!fixed_point_rewrite
+  $.mulholland.mh(source) = source /!parse /!toplevel_rewriter
 
-  -where [parse                  = $.mulholland(),
-          rewrite_form           = parse('_x //@ [_y]'),
-          rewrite(match)         = match && $.mulholland.rewriter(match._y.flatten(','))(match._x),
+  -where [parse             = $.mulholland(),
+          rewrite_form      = parse('_x //@ [_y]'),
+          rewrite(match)    = match && $.mulholland.rewriter(match._y.flatten(','))(match._x),
 
-          toplevel_rewriter      = $.mulholland.rewriter([[rewrite_form, rewrite]]),
-          fixed_point_rewrite(t) = t.dfs(rewrite_form, "_ /~match/ this -re [it && fixed_point_rewrite(toplevel_rewriter(it._))]".qf) || t]});
+          toplevel_rewriter = $.mulholland.rewriter([[rewrite_form, rewrite]])]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
