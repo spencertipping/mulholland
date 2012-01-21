@@ -431,7 +431,7 @@ create('sdoc::waul::doc/' . join('-', @_));
 __
 meta::function('disable', 'hook(\'disable\', chmod_self(sub {$_[0] & 0666}));');
 meta::function('e', <<'__');
-my @keys = select_keys('--criteria' => '^sdoc::waul::(.*\W)?' . join('.*', @_));
+my @keys = select_keys('--criteria' => '^sdoc::(?:waul|js)::(.*\W)?' . join('.*', @_));
 edit($keys[0]);
 
 __
@@ -640,6 +640,9 @@ meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^
 meta::function('render', <<'__');
 file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite|;
 sh("waul src/*.waul src/*/*.waul");
+
+file::write('mh', retrieve('pp::js::mh'));
+chmod 0755, 'mh';
 
 __
 meta::function('repl', <<'__');
@@ -964,7 +967,7 @@ with_exported("waul::$name", sub {
 
 __
 meta::hook('before-shell::ad', <<'__');
-ad('waul::');
+ad('sdoc::');
 
 __
 meta::indicator('cc', 'length ::retrieve(\'data::current-continuation\') ? "\\033[1;36mcc\\033[0;0m" : \'\';');
@@ -1651,6 +1654,21 @@ meta::retriever('sdoc', 'exists $data{"sdoc::$_[0]"} ? sdoc("sdoc::$_[0]") : und
 meta::retriever('sdocp', <<'__');
 my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
+__
+meta::sdoc('js::mh', <<'__');
+#!/usr/bin/env node
+
+Mulholland compiler | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+- include deps/caterwaul.min.js
+- include deps/caterwaul.std.min.js
+
+- include src/i.js
+- include src/i/tree.js
+- include src/i/parse.js
+- include src/i/rewrite.js
+
 __
 meta::sdoc('waul::i', <<'__');
 Mulholland interpreter | Spencer Tipping

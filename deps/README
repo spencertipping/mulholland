@@ -1,0 +1,3 @@
+Dependencies for Mulholland.
+Right now this just includes Caterwaul and the standard extension. These are
+used by the Mulholland compiler/interpreter.
