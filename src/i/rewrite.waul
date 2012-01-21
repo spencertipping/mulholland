@@ -9,7 +9,7 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
 
 # Compile-time rewriting.
 # All rewriting rules are localized to a given expression tree in the source; there is no such thing as a toplevel rewrite. You can introduce anonymous rewriting rules as well as using shared
-# ones. This is done by using the anonymous-rewriting operator @. So, for example:
+# ones. This is done by using the anonymous-rewriting operator /@. So, for example:
 
 # | foo + bar -/@ foo /= baz +, bar /= bif
 #   foo + bar -/@ [foo = bar, bar = bif]           <- same thing, but with explicit grouping
