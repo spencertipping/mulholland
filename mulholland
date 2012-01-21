@@ -1878,7 +1878,7 @@ Because it's common to want various modes of transparency, Mulholland's standard
   -where [current_list        = +rules -seq,
 
           rewrite_once(t)     = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
-          fixed_point(t)      = t *~![x][r = x /!rewrite_once || r] -seq -re- r -where [r = null],
+          fixed_point(t)      = rewrite_once(t) -re [it ? fixed_point(it) : t],
           transitive_limit(r) = r[1].constructor === Function ? r : [r[0], fixed_point(r[1])],
 
           uniq(rs)            = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
@@ -1919,8 +1919,8 @@ These are useful when analyzing syntax trees in non-interpretative ways. For exa
 ',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
 
     flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
-    left_flatten(op)  = this.resolved_data() === op ? [this[0]] /~concat/ this[1].left_flatten(op)  : [this],
-    right_flatten(op) = this.resolved_data() === op ? this[0].right_flatten(op) /~concat/ [this[1]] : [this],
+    left_flatten(op)  = this.resolved_data() === op ? this[0].left_flatten(op) /~concat/ [this[1]]  : [this],
+    right_flatten(op) = this.resolved_data() === op ? [this[0]] /~concat/ this[1].right_flatten(op) : [this],
 
 Attributes.
 Attributes arise from the structure of an identifier. These are orthogonal to syntactic roles, which determine parse behavior; attributes determine purely semantic things like whether one
@@ -1973,15 +1973,15 @@ positives, we re-check at every match level. In Bloom filter space, A & B repres
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
-    first(pattern)       = pattern /~can_match/ this && (pattern /~match/ this || this |[x /~first/ pattern] |seq),
+    dfs(pattern, f)      = pattern /~can_match/ this && (f.call(this, pattern) || this /~map/ "_.dfs(pattern, f) || _".qf),
 
-    match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
+    match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
                            (m[this.resolved_data()] ? m[this.resolved_data()] /~match/ t : m[this.resolved_data()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
     replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
 
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
-    level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null ? t : t.length === this.arity_constraint() && t : this.data === t.data && this.length === t.length,
+    level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null || t.length === this.arity_constraint() : this.data === t.data && this.length === t.length,
     children_match(t, m) = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});
 
 __
@@ -2001,16 +2001,16 @@ _x //@ [_y], rewrite _x using _y." This rewrite operator can be used to construc
 At that point it is converted into Caterwaul and compiled or saved.
 
   $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', x.as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
-  $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, '' + $.mulholland.mh(s).as_caterwaul()) -rescue- cc(e, undefined)],
+  $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh(source) = source /!parse /!fixed_point_rewrite
 
   -where [parse                  = $.mulholland(),
           rewrite_form           = parse('_x //@ [_y]'),
-          rewrite(match)         = $.mulholland.rewriter(match._y.flatten(',') *![x.data === '=' || new Error('#{match._x}: bad rewrite: #{match._y}') /raise] *[[x[0], x[1]]] -seq),
+          rewrite(match)         = match && $.mulholland.rewriter(match._y.flatten(','))(match._x),
 
           toplevel_rewriter      = $.mulholland.rewriter([[rewrite_form, rewrite]]),
-          fixed_point_rewrite(t) = t.first(rewrite_form) -re [it ? fixed_point_rewrite(toplevel_rewriter(it)) : t]]});
+          fixed_point_rewrite(t) = t.dfs(rewrite_form, "_ /~match/ this -re [it && fixed_point_rewrite(toplevel_rewriter(it._))]".qf) || t]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
