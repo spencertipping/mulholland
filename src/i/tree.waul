@@ -1,0 +1,95 @@
+# Mulholland syntax trees | Spencer Tipping
+# Licensed under the terms of the MIT source code license
+
+# Introduction.
+# Mulholland uses interned strings rather than representing node data directly. As such, its syntax representation is a little different from Caterwaul's trees. It also has a different set of
+# methods that it uses to detect the roles of various things. Finally, it uses node-level transformations to render Javascript and machine code from its syntactic representation. This happens
+# with low-level Mulholland nodes, which are usually generated with @cps.
+
+caterwaul.module('mulholland.tree', 'js_all', function ($) {
+
+# Idioms.
+# These trees behave differently from Caterwaul syntax trees in a few ways. The overall structure is similar: each node has a 'data' and 'length' property along with zero or more
+# numerically-indexed children. However, the constructor protocol differs significantly. Instead of a flexible constructor that supports copying, the constructor rigidly requires exactly two
+# arguments. The first is the data, which is copied onto the node verbatim; the second is an array of children. The array of children can itself be a node. The data must be an integer that
+# indexes into the symbol table.
+
+  $.mulholland.syntax(parser, result.prototype /-$.merge/ methods(parser))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
+  where [methods(parser) = capture [
+
+    resolved_data() = parser.extern(this.data),
+    structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
+    as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
+
+    push(x, this[this.length++] = x)             = this,
+    map(f, r = this *f -seq, r.data = this.data) = r,
+
+# Transformations.
+# These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
+# ',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
+
+    flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
+    left_flatten(op)  = this.resolved_data() === op ? [this[0]] /~concat/ this[1].left_flatten(op)  : [this],
+    right_flatten(op) = this.resolved_data() === op ? this[0].right_flatten(op) /~concat/ [this[1]] : [this],
+
+# Attributes.
+# Attributes arise from the structure of an identifier. These are orthogonal to syntactic roles, which determine parse behavior; attributes determine purely semantic things like whether one
+# identifier matches another. Mulholland supports the following cases:
+
+# | 1. Regular constant term; this matches only itself, and at its own arity.
+#   2. Wildcard term; this matches any leaf or subtree. Wildcards start with '_' and are at least two characters long.
+#   3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
+#   4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
+
+    is_wildcard()      = this._is_wildcard      === undefined ? this._is_wildcard      = /^_./.test(table[this.data])                            : this._is_wildcard,
+    arity_constraint() = this._arity_constraint === undefined ? this._arity_constraint = /^_.*@(\d+)$/.exec(table[this.data]) -re [it && +it[1]] : this._arity_constraint,
+
+# Bloom filters.
+# Trees are annotated with 31-bit Bloom filters that indicate which elements are contained. These are used to quickly reject large subtrees that don't contain necessary pattern variables. The
+# Bloom filter is a single-hash bit vector computed from the intened symbol indexes.
+
+    bloom() = this._bloom === undefined ? this._bloom = this /[this.self_bloom()][x0 | x.bloom()] -seq : this._bloom,
+
+# There are some interesting considerations here. My initial feeling was that n mod 31 would make a reasonable enough hash function, since it is uniform over both n. However, this has some
+# suboptimal distribution properties over large trees. First, large trees are likely to quickly become saturated, which increases the expected match depth for highly-generic operators such as
+# ',' (though hopefully you don't have patterns that use things like , as a toplevel operator). It also is likely to cause trivial collisions of constants with high-occurrence operator symbols.
+# Here's the implementation of the uniform hash:
+
+# |   self_bloom() = this.is_wildcard() ? 0 : 1 << this.data % 31,
+
+# Given this, an alternative approach seems more sensible. My current feeling is that it's important to pack a lot of the more common symbols into a smaller bit range, then allow less common
+# symbols to occupy more space. Ideally this would be a continuous progression, though it's difficult to gauge a symbol's frequency without doing some sort of high-level analysis. The only thing
+# I can think of immediately is that a logarithmic progression makes sense; that is, the number of bits occupied by symbols is proportional to log(n), where n is the symbol's index. We can top
+# this out at 16000 or so unique symbols (in practice it's more because we're taking the natural log, not log-2). Operators can be stuffed into a small bit-space; these will quickly become
+# saturated in any case.
+
+# Here's an implementation that has these properties:
+
+    self_bloom() = this.is_wildcard() ? 0 : 1 << this.data % ((Math /~log/ this.data >>> 0) + 18),
+
+# Complexity computation.
+# This is a fairly straightforward way to reject low-level leaf nodes in recursive match cases. Each tree has a total 'complexity', which is a measure of the number of descendants it has. A
+# simple rule is that a pattern cannot have higher complexity than a target.
+
+    complexity() = this._complexity === undefined ? this._complexity = 1 + this /[0][x0 + x.complexity()] /seq : this._complexity,
+
+# Pattern matching and replacement.
+# Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well, though the match maps use numeric mapping rather than
+# Caterwaul's string mapping. Unlike Caterwaul, a failed match returns the boolean value false instead of null or undefined. This allows you to inspect its match variables, all of which will be
+# undefined. If passed into the replace() function, 'false' causes false to be returned. This allows replacement to be closed over match failure.
+
+# The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
+# positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
+
+# Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
+
+    match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
+                           (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
+
+    replace(m)           = m === false ? false : m[this.data] || this /~map/ "_.replace(m)".qf,
+
+    can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
+    level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null ? t : t.length === this.arity_constraint() && t : this.data === t.data && this.length === t.length,
+    children_match(t, m) = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});
+
+# Generated by SDoc 

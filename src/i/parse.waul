@@ -1,0 +1,131 @@
+# Mulholland parser | Spencer Tipping
+# Licensed under the terms of the MIT source code license
+
+# Introduction.
+# The parser is based on operator-precedence parsing using a regexp lexer. This should be very fast under recent Javascript VMs and should involve a minimal GC overhead. Symbols are interned
+# into integers to accelerate access; the tree can be back-translated by dereferencing: tree.resolved_data(). This interning process is done before folding groups. Assigned numbers are coded
+# according to their syntactic roles.
+
+# Unlike the Caterwaul parser, this one uses a shunting yard algorithm to fold operators as the parse is running. We can get away with this because there are no special cases involving blocks
+# and there are no patch-ups that need to be done. The algorithm is modified from the original shunting-yard algorithm in that it detects operator-value / value-value sequences so that it can
+# parse implicit joins (e.g. f x = x + 1: in this case, 'f x' is an implicit join with high precedence).
+
+caterwaul.module('mulholland.parser', 'js_all', function ($) {
+  $.mulholland.parser(table = {}, table_i = {}, next = 0, result /-$.merge/ statics())(code) = code.toString() /!sdoc /!lex /!parse
+
+# Static data.
+# You can access most of the internal state of a parser. You probably shouldn't poke around and change stuff, but you can at the very least inspect it and ask the parser questions. (For
+# instance, you might want to know the precedence and associativity of a given operator.)
+
+  -where [statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
+          syntax    = $.mulholland.syntax(table, table_i),
+
+# Lexer and token types.
+# Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
+# level, Mulholland supports these types of tokens:
+
+# | 1. Identifiers, which have the form /[_@A-Za-z0-9\x7f-\uffff][^ \n\t\r.:,;()\[\]{}]*/
+#   2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
+#   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
+#   4. Brackets, which are any of [ ] ( ) { }
+#   5. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
+#   6. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z$_@]*/
+
+# It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
+# treats any Unicode character as the beginning of an identifier.
+
+          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
+          lexer   = /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w$_@]*)/,
+          lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
+
+# Symbol interning.
+# Symbols are interned into integers for performance reasons. The overhead involved in doing this is relatively small and the speedup for rewrites is quite significant. These symbols are
+# transparently rendered by the syntax nodes, whose constructor is already parameterized with the symbol table. Note, however, that this means you need to use the same parser for all trees that
+# are backed by symbol tables, at least until you render them into regular Caterwaul syntax trees. On the bright side, the syntax node constructor contains a reference to the parser that created
+# it; so generally speaking you don't have to worry about it.
+
+          intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
+          extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
+
+# Operator composition.
+# Operators in Mulholland are far more expressive than they are in most languages. Each operator has a well-defined precedence, but it is possible to modify it to have a different precedence or
+# associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Operators take roughly this form:
+
+# | [precedence/associativity hint][semantics]
+
+# For example, consider the = operator. Here are some ways you can use it:
+
+# | f x = x + 1           <- semantic is =, no hint (uses default precedence/associativity for =)
+#   f x -= x + 1          <- semantic is =, precedence/associativity is the same as -
+#   f x =cps x + 1        <- semantic is =cps, no hint
+#   f x -=cps x + 1       <- semantic is =cps, p/a is the same as -
+
+# This is a parse-level property of all except for micro-operators. To adjust the precedence of a micro-operator, you need to surround it with whitespace:
+
+# | foo -.cps bif         <- semantic is .cps, p/a hint is -
+
+# Redundancy and hint shading.
+# Many precedence and associativity levels have several operators in them. Which one you choose has a subtle impact on the precedence of the outcome. For example, there are three operators that
+# have multiplicative precedence: *, /, and %. Hint shading creates the following properties:
+
+# | precedence(.) > precedence(*+) > precedence(/+) > precedence(%+) > precedence(+)
+#   precedence(*) = precedence(/+) = precedence(%)
+
+# The ordering here is somewhat arbitrary, but it is based on QWERTY keyboard ergonomics. In general, anything you can type without the shift key will have 'default' precedence. Anything else is
+# shaded. In general, characters progress from right to left on a QWERTY keyboard: * is to the right of %, so it has higher precedence when used as a shaded hint.
+
+# You can use shading to alter the precedence of ordinary operators. For example, ++ has slightly higher precedence than + but has the same meaning otherwise.
+
+# Precedence and associativity table.
+# The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
+
+# | .             left    micro-operator, but can be used as a hint.
+#   adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
+#   ` ~(>)        right
+#   / *(>) %(<)   left
+#   \ :(>) !(<)   right
+#   - +(>)        left
+#   < >(>)        right
+#   &             left
+#   | ^(>)        left
+#   = ?(>)        right
+#   $             right
+#   ,             left
+#   ;             left
+
+# Shunting yard implementation.
+# Most of the implementation here is the classical shunting yard algorithm. The only real point of divergence is that it maintains a flag that indicates whether a value should be interpreted as
+# an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
+# did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
+
+          base_operators         = '\\. # [`~] [/*%] [\\\\:!] [-+] [<>] & [|^] [=?] \\$ , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
+          right_associative      = /^[\\:!<>`~=?(\[{]$/.qf,
+          shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
+
+          precedence(t)          = t.length === 1 ? t /!unshaded_precedence : t.charAt(0) /!shaded_precedence,
+          unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,
+          shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
+          operator_semantic(t)   = t.length === 1 ? t : t.substr(1),
+
+          is_value(t)            = /^['"$_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
+          node(op, x2, x1)       = new syntax(op, [x1, x2]),
+
+          parse(ts)              = ts *!route -seq -re- pop_everything()
+                           -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
+
+                                   defer(op)    = operator_stack /~push/ op,
+                                   use(op)      = output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
+
+                                   pop()        = use(operator_stack.pop()),
+                                   pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
+
+                                   route(t)     = t /!is_value ? binary('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
+                                                               : expect_value = !!decide(t),
+
+                                   binary(o)    = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
+                                   decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
+                                                  o /!opens_a_group  ? (binary('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : binary(o),
+
+                                   pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
+
+# Generated by SDoc 

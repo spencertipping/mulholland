@@ -637,6 +637,11 @@ else    {pop @{$transient{path}}}
 
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
+meta::function('render', <<'__');
+file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite|;
+sh("waul src/*.waul src/*/*.waul");
+
+__
 meta::function('repl', <<'__');
 my @modules = qw|i i/tree i/parse i/rewrite|;
 my %filenames = map {$_ => temporary_name() . '.waul.sdoc'} @modules;
@@ -1664,7 +1669,7 @@ Licensed under the terms of the MIT source code license
 
 Introduction.
 The parser is based on operator-precedence parsing using a regexp lexer. This should be very fast under recent Javascript VMs and should involve a minimal GC overhead. Symbols are interned
-into integers to accelerate access; the tree can be back-translated by dereferencing: tree.symbols[tree.data]. This interning process is done before folding groups. Assigned numbers are coded
+into integers to accelerate access; the tree can be back-translated by dereferencing: tree.resolved_data(). This interning process is done before folding groups. Assigned numbers are coded
 according to their syntactic roles.
 
 Unlike the Caterwaul parser, this one uses a shunting yard algorithm to fold operators as the parse is running. We can get away with this because there are no special cases involving blocks
