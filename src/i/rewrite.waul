@@ -58,7 +58,7 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
 
           rewrite_once(t)     = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
           fixed_point(t)      = t *~![x][r = x /!rewrite_once || r] -seq -re- r -where [r = null],
-          transitive_limit(r) = [r[0], fixed_point(r[1])],
+          transitive_limit(r) = r[1].constructor === Function ? r : [r[0], fixed_point(r[1])],
 
           uniq(rs)            = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
           current_list        = uniq(current_list + current_list *transitive_limit -seq),

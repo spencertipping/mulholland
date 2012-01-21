@@ -1699,14 +1699,15 @@ and there are no patch-ups that need to be done. The algorithm is modified from 
 parse implicit joins (e.g. f x = x + 1: in this case, 'f x' is an implicit join with high precedence).
 
 caterwaul.module('mulholland.parser', 'js_all', function ($) {
-  $.mulholland.parser(table = {}, table_i = {}, next = 0, result /-$.merge/ statics())(code) = code.toString() /!sdoc /!lex /!parse
+  $.mulholland.parser(table = {}, table_i = {}, next = 0) = parser /-$.merge/ statics()
 
 Static data.
 You can access most of the internal state of a parser. You probably shouldn't poke around and change stuff, but you can at the very least inspect it and ask the parser questions. (For
 instance, you might want to know the precedence and associativity of a given operator.)
 
-  -where [statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
-          syntax    = $.mulholland.syntax(table, table_i),
+  -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
+          syntax    = $.mulholland.syntax(parser),
+          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
 
 Lexer and token types.
 Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
@@ -1878,7 +1879,7 @@ Because it's common to want various modes of transparency, Mulholland's standard
 
           rewrite_once(t)     = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
           fixed_point(t)      = t *~![x][r = x /!rewrite_once || r] -seq -re- r -where [r = null],
-          transitive_limit(r) = [r[0], fixed_point(r[1])],
+          transitive_limit(r) = r[1].constructor === Function ? r : [r[0], fixed_point(r[1])],
 
           uniq(rs)            = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
           current_list        = uniq(current_list + current_list *transitive_limit -seq),
@@ -1930,8 +1931,8 @@ identifier matches another. Mulholland supports the following cases:
   3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
   4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
 
-    is_wildcard()      = this._is_wildcard      === undefined ? this._is_wildcard      = /^_./.test(table[this.data])                            : this._is_wildcard,
-    arity_constraint() = this._arity_constraint === undefined ? this._arity_constraint = /^_.*@(\d+)$/.exec(table[this.data]) -re [it && +it[1]] : this._arity_constraint,
+    is_wildcard()      = this._is_wildcard      === undefined ? this._is_wildcard      = /^_./.test(this.resolved_data())                            : this._is_wildcard,
+    arity_constraint() = this._arity_constraint === undefined ? this._arity_constraint = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._arity_constraint,
 
 Bloom filters.
 Trees are annotated with 31-bit Bloom filters that indicate which elements are contained. These are used to quickly reject large subtrees that don't contain necessary pattern variables. The
@@ -1963,21 +1964,21 @@ simple rule is that a pattern cannot have higher complexity than a target.
     complexity() = this._complexity === undefined ? this._complexity = 1 + this /[0][x0 + x.complexity()] /seq : this._complexity,
 
 Pattern matching and replacement.
-Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well, though the match maps use numeric mapping rather than
-Caterwaul's string mapping. Unlike Caterwaul, a failed match returns the boolean value false instead of null or undefined. This allows you to inspect its match variables, all of which will be
-undefined. If passed into the replace() function, 'false' causes false to be returned. This allows replacement to be closed over match failure.
+Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well. Unlike Caterwaul, a failed match returns the boolean value
+false instead of null or undefined. This allows you to inspect its match variables, all of which will be undefined. If passed into the replace() function, 'false' causes false to be returned.
+This allows replacement to be closed over match failure.
 
 The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
 positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
-    first(pattern)       = this /~can_match/ pattern && (this /~match/ pattern || this |[x /~first/ pattern] |seq),
+    first(pattern)       = pattern /~can_match/ this && (pattern /~match/ this || this |[x /~first/ pattern] |seq),
 
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
-                           (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
+                           (m[this.resolved_data()] ? m[this.resolved_data()] /~match/ t : m[this.resolved_data()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
-    replace(m)           = m === false ? false : m[this.data] || this /~map/ "_.replace(m)".qf,
+    replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
 
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null ? t : t.length === this.arity_constraint() && t : this.data === t.data && this.length === t.length,
@@ -1999,17 +2000,17 @@ Mulholland needs a way to trigger the initial rewriting pass, so it gives you th
 _x //@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators.
 At that point it is converted into Caterwaul and compiled or saved.
 
-  $.mulholland.mh_main(argv) = argv *!$.mulholland.mh -seq,
-  $.mulholland.mh(source) = source /!parse /!fixed_point_rewrite /!print
+  $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', x.as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
+  $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, '' + $.mulholland.mh(s).as_caterwaul()) -rescue- cc(e, undefined)],
+
+  $.mulholland.mh(source) = source /!parse /!fixed_point_rewrite
 
   -where [parse                  = $.mulholland(),
           rewrite_form           = parse('_x //@ [_y]'),
           rewrite(match)         = $.mulholland.rewriter(match._y.flatten(',') *![x.data === '=' || new Error('#{match._x}: bad rewrite: #{match._y}') /raise] *[[x[0], x[1]]] -seq),
 
           toplevel_rewriter      = $.mulholland.rewriter([[rewrite_form, rewrite]]),
-          fixed_point_rewrite(t) = t.first('/@') -re [it ? fixed_point_rewrite(toplevel_rewriter(it)) : t],
-
-          print(t)               = console.log('%s', t.as_caterwaul().toString())]});
+          fixed_point_rewrite(t) = t.first(rewrite_form) -re [it ? fixed_point_rewrite(toplevel_rewriter(it)) : t]]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');

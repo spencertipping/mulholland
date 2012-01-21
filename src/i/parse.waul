@@ -11,14 +11,15 @@
 # parse implicit joins (e.g. f x = x + 1: in this case, 'f x' is an implicit join with high precedence).
 
 caterwaul.module('mulholland.parser', 'js_all', function ($) {
-  $.mulholland.parser(table = {}, table_i = {}, next = 0, result /-$.merge/ statics())(code) = code.toString() /!sdoc /!lex /!parse
+  $.mulholland.parser(table = {}, table_i = {}, next = 0) = parser /-$.merge/ statics()
 
 # Static data.
 # You can access most of the internal state of a parser. You probably shouldn't poke around and change stuff, but you can at the very least inspect it and ask the parser questions. (For
 # instance, you might want to know the precedence and associativity of a given operator.)
 
-  -where [statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
-          syntax    = $.mulholland.syntax(table, table_i),
+  -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
+          syntax    = $.mulholland.syntax(parser),
+          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
 
 # Lexer and token types.
 # Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high

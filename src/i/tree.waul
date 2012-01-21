@@ -42,8 +42,8 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
 #   3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
 #   4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
 
-    is_wildcard()      = this._is_wildcard      === undefined ? this._is_wildcard      = /^_./.test(table[this.data])                            : this._is_wildcard,
-    arity_constraint() = this._arity_constraint === undefined ? this._arity_constraint = /^_.*@(\d+)$/.exec(table[this.data]) -re [it && +it[1]] : this._arity_constraint,
+    is_wildcard()      = this._is_wildcard      === undefined ? this._is_wildcard      = /^_./.test(this.resolved_data())                            : this._is_wildcard,
+    arity_constraint() = this._arity_constraint === undefined ? this._arity_constraint = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._arity_constraint,
 
 # Bloom filters.
 # Trees are annotated with 31-bit Bloom filters that indicate which elements are contained. These are used to quickly reject large subtrees that don't contain necessary pattern variables. The
@@ -75,21 +75,21 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
     complexity() = this._complexity === undefined ? this._complexity = 1 + this /[0][x0 + x.complexity()] /seq : this._complexity,
 
 # Pattern matching and replacement.
-# Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well, though the match maps use numeric mapping rather than
-# Caterwaul's string mapping. Unlike Caterwaul, a failed match returns the boolean value false instead of null or undefined. This allows you to inspect its match variables, all of which will be
-# undefined. If passed into the replace() function, 'false' causes false to be returned. This allows replacement to be closed over match failure.
+# Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well. Unlike Caterwaul, a failed match returns the boolean value
+# false instead of null or undefined. This allows you to inspect its match variables, all of which will be undefined. If passed into the replace() function, 'false' causes false to be returned.
+# This allows replacement to be closed over match failure.
 
 # The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
 # positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
 
 # Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
-    first(pattern)       = this /~can_match/ pattern && (this /~match/ pattern || this |[x /~first/ pattern] |seq),
+    first(pattern)       = pattern /~can_match/ this && (pattern /~match/ this || this |[x /~first/ pattern] |seq),
 
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
-                           (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
+                           (m[this.resolved_data()] ? m[this.resolved_data()] /~match/ t : m[this.resolved_data()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
-    replace(m)           = m === false ? false : m[this.data] || this /~map/ "_.replace(m)".qf,
+    replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
 
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null ? t : t.length === this.arity_constraint() && t : this.data === t.data && this.length === t.length,
