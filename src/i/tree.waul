@@ -19,6 +19,7 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
 
     resolved_data() = parser.extern(this.data),
     structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
+    toString()      = this.structure(),
     as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
     push(x, this[this.length++] = x)             = this,
@@ -82,6 +83,8 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
 # positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
 
 # Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
+
+    first(pattern)       = this /~can_match/ pattern && (this /~match/ pattern || this |[x /~first/ pattern] |seq),
 
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
                            (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),

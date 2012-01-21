@@ -5,7 +5,8 @@ return( '(' + (this.resolved_data() ) + '' + ( (function(it) {return(it.join( ""
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( " " +x.structure() ) ) ;
-return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) ) ) + ')' ) } ,as_caterwaul:function() {;
+return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) ) ) + ')' ) } ,toString:function() {;
+return this.structure() } ,as_caterwaul:function() {;
 return new $.syntax(this.resolved_data() , (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0,_y;
 xi<xl;
@@ -33,7 +34,12 @@ return this._complexity===undefined?this._complexity=1+ (function(xs) {var x,x0,
 for(var x0= (0) ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,x0= (x0+x.complexity() ) ;
-return x0} ) .call(this,this) :this._complexity} ,match:function(t,m) {;
+return x0} ) .call(this,this) :this._complexity} ,first:function(pattern) {;
+return(this) .can_match(pattern) && ( (this) .match(pattern) || (function(xs) {var x,x0,xi,xl,xr;
+for(var x=xs[0] ,xi=0,xl=xs.length,x_3_BTbiZqDtYgZA4K7G2l0KOx;
+xi<xl;
+ ++xi) {x=xs[xi] ;
+if(x_3_BTbiZqDtYgZA4K7G2l0KOx= ( (x) .first(pattern) ) )return x_3_BTbiZqDtYgZA4K7G2l0KOx}return false} ) .call(this,this) ) } ,match:function(t,m) {;
 return(this) .can_match(t) && (this) .level_matches(t) && (m|| (m= { } ) ) && ( ( (this.is_wildcard() ) && (m[this.data] ? (m[this.data] ) .match(t) :m[this.data] =t) ) , (this) .children_match(t,m) &&m) } ,replace:function(m) {;
 return m===false?false:m[this.data] || (this) .map(function(_) {return _.replace(m) } ) } ,can_match:function(t) {;
 return(this.bloom() &t.bloom() ) ===this.bloom() &&this.complexity() <=t.complexity() } ,level_matches:function(t) {;

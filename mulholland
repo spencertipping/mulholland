@@ -638,7 +638,7 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite|;
+file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite mh/mh|;
 sh("waul src/*.waul src/*/*.waul");
 
 file::write('mh', retrieve('pp::js::mh'));
@@ -1669,6 +1669,10 @@ Licensed under the terms of the MIT source code license
 - include src/i/parse.js
 - include src/i/rewrite.js
 
+- include src/mh/mh.js
+
+caterwaul.mulholland.mh_main(process.argv.slice(2));
+
 __
 meta::sdoc('waul::i', <<'__');
 Mulholland interpreter | Spencer Tipping
@@ -1713,13 +1717,13 @@ level, Mulholland supports these types of tokens:
   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
   4. Brackets, which are any of [ ] ( ) { }
   5. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
-  6. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z$_@]*/
+  6. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z0-9@]*/
 
 It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w$_@]*)/,
+          lexer   = /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -1903,6 +1907,7 @@ indexes into the symbol table.
 
     resolved_data() = parser.extern(this.data),
     structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
+    toString()      = this.structure(),
     as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
     push(x, this[this.length++] = x)             = this,
@@ -1967,6 +1972,8 @@ positives, we re-check at every match level. In Bloom filter space, A & B repres
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
+    first(pattern)       = this /~can_match/ pattern && (this /~match/ pattern || this |[x /~first/ pattern] |seq),
+
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {})) &&
                            (m[this.data] ? m[this.data] /~match/ t : m[this.data] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
@@ -1975,6 +1982,34 @@ Note that match() forms a partial ordering over trees. In particular, it is tran
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.arity_constraint() === null ? t : t.length === this.arity_constraint() && t : this.data === t.data && this.length === t.length,
     children_match(t, m) = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});
+
+__
+meta::sdoc('waul::mh/mh', <<'__');
+Mulholland compiler runtime | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+The Mulholland compiler runs or precompiles Mulholland source. It does this by applying rewrite rules to the source code, transforming the result into a Javascript expression using the
+as_caterwaul() method, and then either evaluating or serializing the tree. It provides a few builtin rewriting rules and compiler directives to bootstrap the process.
+
+caterwaul.module('mulholland.mh', 'js_all', function ($) {
+
+Rewriting operators.
+Mulholland needs a way to trigger the initial rewriting pass, so it gives you the following toplevel rewrite rule: _x //@ [...] = rewriter(...)(_x). This says, "for every subtree of the form
+_x //@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators.
+At that point it is converted into Caterwaul and compiled or saved.
+
+  $.mulholland.mh_main(argv) = argv *!$.mulholland.mh -seq,
+  $.mulholland.mh(source) = source /!parse /!fixed_point_rewrite /!print
+
+  -where [parse                  = $.mulholland(),
+          rewrite_form           = parse('_x //@ [_y]'),
+          rewrite(match)         = $.mulholland.rewriter(match._y.flatten(',') *![x.data === '=' || new Error('#{match._x}: bad rewrite: #{match._y}') /raise] *[[x[0], x[1]]] -seq),
+
+          toplevel_rewriter      = $.mulholland.rewriter([[rewrite_form, rewrite]]),
+          fixed_point_rewrite(t) = t.first('/@') -re [it ? fixed_point_rewrite(toplevel_rewriter(it)) : t],
+
+          print(t)               = console.log('%s', t.as_caterwaul().toString())]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');

@@ -29,13 +29,13 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 #   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
 #   4. Brackets, which are any of [ ] ( ) { }
 #   5. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
-#   6. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z$_@]*/
+#   6. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z0-9@]*/
 
 # It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 # treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w$_@]*)/,
+          lexer   = /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 # Symbol interning.
