@@ -1663,6 +1663,7 @@ Licensed under the terms of the MIT source code license
 
 - include deps/caterwaul.min.js
 - include deps/caterwaul.std.min.js
+- include deps/bloom.js
 
 - include src/i.js
 - include src/i/tree.js
@@ -1909,13 +1910,12 @@ example, this is a case where transitivity would apply:
   -where [current_list         = +rules -seq,
           rewrote_something    = null,
 
-          pattern_bloom()      = current_list /[0][x0 & x[0].bloom()] -seq,
           pattern_complexity() = current_list /[Infinity][x0 /-Math.min/ x[0].complexity()] -seq,
           rewrite_once(t)      = rewrote_something = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
 
-          deep_rewriter(b = pattern_bloom(), c = pattern_complexity())(t) = (b & t.bloom()) === b && t.complexity() >= c ? t /~rmap/ rewrite_once : t,
-          fixed_point(r = deep_rewriter(), fix = result)(t)               = (rewrote_something = null, r(t) -re [rewrote_something ? fix(it) : it]),
-          transitive_limit(r)                                             = r[1].constructor === Function ? r : [r[0], fixed_point()(r[1])],
+          deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
+          fixed_point(r = deep_rewriter(), fix = result)(t) = (rewrote_something = null, r(t) -re [rewrote_something ? fix(it) : it]),
+          transitive_limit(r)                               = r[1].constructor === Function ? r : [r[0], fixed_point()(r[1])],
 
           uniq(rs)             = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
           current_list         = uniq(current_list + current_list *transitive_limit -seq),
@@ -1974,33 +1974,18 @@ identifier matches another. Mulholland supports the following cases:
     without_arity() = this._without_arity === undefined ? this._without_arity = this.resolved_data().replace(/@(\d+)$/, '')                 : this._without_arity,
 
 Bloom filters.
-Trees are annotated with 31-bit Bloom filters that indicate which elements are contained. These are used to quickly reject large subtrees that don't contain necessary pattern variables. The
-Bloom filter is a single-hash bit vector computed from the intened symbol indexes.
+Trees are annotated with Bloom filters that indicate which constants they contain. This optimizes rewriting by quickly eliminating subtrees that don't contain constants that are present in a
+pattern. For example, if your pattern is _x + foo, then its filter contains the constants '+' and 'foo'; target trees that don't contain these constants can't match the pattern.
 
-    bloom() = this._bloom === undefined ? this._bloom = this /[this.self_bloom()][x0 | x.bloom()] -seq : this._bloom,
-
-There are some interesting considerations here. My initial feeling was that n mod 31 would make a reasonable enough hash function, since it is uniform over both n. However, this has some
-suboptimal distribution properties over large trees. First, large trees are likely to quickly become saturated, which increases the expected match depth for highly-generic operators such as
-',' (though hopefully you don't have patterns that use things like , as a toplevel operator). It also is likely to cause trivial collisions of constants with high-occurrence operator symbols.
-Here's the implementation of the uniform hash:
-
-|   self_bloom() = this.is_wildcard() ? 0 : 1 << this.data % 31,
-
-Given this, an alternative approach seems more sensible. My current feeling is that it's important to pack a lot of the more common symbols into a smaller bit range, then allow less common
-symbols to occupy more space. Ideally this would be a continuous progression, though it's difficult to gauge a symbol's frequency without doing some sort of high-level analysis. The only thing
-I can think of immediately is that a logarithmic progression makes sense; that is, the number of bits occupied by symbols is proportional to log(n), where n is the symbol's index. We can top
-this out at 16000 or so unique symbols (in practice it's more because we're taking the natural log, not log-2). Operators can be stuffed into a small bit-space; these will quickly become
-saturated in any case.
-
-Here's an implementation that has these properties:
-
-    self_bloom() = this.is_wildcard() ? 0 : 1 << this.data % ((Math /~log/ this.data >>> 0) + 18),
+    create_bloom() = $.bloom(["_ * 5471".qf, "_ * 8707".qf], 8),
+    self_bloom()   = this.is_wildcard() ? this.create_bloom() : this.create_bloom() /~add/ this.data,
+    bloom()        = this._bloom || this /[this._bloom = this.self_bloom()][x0 /~merge/ x.bloom()] -seq,
 
 Complexity computation.
 This is a fairly straightforward way to reject low-level leaf nodes in recursive match cases. Each tree has a total 'complexity', which is a measure of the number of descendants it has. A
 simple rule is that a pattern cannot have higher complexity than a target.
 
-    complexity() = this._complexity === undefined ? this._complexity = 1 + this /[0][x0 + x.complexity()] /seq : this._complexity,
+    complexity() = this._complexity || (this._complexity = 1 + this /[0][x0 + x.complexity()] /seq),
 
 Pattern matching and replacement.
 Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well. Unlike Caterwaul, a failed match returns the boolean value
@@ -2008,7 +1993,7 @@ false instead of null or undefined. This allows you to inspect its match variabl
 This allows replacement to be closed over match failure.
 
 The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
-positives, we re-check at every match level. In Bloom filter space, A & B represents set intersection; so (A & B) === A is true iff A ⊆ B.
+positives, we re-check at every match level.
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
@@ -2017,7 +2002,7 @@ Note that match() forms a partial ordering over trees. In particular, it is tran
 
     replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
 
-    can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
+    can_match(t)         = this.bloom() /~subset/ t.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
                                               : this.data === t.data && this.length === t.length,
     children_match(t, m) = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});

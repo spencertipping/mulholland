@@ -31,13 +31,12 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
   -where [current_list         = +rules -seq,
           rewrote_something    = null,
 
-          pattern_bloom()      = current_list /[0][x0 & x[0].bloom()] -seq,
           pattern_complexity() = current_list /[Infinity][x0 /-Math.min/ x[0].complexity()] -seq,
           rewrite_once(t)      = rewrote_something = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
 
-          deep_rewriter(b = pattern_bloom(), c = pattern_complexity())(t) = (b & t.bloom()) === b && t.complexity() >= c ? t /~rmap/ rewrite_once : t,
-          fixed_point(r = deep_rewriter(), fix = result)(t)               = (rewrote_something = null, r(t) -re [rewrote_something ? fix(it) : it]),
-          transitive_limit(r)                                             = r[1].constructor === Function ? r : [r[0], fixed_point()(r[1])],
+          deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
+          fixed_point(r = deep_rewriter(), fix = result)(t) = (rewrote_something = null, r(t) -re [rewrote_something ? fix(it) : it]),
+          transitive_limit(r)                               = r[1].constructor === Function ? r : [r[0], fixed_point()(r[1])],
 
           uniq(rs)             = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
           current_list         = uniq(current_list + current_list *transitive_limit -seq),
