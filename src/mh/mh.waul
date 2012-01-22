@@ -18,9 +18,10 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before the anonymous rewrite is executed. (This happens because anonymous rewrites pre-expand their rewriting
 # contexts under the toplevel macroexpander.)
 
-  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh()] : $.mulholland.mh_repl(argv),
-  $.mulholland.mh_repl(argv) = require('repl').start('mh> ', undefined, evaluator) -where [mh                       = $.mulholland.mh(),
-                                                                                           evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
+  $.mulholland.mh_main(argv) = argv.length && argv |![x === '-i'] |seq ? argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh()] : $.mulholland.mh_repl(argv),
+  $.mulholland.mh_repl(argv) = argv %![/^-/.test(x)] *read_file *mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
+                       -where [mh                       = $.mulholland.mh(),
+                               evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh() = "parse(_).flatten_all(';') *toplevel_rewriter -seq -re- it.pop()".qf /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, js: js, output: output}
 
