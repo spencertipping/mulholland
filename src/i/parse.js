@@ -7,7 +7,7 @@ return(function(it) {return(it.join( '\n\n' ) ) } ) .call(this, ( (function(xs) 
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0;
 xi<xl;
  ++xi)x=xs[xi] , ( /^\s*[A-Z|]/ .test(x) ) ||xr.push(x) ;
-return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/ ,lex=function(s) {;
+return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/ ,lex=function(s) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0;
 xi<xl;
@@ -22,14 +22,14 @@ return xr} ) .call(this, [ '\\.' , '#' , '[`~]' , '[/*%]' , '[\\\\:!]' , '[-+]' 
 var xr=new xs.constructor() ;
 for(var k in xs)if(Object.prototype.hasOwnProperty.call(xs,k) )x=xs[k] ,xr[k] = ( -x) ;
 return xr} ) .call(this, { '~' : '1' , '*' : '1' , ':' : '1' , '+' : '1' , '>' : '1' , '^' : '1' , '?' : '1' , '%' : '-1' , '!' : '-1' } ) ,precedence=function(t) {;
-return t.length===1?unshaded_precedence(t) :shaded_precedence(t.charAt(t.length-1) ) ||unshaded_precedence(t.charAt(0) ) } ,unshaded_precedence=function(c) {;
+return t.length>1&&shaded_precedence(t.charAt(t.length-1) ) ||unshaded_precedence(t.charAt(0) ) } ,unshaded_precedence=function(c) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var x=xs[0] ,xi=0,xl=xs.length,x3;
 xi<xl;
  ++xi) {x=xs[xi] ;
 if(x3= (x.test(c) &&xi+1<<2) )return x3}return false} ) .call(this,base_operators) } ,shaded_precedence=function(c) {;
 return unshaded_precedence(c) + ( (shading[c] ) || (0) ) } ,operator_semantic=function(t) {;
-return t.length===1|| /\w$/ .test(t) ?t:t.substr(0,t.length-1) } ,is_value=function(t) {;
+return/\w/ .test(t) ?t.replace( /\W$/ , '' ) :t} ,is_value=function(t) {;
 return/^['"$_@A-Za-z0-9\x7f-\uffff]/ .test(t) } ,opens_a_group=function(t) {;
 return/^[(\[{]/ .test(t) } ,closes_a_group=function(t) {;
 return/^[)\]}]/ .test(t) } ,node=function(op,x2,x1) {;

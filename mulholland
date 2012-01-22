@@ -1727,7 +1727,7 @@ Returning values this way is inconvenient, so Mulholland's implementation of ret
   return (x /rescue y)                          -> try {return x} catch (e) {return y}
   return (v /var value)                         -> var v = value ; return v             // It's important to do it this way instead of 'return value'; self-referential closure.
 
-  $.mulholland.js(parser) = "rewrite(_) -re- it /!as_javascript".qf
+  $.mulholland.js(parser, convert = result) = "rewrite(_) -re- it /!as_javascript".qf
 
   -where [rules                     = [['return (_s1 ; _s2)',                                '_s1 ; return _s2'],  ['return (_x /if _cond)',          'return _x /if _cond'],
                                        ['return (_x /if _cond /else _y)', 'return _x /if _cond /else return _y'],  ['return (_x /rescue _y)', 'return _x /rescue return _y'],
@@ -1735,7 +1735,7 @@ Returning values this way is inconvenient, so Mulholland's implementation of ret
 
                                       *~[x *parser] -seq,
 
-          expand_match_parts(match) = match %k%[x.length > 1] %v*rewrite -seq,
+          expand_match_parts(match) = match %k%[x.length > 1] %v*as_javascript -seq,
           primitives                = [['_body /if _cond',                  'if (_cond) {_body}'.qs],  ['_body /if _cond /else _else',      'if (_cond) {_body} else {_else}'.qs],
                                        ['_body /while _cond',            'while (_cond) {_body}'.qs],  ['_body /for [_init; _cond; _inc]', 'for (_init; _cond; _inc) {_body}'.qs],
                                        ['_body /rescue _catch', 'try {_body} catch (e) {_catch}'.qs],  ['_v@0 /var _value',                                 'var _v = _value'.qs],
@@ -1744,7 +1744,7 @@ Returning values this way is inconvenient, so Mulholland's implementation of ret
 
                                       *+[[parser(x[0]), "_ && x[1].replace(_ /!expand_match_parts)".qf]] -seq,
 
-          as_javascript(t)          = primitives |[x[1](x[0] /~match/ t)] |seq || t,
+          as_javascript(t)          = primitives |[x[1](x[0] /~match/ t)] |seq || new caterwaul.syntax(t.resolved_data(), +t *as_javascript -seq),
           rewrite                   = $.mulholland.rewriter(rules)]});
 
 __
@@ -1787,7 +1787,7 @@ It also supports SDoc-style paragraph comments. These are removed just like line
 treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /((?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|#.*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
+          lexer   = /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -1801,20 +1801,13 @@ it; so generally speaking you don't have to worry about it.
 
 Operator composition.
 Operators in Mulholland are far more expressive than they are in most languages. Each operator has a well-defined precedence, but it is possible to modify it to have a different precedence or
-associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Operators take one of these two forms:
-
-| [semantics][precedence/associativity hint]
-
-For example, consider the = operator. Here are some ways you can use it:
+associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Hinting is done by appending an operator character to an operator with letters in it.
+Operators without letters can't be hinted. For example, consider the = operator. Here are some ways you can use it:
 
 | f x = x + 1           <- semantic is =, no hint (uses default precedence/associativity for =)
-  f x =- x + 1          <- semantic is =, precedence/associativity is the same as -
+  f x =- x + 1          <- semantic is =-, no hint (uses default precedence/associativity for -)
   f x =cps x + 1        <- semantic is =cps, no hint
   f x =cps- x + 1       <- semantic is =cps, p/a is the same as -
-
-This is a parse-level property of all except for micro-operators. To adjust the precedence of a micro-operator, you need to surround it with whitespace:
-
-| foo .cps- bif         <- semantic is .cps, p/a hint is -
 
 Redundancy and hint shading.
 Many precedence and associativity levels have several operators in them. Which one you choose has a subtle impact on the precedence of the outcome. For example, there are three operators that
@@ -1854,10 +1847,10 @@ did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted
           right_associative      = /^[\\:!<>`~=?(\[{]$/.qf,
           shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
 
-          precedence(t)          = t.length === 1 ? t /!unshaded_precedence : t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
+          precedence(t)          = t.length > 1 && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
           unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,
           shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
-          operator_semantic(t)   = t.length === 1 || /\w$/.test(t) ? t : t.substr(0, t.length - 1),
+          operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,
 
           is_value(t)            = /^['"$_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
           node(op, x2, x1)       = new syntax(op, [x1, x2]),
@@ -2044,7 +2037,7 @@ Mulholland needs a way to trigger the initial rewriting pass, so it gives you th
 /@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators. At
 that point it is converted into Caterwaul and compiled or saved.
 
-  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *$.mulholland.mh *![console.log('%s', js(x).as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
+  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *$.mulholland.mh *![console.log('%s', js(x).toString())] -seq : $.mulholland.mh_repl(),
   $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh(source) = source /!parse /!toplevel_rewriter,

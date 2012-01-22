@@ -5,7 +5,7 @@ return($.mulholland.mh_main=function(argv) {;
 return argv.length? (function(xs) {var x,x0,xi,xl,xr;
 for(var xi=0,xl=xs.length;
 xi<xl;
- ++xi)x=xs[xi] , (console.log( '%s' ,js(x) .as_caterwaul() .toString() ) ) ;
+ ++xi)x=xs[xi] , (console.log( '%s' ,js(x) .toString() ) ) ;
 return xs} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;

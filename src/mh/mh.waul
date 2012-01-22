@@ -12,7 +12,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # /@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators. At
 # that point it is converted into Caterwaul and compiled or saved.
 
-  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *$.mulholland.mh *![console.log('%s', js(x).as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
+  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *$.mulholland.mh *![console.log('%s', js(x).toString())] -seq : $.mulholland.mh_repl(),
   $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh(source) = source /!parse /!toplevel_rewriter,
