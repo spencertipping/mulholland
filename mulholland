@@ -1727,24 +1727,25 @@ Returning values this way is inconvenient, so Mulholland's implementation of ret
   return (x /rescue y)                          -> try {return x} catch (e) {return y}
   return (v /var value)                         -> var v = value ; return v             // It's important to do it this way instead of 'return value'; self-referential closure.
 
-  $.mulholland.js(parser, rewrite = result) = $.mulholland.rewriter(rules)
+  $.mulholland.js(parser) = "rewrite(_) -re- it /!as_javascript".qf
 
-  -where [expand_match_parts(match) = match %k%[x.length > 1] %v*rewrite -seq,
-
-          primitives                = [['_body /if _cond',      'if (_cond) {_body}'.qs],              ['_body /if _cond /else _else',     'if (_cond) {_body} else {_else}'.qs],
-                                       ['_body /while _cond',   'while (_cond) {_body}'.qs],           ['_body /for [_init; _cond; _inc]', 'for (_init; _cond; _inc) {_body}'.qs],
-                                       ['_body /rescue _catch', 'try {_body} catch (e) {_catch}'.qs],  ['_v@0 /var _value',                'var _v = _value'.qs],
-                                       ['_xs -> _body',         'function (_xs) {_body}'.qs],          ['_x ; _y',                         '_x ; _y'.qs]]
-
-                                      *+[[parser(x[0]), "x[1].replace(_ /!expand_match_parts)".qf]] -seq,
-
-          return_distribution       = [['return (_s1 ; _s2)',             '_s1 ; return _s2'],                    ['return (_x /if _cond)',  'return _x /if _cond'],
-                                       ['return (_x /if _cond /else _y)', 'return _x /if _cond /else return _y'], ['return (_x /rescue _y)', 'return _x /rescue return _y'],
-                                       ['return (_v@0 /var _value)',      '_v /var _value; return _v']]
+  -where [rules                     = [['return (_s1 ; _s2)',                                '_s1 ; return _s2'],  ['return (_x /if _cond)',          'return _x /if _cond'],
+                                       ['return (_x /if _cond /else _y)', 'return _x /if _cond /else return _y'],  ['return (_x /rescue _y)', 'return _x /rescue return _y'],
+                                       ['return (_v@0 /var _value)',                '_v /var _value; return _v']]
 
                                       *~[x *parser] -seq,
 
-          rules                     = primitives + return_distribution -seq]});
+          expand_match_parts(match) = match %k%[x.length > 1] %v*rewrite -seq,
+          primitives                = [['_body /if _cond',                  'if (_cond) {_body}'.qs],  ['_body /if _cond /else _else',      'if (_cond) {_body} else {_else}'.qs],
+                                       ['_body /while _cond',            'while (_cond) {_body}'.qs],  ['_body /for [_init; _cond; _inc]', 'for (_init; _cond; _inc) {_body}'.qs],
+                                       ['_body /rescue _catch', 'try {_body} catch (e) {_catch}'.qs],  ['_v@0 /var _value',                                 'var _v = _value'.qs],
+                                       ['_xs -> _body',                 'function (_xs) {_body}'.qs],  ['_x ; _y',                                                  '_x ; _y'.qs],
+                                       ['_x [_y]',                                      '_x[_y]'.qs],  ['_f _x',                                                     '_f(_x)'.qs]]
+
+                                      *+[[parser(x[0]), "_ && x[1].replace(_ /!expand_match_parts)".qf]] -seq,
+
+          as_javascript(t)          = primitives |[x[1](x[0] /~match/ t)] |seq || t,
+          rewrite                   = $.mulholland.rewriter(rules)]});
 
 __
 meta::sdoc('waul::i/parse', <<'__');
@@ -2043,17 +2044,18 @@ Mulholland needs a way to trigger the initial rewriting pass, so it gives you th
 /@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators. At
 that point it is converted into Caterwaul and compiled or saved.
 
-  $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', js(x).as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
+  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *$.mulholland.mh *![console.log('%s', js(x).as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
   $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
 
-  $.mulholland.mh(source) = source /!parse /!toplevel_rewriter
+  $.mulholland.mh(source) = source /!parse /!toplevel_rewriter,
 
-  -where [parse             = $.mulholland(),
-          js                = $.mulholland.js(parse),
-          rewrite_form      = parse('_x /@ [_y]'),
-          rewrite(match)    = match && $.mulholland.rewriter(match._y.flatten(','))(match._x),
+  where [parse             = $.mulholland(),
+         js                = $.mulholland.js(parse),
+         rewrite_form      = parse('_x /@ [_y]'),
+         rewrite(match)    = match && $.mulholland.rewriter(match._y.flatten(','))(match._x),
+         read_file(f)      = require('fs').readFileSync(f, 'utf8'),
 
-          toplevel_rewriter = $.mulholland.rewriter([[rewrite_form, rewrite]])]});
+         toplevel_rewriter = $.mulholland.rewriter([[rewrite_form, rewrite]])]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
