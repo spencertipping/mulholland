@@ -517,6 +517,12 @@ else    {pop @{$transient{path}}}
 
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
+meta::function('repl', <<'__');
+my @files = @_ ? select_keys('--criteria' => join('|', map "^mh::.*$_", @_)) : select_keys('--criteria' => '^mh::');
+with_exported(@files, sub {
+  sh("mh -i $_[0]")});
+
+__
 meta::function('rm', <<'__');
 around_hook('rm', @_, sub {
   exists $data{$_} or terminal::warning("$_ does not exist") for @_;

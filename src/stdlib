@@ -517,6 +517,12 @@ else    {pop @{$transient{path}}}
 
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
+meta::function('repl', <<'__');
+my @files = @_ ? select_keys('--criteria' => join('|', map "^mh::.*$_", @_)) : select_keys('--criteria' => '^mh::');
+with_exported(@files, sub {
+  sh("mh -i $_[0]")});
+
+__
 meta::function('rm', <<'__');
 around_hook('rm', @_, sub {
   exists $data{$_} or terminal::warning("$_ does not exist") for @_;
@@ -1084,14 +1090,15 @@ Introduction.
 Mulholland makes it easy to build Javascript trees at a low level. This library propagates 'return' through those trees so that you don't have to worry about manually placing it (and so that
 you can use imperative constructs as if they were values).
 
-return (_s1 ; _s2) =@ (_s1 ; return _s2);
-return (_x /if _cond) =@ return _x /if _cond;
-return (_x /if _cond /else _y) =@ return _x /if _cond /else _y;
-return (_x /rescue _y) =@ return _x /rescue return _y;
-return (_v /var _x) =@ (_v /var _x; return _v)
+@js (return (_s1 ; _s2))             =@ @js (_s1 ; return _s2);
+@js (return (_x /if _cond))          =@ @js (return _x /if _cond);
+@js (return (_x /if _cond /else _y)) =@ @js (return _x /if _cond /else _y);
+@js (return (_x /rescue _y))         =@ @js (return _x /rescue return _y);
+@js (return (_v /var _x))            =@ @js (_v /var _x; return _v)
 
 __
 meta::parent('../mh-object', <<'__');
+function::repl            a31cc95a82c67b1a4797bb456adc6667
 meta::type::mh            0b10222b800b45a0e3cb98e8d7607645
 parent::vim-highlighters  77c9231e0b6ba6e7aa6ed74193c02d2c
 vim_highlighter::mh       35a7cfb3889fbb280ad4e9abc18097cc
