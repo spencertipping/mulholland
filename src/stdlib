@@ -90,17 +90,6 @@ sub meta::functor::editable {
       return associate($attribute, @new_value ? join(' ', @new_value) : join('', <STDIN>)) if $command eq '=' or $command eq 'import' or $options{default} eq 'import' and not defined $command;
       return retrieve($attribute)}}}
 __
-meta::meta('functor::html-templates', <<'__');
-my @html_elements = qw/html head title meta script style link body div/;    # Very incomplete list
-
-for my $e (@html_elements) {
-  meta::externalize "template::$e", "template::$e", sub {
-    my ($line, $block) = @_;
-    "<$e $line>\n$block\n</$e>";
-  };
-}
-
-__
 meta::meta('type::alias', <<'__');
 meta::configure 'alias', inherit => 0;
 meta::define_form 'alias', sub {
@@ -177,10 +166,6 @@ meta::define_form 'internal_function', sub {
   *{$name} = meta::eval_in("sub {\n$value\n}", "internal_function::$name");
 };
 __
-meta::meta('type::js', <<'__');
-meta::functor::editable 'js', extension => '.js', inherit => 1;
-
-__
 meta::meta('type::library', <<'__');
 meta::configure 'library', extension => '.pl', inherit => 1;
 meta::define_form 'library', sub {
@@ -217,22 +202,6 @@ meta::define_form 'retriever', sub {
   $transient{retrievers}{$name} = meta::eval_in("sub {\n$value\n}", "retriever::$name");
 };
 __
-meta::meta('type::sdoc', <<'__');
-# A meta-type for other types. So retrieve('js::main') will work if you have
-# the attribute 'sdoc::js::main'. The filename will be main.js.sdoc.
-
-meta::functor::editable 'sdoc', inherit => 1, extension => sub {
-  extension_for(attribute($_[0])) . '.sdoc';
-};
-__
-meta::meta('type::slibrary', <<'__');
-meta::configure 'slibrary', extension => '.pl.sdoc', inherit => 1;
-meta::define_form 'slibrary', sub {
-  my ($name, $value) = @_;
-  meta::eval_in(sdoc("slibrary::$name"), "slibrary::$name");
-};
-
-__
 meta::meta('type::state', <<'__');
 # Allows temporary or long-term storage of states. Nothing particularly insightful
 # is done about compression, so storing alternative states will cause a large
@@ -244,20 +213,9 @@ meta::meta('type::state', <<'__');
 meta::configure 'state', inherit => 0, extension => '.pl';
 meta::define_form 'state', \&meta::bootstrap::implementation;
 __
-meta::meta('type::template', <<'__');
-meta::configure 'template', extension => '.pl', inherit => 1;
-meta::define_form 'template', sub {
-  my ($name, $value) = @_;
-  meta::externalize "template::$name", "template::$name", meta::eval_in("sub {\n$value\n}", "template::$name");
-};
-__
 meta::meta('type::vim_highlighter', <<'__');
 meta::configure 'vim_highlighter', extension => '.vim', inherit => 1;
 meta::define_form 'vim_highlighter', \&meta::bootstrap::implementation;
-
-__
-meta::meta('type::waul', <<'__');
-meta::functor::editable 'waul', inherit => 1, extension => '.waul', default => 'edit';
 
 __
 meta::alias('ev', 'edit vim_highlighter::mh');
@@ -345,13 +303,8 @@ run this script with the 'usage' argument.
 
 __
 meta::cache('parent-identification', <<'__');
-/home/spencertipping/bin/object 99aeabc9ec7fe80b1b39f5e53dc7e49e
-/home/spencertipping/bin/waul-object 4e04fdb8e560f4dd2ca4880b91a8e2ea
-/home/spencertipping/conjectures/perl-objects/js 246bc56c88e8e8daae3737dbb16a2a2c
-/home/spencertipping/conjectures/perl-objects/sdoc a1e8480e579614c01dabeecf0f963bcc
-mh-object 1c4e5c01fba8dd73fae05f53c8295b39
+../mh-object 1c4e5c01fba8dd73fae05f53c8295b39
 object 99aeabc9ec7fe80b1b39f5e53dc7e49e
-preprocessor 70dae4b46eb4e06798ec6f38d17d4c7b
 vim-highlighters 902333a0bd6ed90ff919fe8477cb4e69
 __
 meta::data('author', 'Spencer Tipping');
@@ -425,16 +378,7 @@ around_hook('create', $name, $value, sub {
   edit($name) unless defined $value});
 __
 meta::function('current-state', 'serialize(\'-pS\');');
-meta::function('d', <<'__');
-create('sdoc::waul::doc/' . join('-', @_));
-
-__
 meta::function('disable', 'hook(\'disable\', chmod_self(sub {$_[0] & 0666}));');
-meta::function('e', <<'__');
-my @keys = select_keys('--criteria' => '^sdoc::(?:waul|js)::(.*\W)?' . join('.*', @_));
-edit($keys[0]);
-
-__
 meta::function('edit', <<'__');
 my ($name, %options) = @_;
 my $extension = extension_for($name);
@@ -550,16 +494,6 @@ join "\n", map strip($_), split /\n/, table_display($external ? [grep length, @e
                                                     $sizes ? ([@sizes]) : (), $flags ? ([@flags]) : (), $hashes ? ([@hashes]) : (), $parent_hashes ? ([@parent_hashes]) : ());
 
 __
-meta::function('minify-yui', <<'__');
-# Minify using YUI compressor
-my ($filename) = @_;
-my $minified = $filename;
-$minified =~ s/\.js$/.min.js/;
-
-terminal::info("minifying $filename");
-file::write($minified, join '', qx(yuicompressor --nomunge --line-break 160 "$filename"));
-
-__
 meta::function('mv', <<'__');
 my ($from, $to) = @_;
 die "'$from' does not exist" unless exists $data{$from};
@@ -576,60 +510,6 @@ meta::function('perl', <<'__');
 my $result = eval(join ' ', @_);
 $@ ? terminal::error($@) : $result;
 __
-meta::function('preprocess', <<'__');
-# Implements a simple preprocessing language.
-# Syntax follows two forms. One is the 'line form', which gives you a way to specify arguments inline
-# but not spanning multiple lines. The other is 'block form', which gives you access to both one-line
-# arguments and a block of lines. The line parameters are passed in verbatim, and the block is
-# indentation-adjusted and then passed in as a second parameter. (Indentation is adjusted to align
-# with the name of the command.)
-#
-# Here are the forms:
-#
-# - line arguments to function
-#
-# - block line arguments << eof
-#   block contents
-#   block contents
-#   ...
-# - eof
-
-my ($string, %options) = @_;
-my $expansions         = 0;
-my $old_string         = '';
-my $limit              = $options{expansion_limit} || 100;
-my @pieces             = ();
-
-sub adjust_spaces {
-  my ($spaces, $string) = @_;
-  $string =~ s/^$spaces  //mg;
-  chomp $string;
-  $string;
-}
-
-while ($old_string ne $string and $expansions++ < $limit) {
-  $old_string = $string;
-
-  while ((my @pieces = split  /(^(\h*)-\h \S+ \h* \V* <<\h*(\w+)$ \n .*?  ^\2-\h\3$)/xms, $string) > 1 and $expansions++ < $limit) {
-    $pieces[1 + ($_ << 2)] =~ /^ (\h*)-\h(\S+)\h*(\V*)<<\h*(\w+)$ \n(.*?) ^\1-\h\4 $/xms && $externalized_functions{"template::$2"} and
-      $pieces[1 + ($_ << 2)] = &{"template::$2"}($3, adjust_spaces($1, $5))
-      for 0 .. $#pieces / 4;
-
-    @pieces[2 + ($_ << 2), 3 + ($_ << 2)] = '' for 0 .. $#pieces / 4;
-    $string = join '', @pieces;
-  }
-
-  if ((my @pieces = split     /^(\h*-\h \S+ \h* .*)$/xom, $string) > 1) {
-    $pieces[1 + ($_ << 1)] =~ /^ \h*-\h(\S+)\h*(.*)$/xom && $externalized_functions{"template::$1"} and
-      $pieces[1 + ($_ << 1)] = &{"template::$1"}($2)
-      for 0 .. $#pieces >> 1;
-
-    $string = join '', @pieces;
-  }
-}
-
-$string;
-__
 meta::function('rd', <<'__');
 if (@_) {my $pattern = join '|', @_;
          @{$transient{path}} = grep $_ !~ /^$pattern$/, @{$transient{path}}}
@@ -637,24 +517,6 @@ else    {pop @{$transient{path}}}
 
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
-meta::function('render', <<'__');
-file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite i/js mh/mh|;
-sh("waul src/*.waul src/*/*.waul");
-
-file::write('mh', retrieve('pp::js::mh'));
-chmod 0755, 'mh';
-
-__
-meta::function('repl', <<'__');
-my @modules = qw|i i/tree i/parse i/rewrite i/js mh/mh|;
-my %filenames = map {$_ => temporary_name() . '.waul.sdoc'} @modules;
-file::write($filenames{$_}, retrieve("sdoc::waul::$_")) for @modules;
-
-my @options = map "--extension $filenames{$_}", @modules;
-system("waul @options --configure js_all");
-unlink $_ for values %filenames;
-
-__
 meta::function('rm', <<'__');
 around_hook('rm', @_, sub {
   exists $data{$_} or terminal::warning("$_ does not exist") for @_;
@@ -694,114 +556,6 @@ my ($state_name) = @_;
 around_hook('save-state', $state_name, sub {
   associate("state::$state_name", current_state(), execute => 1)});
 
-__
-meta::function('sdoc', <<'__');
-# Applies SDoc processing to a file or attribute. Takes the file or attribute
-# name as the first argument and returns the processed text.
-
-my %comments_for_extension = 
-  qw|c     /*,*/  cpp   //    cc   //    h    //    java //  py  #    rb   #    pl  #   pm   #         ml   (*,*)  js  //
-     hs    --     sh    #     lisp ;;;   lsp  ;;;   s    ;   scm ;;;  sc   ;;;  as  //  html <!--,-->  mli  (*,*)  cs  //
-     vim   "      elisp ;     bas  '     ada  --    asm  ;   awk #    bc   #    boo #   tex  %         fss  (*,*)  erl %
-     scala //     hx    //    io   //    j    NB.   lua  --  n   //   m    %    php //  sql  --        pov  //     pro %
-     r     #      self  ","   tcl  #     texi @c    tk   #   csh #    vala //   vbs '   v    /*,*/     vhdl --     ss  ;;;
-     haml  -#     sass  /*,*/ scss /*,*/ css  /*,*/ fig  /   waul #|;
-
-# No extension suggests a shebang line, which generally requires # to denote a comment.
-$comments_for_extension{''} = '#';
-
-my $generated_string = 'Generated by SDoc';
-
-sub is_code    {map /^\s*[^A-Z\|\s]/o, @_}
-sub is_blank   {map /^\n/o, @_}
-sub comment    {my ($text, $s, $e) = @_; join "\n", map("$s $_$e", split /\n/, $text)}
-
-sub paragraphs {map split(/((?:\n\h*){2,})/, $_), @_}
-
-my ($filename) = @_;
-
-# Two possibilities here. One is that the filename is an attribute, in which case
-# we want to look up the extension in the transients table. The other is that
-# it's a real filename.
-my ($extension)       = $filename =~ /\.sdoc$/io ? $filename =~ /\.(\w+)\.sdoc$/igo : $filename =~ /\.(\w+)$/igo;
-my ($other_extension) = extension_for($filename);
-$other_extension =~ s/\.sdoc$//io;
-$other_extension =~ s/^\.//o;
-
-my ($start, $end) = split /,/o, $comments_for_extension{lc($other_extension || $extension)} // $comments_for_extension{''} // '#';
-
-join '', map(is_code($_) || is_blank($_) ? ($_ =~ /^\s*c\n(.*)$/so ? $1 : $_) : comment($_, $start, $end), paragraphs retrieve($filename)),
-         "\n$start $generated_string $end\n";
-
-__
-meta::function('sdoc-html', <<'__');
-# Converts SDoc to logically-structured HTML. Sections end up being nested,
-# and code sections and examples are marked as such. For instance, here is some
-# sample output:
-
-# <div class='section level1'>
-#   <h1 class='title'>Foo</h1>
-#   <p>This is a paragraph...</p>
-#   <p>This is another paragraph...</p>
-#   <pre class='code'>int main () {return 0;}</pre>
-#   <pre class='quoted'>int main () {return 0} // Won't compile</pre>
-#   <div class='section level2'>
-#     <h2 class='title'>Bar</h2>
-#     ...
-#   </div>
-# </div>
-
-# It is generally good about escaping things that would interfere with HTML,
-# but within text paragraphs it lets you write literal HTML. The heuristic is
-# that known tags that are reasonably well-formed are allowed, but unknown ones
-# are escaped.
-
-my ($attribute)   = @_;
-my @paragraphs    = split /\n(?:\s*\n)+/, retrieve($attribute);
-
-my $known_tags    = join '|', qw[html head body meta script style link title div a span input button textarea option select form label iframe blockquote code caption
-                                 table tbody tr td th thead tfoot img h1 h2 h3 h4 h5 h6 li ol ul noscript p pre samp sub sup var canvas audio video];
-my $section_level = 0;
-my @markup;
-
-my $indent        = sub {'  ' x ($_[0] || $section_level)};
-my $unindent      = sub {my $spaces = '  ' x ($section_level - 1); s/^$spaces//gm};
-
-my $escape_all    = sub {s/&/&amp;/g; s/</&lt;/g; s/>/&gt;/g};
-my $escape_some   = sub {s/&/&amp;/g; s/<(?!\/|($known_tags)[^>]*>.*<\/\1>)/&lt;/gs};
-
-my $code          = sub {&$escape_all(); &$unindent(); s/^c\n//;                   push @markup, &$indent() . "<pre class='code'>$_</pre>"};
-my $quoted        = sub {&$escape_all(); &$unindent(); s/^\|(\s?)/ \1/; s/^  //mg; push @markup, &$indent() . "<pre class='quoted'>$_</pre>"};
-
-my $paragraph     = sub {&$escape_some(); push @markup, &$indent() . "<p>$_</p>"};
-
-my $section       = sub {my $h = $_[0] > 6 ? 6 : $_[0]; push @markup, &$indent($_[0] - 1) . "<div class='section level$_[0]'>", &$indent($_[0]) . "<h$h>$2</h$h>"};
-my $close_section = sub {push @markup, &$indent($_[0]) . "</div>"};
-
-my $title = sub {
-  my $indentation = (length($1) >> 1) + 1;
-  &$close_section($section_level) while $section_level-- >= $indentation;
-  &$section($indentation);
-  $section_level = $indentation;
-};
-
-for (@paragraphs) {
-  &$code(),   next unless /^\h*[A-Z|]/;
-  &$quoted(), next if     /^\h*\|/;
-
-  &$title(), s/^.*\n// if /^(\s*)(\S.*)\.\n([^\n]+)/ and length("$1$2") - 10 < length($3);
-  &$paragraph();
-}
-
-&$close_section($section_level) while $section_level--;
-
-join "\n", @markup;
-__
-meta::function('sdocp', <<'__');
-# Renders an attribute as SDocP. This logic was taken directly from the sdoc script.
-my $attribute = retrieve($_[0]);
-sub escape {my @results = map {s/\\/\\\\/go; s/\n/\\n/go; s/'/\\'/go; $_} @_; wantarray ? @results : $results[0]}
-"sdocp('" . escape($_[0]) . "', '" . escape($attribute) . "');";
 __
 meta::function('serialize', <<'__');
 my ($options, @criteria) = separate_options(@_);
@@ -950,24 +704,8 @@ meta::function('vim', <<'__');
 # Installs VIM highlighters.
 file::write("$ENV{'HOME'}/.vim/syntax/$_.vim", retrieve("vim_highlighter::$_")) for grep s/^vim_highlighter:://o, keys %data;
 __
-meta::function('waul', <<'__');
-# Runs one or more Waul attributes with the waulrun interpreter, which is
-# assumed to be on the $PATH somewhere.
-
-my ($name, %options) = @_;
-$name =~ s/^waul:://;
-my $output = $options{output} || "$name.js";
-my $waul   = retrieve("waul::$name") =~ m-^#!/usr/bin/env (\S+)- ? $1 : 'waul';
-
-terminal::info("compiling waul::$name using $waul");
-
-with_exported("waul::$name", sub {
-  my ($exported) = @_;
-  sh("$waul --output '$output' $exported")});
-
-__
 meta::hook('before-shell::ad', <<'__');
-ad('sdoc::');
+ad('mh::');
 
 __
 meta::indicator('cc', 'length ::retrieve(\'data::current-continuation\') ? "\\033[1;36mcc\\033[0;0m" : \'\';');
@@ -1338,153 +1076,25 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
-meta::parent('/home/spencertipping/bin/object', <<'__');
-bootstrap::html                         f44dd03cb0c904b3a5f69fbda5f018d0
-bootstrap::initialization               1cf74e7209f32722a79b6e49e3907fd3
-bootstrap::perldoc                      5793df44bdd2526bb461272924abfd4b
-function::ad                            77a05d9a6fef7871b2c3e8e94b56870a
-function::alias                         8eeeeb4e064ef3aba7edf8f254427bc2
-function::cat                           f684de6c8776617a437b76009114f52e
-function::cc                            12ea9176e388400704d823433c209b7a
-function::ccc                           d151a9793edd83f80fb880b7f0ab9b34
-function::child                         f5764adf0b4e892f147a9b6b68d4816f
-function::clone                         bb42e04e10a8e54e88786b6fbc4fb213
-function::cp                            3fe69d1b58d90045ad520048977538c4
-function::create                        3010d55f4dfa59a998742e07823ed54d
-function::current-state                 6f03f86f1901e9ef07fdb5d4079a914c
-function::disable                       53b449708cc2ffdefa352e53bb7d847d
-function::edit                          9ce5ba1ae4607e8cf1975080bcde1cf4
-function::enable                        7de1cedc36841f5de8f9fdfbc3b65097
-function::export                        2374cd1dbf7616cb38cafba4e171075d
-function::extern                        1290a5223e2824763eecfb3a54961eff
-function::grep                          55c3cea8ff4ec2403be2a9d948e59f14
-function::hash                          6ee131d093e95b80039b4df9c7c84a02
-function::hook                          675cdb98b5dd8567bdd5a02ead6184b5
-function::hooks                         3d989899c616f7440429a2d9bf1cc44b
-function::identity                      6523885762fcc2f354fc25cf6ed126ce
-function::import                        5d0f0634cbd01274f2237717507198a2
-function::initial-state                 03d8ed608855a723124e79ca184d8e73
-function::is                            41564c8f21b12ab80824ac825266d805
-function::load-state                    b6cf278a1f351f316fa6e070359b6081
-function::lock                          5d8db258704e6a8623fac796f62fac02
-function::ls                            01a23d51d5b529e03943bd57e33f92df
-function::mv                            4a0e338a6edb89ad1e2c779d51d4d47b
-function::name                          955ba2d1fe1d67cd78651a4042283b00
-function::parents                       3da9e63b5aae9e2f5dcc946a86d166aa
-function::perl                          a0f341ea54391b63b6195e7992b6a686
-function::rd                            2adb16d7e819d2e87a27201744a581e7
-function::reload                        1589f4cf8374e0011991cb8907afca3e
-function::rm                            6f6fd7a6c25558eb469d78ea888f8551
-function::rmparent                      fc2884910a6939a47898a778f277332c
-function::save                          778c0e1043b9c6c96fb8f266f8061624
-function::save-state                    5af59ebc4ad8965767e4dc106d3b557e
-function::serialize                     a19ada2d2558ea9da3a7942fb913e15f
-function::serialize-single              aa77af032272f5a2664e21713739a223
-function::sh                            1b2f542ca9dd63ad437058b7f6f61aac
-function::shb                           7b2685a4041c25bc495816e472bdace5
-function::shell                         a87f389b94713e5855e62241d649d01d
-function::size                          8d4bd7a84ece556717f8ba3bf258d33c
-function::snapshot                      56939a47f2758421669641e15ebd66eb
-function::state                         8c68044dccae28f33244d0c7e9e9acfb
-function::touch                         3991b1b7c7187566f50e5e58ce01fa06
-function::unlock                        b4aac02f7f3fb700acf4acfd9b180ceb
-function::update                        ac391dc90e507e7586c81850e7c2ecdd
-function::update-from                   631721c4dc30e11b2023a6703cbcef52
-function::usage                         5bdd370f5a56cfbf199e08d398091444
-function::verify                        0c0cc1dfeab7d705919df122f7850a4f
-indicator::cc                           3db7509c521ee6abfedd33d5f0148ed3
-indicator::locked                       fc2b4f4ca0d6a334b9ac423d06c8f18c
-indicator::path                         9ec891df17cd45895f03a6124f9d065f
-internal_function::around_hook          7cc876e7c5f78c34654337fc95255587
-internal_function::associate            05a75afb70daee635eefec8ae037f593
-internal_function::attribute            dd6f010f9688977464783f60f5b6d3dd
-internal_function::attribute_is         40bda8226322505e323ea6d405388f08
-internal_function::cache                eb9da45580a9ac0882baf98acd2ecd60
-internal_function::chmod_self           2035e861eedab55ba0a9f6f5a068ca70
-internal_function::dangerous            46c4baaa214ab3d05af43e28083d5141
-internal_function::debug_trace          0faf9d9f4159d72dfe4481f6f3607ce1
-internal_function::execute              f0924e087d978ff2ab1e117124db3042
-internal_function::exported             ae35afef7d4762f2818aee5872c75be0
-internal_function::extension_for        9de8261d69cc93e9b92072b89c89befd
-internal_function::fast_hash            ee5eba48f837fda0fe472645fdd8899a
-internal_function::file::read           e647752332c8e05e81646a3ff98f9a8e
-internal_function::file::write          3e290fdcb353c6f842eb5a40f2e575f8
-internal_function::fnv_hash             c36d56f1e13a60ae427afc43ba025afc
-internal_function::hypothetically       b83e3f894a6df8623ccd370515dfd976
-internal_function::internal::main       f31f2945a19a668d92505f114ab29c78
-internal_function::invoke_editor_on     5eb976796f0ec172d6ec036116a2f41e
-internal_function::is_locked            da12ced6aa38295251f7e748ffd22925
-internal_function::namespace            784d2e96003550681a4ae02b8d6d0a27
-internal_function::parent_attributes    f6ccfaa982ab1a4d066043981aaca277
-internal_function::parent_ordering      57b6da88f76b59f3fed9abfa61280e5e
-internal_function::retrieve             8a34d1fe047fe1b40c3d2957c4a789eb
-internal_function::retrieve_with_hooks  0f1b0220ccd973d57a2e96ff00458cf2
-internal_function::select_keys          a5e3532ec6d58151d0ee24416ea1e2b5
-internal_function::separate_options     34ec41a6edaa15adde607a0db3ccfa36
-internal_function::strip                14f490b10ebd519e829d8ae20ea4d536
-internal_function::table_display        d575f4dc873b2e0be5bd7352047fd904
-internal_function::temporary_name       6f548d101fc68356515ffd0fc9ae0c93
-internal_function::translate_backtrace  d77a56d608473b3cd8a3c6cb84185e10
-internal_function::with_exported        df345d5095d5ed13328ddd07ea922b36
-library::shell                          6b9f3befb61a01e9132a440601f8ea0a
-library::terminal                       7e2d045782405934a9614fe04bcfe559
-message_color::cc                       2218ef0f7425de5c717762ffb100eb43
-message_color::state                    03621cd6ac0b1a40d703f41e26c5807f
-message_color::states                   ac66eeeff487b5f43f88a78ea18b3d56
-meta::configure                         69c2e727c124521d074fde21f8bbc4db
-meta::externalize                       aa44e27e0bbee6f0ca4de25d603a1fc7
-meta::functor::editable                 48246c608f363de66511400e00b26164
-meta::type::alias                       889d26d2df385e9ff8e2da7de4e48374
-meta::type::bootstrap                   51108ab2ddb8d966e927c8f62d9ef3e5
-meta::type::cache                       9267171f2eace476f64a1a670eaaf2c7
-meta::type::data                        120e1649a468d3b3fd3fb783b4168499
-meta::type::function                    8ea626198861dc59dd7f303eecb5ff88
-meta::type::hook                        ff92aef328b6bdc6f87ddd0821f3e42f
-meta::type::inc                         78e0375b6725487cb1f0deca41e96bbe
-meta::type::indicator                   feb54a2624e6983617685047c717427f
-meta::type::internal_function           eff3cf31e2635f51c83836f116c99d2f
-meta::type::library                     7622e8d65e03066668bade74715d65ad
-meta::type::message_color               557a1b44979cbf77a7251fbdc4c5b82c
-meta::type::meta                        c6250056816b58a9608dd1b2614246f8
-meta::type::parent                      09d1d03379e4e0b262e06939f4e00464
-meta::type::retriever                   71a29050bf9f20f6c71afddff83addc9
-meta::type::state                       84da7d5220471307f1f990c5057d3319
-retriever::file                         3bbc9d8a887a536044bafff1d54def7e
-retriever::id                           4da6080168d32445150cc4200af7af6e
-retriever::object                       c7633990b4e01bdc783da7e545799f4f
-retriever::perl                         f41938e6dbad317f62abffc1e4d28cca
+meta::mh('js/return', <<'__');
+Return shorthands for the Javascript binding | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Mulholland makes it easy to build Javascript trees at a low level. This library propagates 'return' through those trees so that you don't have to worry about manually placing it (and so that
+you can use imperative constructs as if they were values).
+
+return (_s1 ; _s2) =@ (_s1 ; return _s2);
+return (_x /if _cond) =@ return _x /if _cond;
+return (_x /if _cond /else _y) =@ return _x /if _cond /else _y;
+return (_x /rescue _y) =@ return _x /rescue return _y;
+return (_v /var _x) =@ (_v /var _x; return _v)
 
 __
-meta::parent('/home/spencertipping/bin/waul-object', <<'__');
-function::minify-yui                                        dd0d6afd6be3108180637436f058a181
-function::waul                                              4a5277531984cdc643ba1f505acaf34f
-meta::type::waul                                            869b5820cd79178b94c3ccdd47dff9df
-parent::/home/spencertipping/conjectures/perl-objects/js    bc7a27dec21a2794a034ca292453d45f
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  c328e1359e74d8eb1b3520c9d3888b90
-parent::preprocessor                                        ce0627808a7fa6f2692af7437f98a731
-
-__
-meta::parent('/home/spencertipping/conjectures/perl-objects/js', <<'__');
-meta::type::js                           0377fcc438f3af85ec87d4770b8cd307
-parent::/home/spencertipping/bin/object  5788ae36d7790310e3b66d5ddd8b796e
-
-__
-meta::parent('/home/spencertipping/conjectures/perl-objects/sdoc', <<'__');
-function::sdoc                           f3f3f3127961399a4c38152771c966ab
-function::sdoc-html                      7e7de47fe059a336309a4a0c06856401
-function::sdocp                          c3d738d982ba87418a298ff58478a85b
-meta::type::sdoc                         22cd7315641d38c9d536344e83c36bed
-meta::type::slibrary                     95474943c4a5f8ff17d3cf66ddb7c386
-parent::/home/spencertipping/bin/object  5788ae36d7790310e3b66d5ddd8b796e
-retriever::html-sdoc                     2a5d5aa45e2d7576f79e045177d8705c
-retriever::sdoc                          662061e9e41491e2a1debd6862ccf1e7
-retriever::sdocp                         330694ea14a23bb04b65c761075cd946
-
-__
-meta::parent('mh-object', <<'__');
+meta::parent('../mh-object', <<'__');
 meta::type::mh            0b10222b800b45a0e3cb98e8d7607645
-parent::vim-highlighters  3cd680d083e4f393c53efb58a610e066
-vim_highlighter::mh       00d35dff233167e6b95c21920e3b71b5
+parent::vim-highlighters  77c9231e0b6ba6e7aa6ed74193c02d2c
+vim_highlighter::mh       35a7cfb3889fbb280ad4e9abc18097cc
 
 __
 meta::parent('object', <<'__');
@@ -1604,21 +1214,6 @@ retriever::object                       c7633990b4e01bdc783da7e545799f4f
 retriever::perl                         f41938e6dbad317f62abffc1e4d28cca
 
 __
-meta::parent('preprocessor', <<'__');
-function::preprocess           ab5526a02ff417d4c162357dc327e7c4
-meta::functor::html-templates  2771200f87e9cbfeecfb5f8a0f796f18
-meta::type::template           bc4b0c80b5efc716b19e99b832c22bf3
-parent::object                 5788ae36d7790310e3b66d5ddd8b796e
-retriever::pp                  3b5f5c5d30c5a04f72056dedaacfe7b7
-template::comment              dfe273d2dad3d8159b847545e4e5c309
-template::eval                 1a0e2124a05056be4abc11803883c294
-template::failing_conditional  e3a4523110dd859e828f342185de7c62
-template::include              47b5552d609d97fe7f2522d5c1027014
-template::pinclude             c07ff79bf8d642cceaa9ef844bfcb189
-template::script-include       76be051ad116449ddebd10e7c3729afd
-template::style-include        8e5a06b70e1b00379765f319bf6c8066
-
-__
 meta::parent('vim-highlighters', <<'__');
 function::vim                cf9e37026f6cd1499a6dd258fbbcd060
 meta::type::vim_highlighter  27990fddb6d7bd383b55dbdfee0d148d
@@ -1626,12 +1221,6 @@ parent::object               5788ae36d7790310e3b66d5ddd8b796e
 
 __
 meta::retriever('file', '-f $_[0] ? file::read($_[0]) : undef;');
-meta::retriever('html-sdoc', <<'__');
-my ($attribute) = @_;
-return undef unless $attribute =~ s/^html::/sdoc::/ and exists $data{$attribute};
-sdoc_html($attribute);
-
-__
 meta::retriever('id', '$_[0] =~ /^id::/ ? substr($_[0], 4) : undef;');
 meta::retriever('object', <<'__');
 # Fetch a property from another Perl object. This uses the 'cat' function.
@@ -1645,437 +1234,21 @@ return undef unless $_[0] =~ /^perl::(.*)$/;
 eval $1;
 
 __
-meta::retriever('pp', <<'__');
-return undef unless namespace($_[0]) eq 'pp';
-my $attr = retrieve(attribute($_[0]));
-defined $attr ? preprocess($attr) : undef;
-__
-meta::retriever('sdoc', 'exists $data{"sdoc::$_[0]"} ? sdoc("sdoc::$_[0]") : undef;');
-meta::retriever('sdocp', <<'__');
-my $attribute = attribute($_[0]);
-exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
-__
-meta::sdoc('js::mh', <<'__');
-#!/usr/bin/env node
-
-Mulholland compiler | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-- include deps/caterwaul.min.js
-- include deps/caterwaul.std.min.js
-- include deps/bloom.js
-
-- include src/i.js
-- include src/i/tree.js
-- include src/i/parse.js
-- include src/i/rewrite.js
-- include src/i/js.js
-
-- include src/mh/mh.js
-
-caterwaul.mulholland.mh_main(process.argv.slice(2));
-
-__
-meta::sdoc('waul::i', <<'__');
-Mulholland interpreter | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-This introduces the Mulholland property on Caterwaul.
-
-caterwaul.module('mulholland', 'js_all', function ($) {
-  $.mulholland() = $.mulholland.parser.apply(this, arguments)});
-
-__
-meta::sdoc('waul::i/js', <<'__');
-Mulholland -> Javascript bindings | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-Mulholland is ultimately compiled down to Javascript. For various reasons, primarily optimization, it's important that this bottom layer provide lots of control about how to represent things.
-For instance, there are several different ways to encode closures and continuations in Javascript, and some are faster (and more memory-efficient) than others. I'm leaving the decision about
-which one to use up to other higher-level rewriting rules.
-
-caterwaul.module('mulholland.js', 'js_all', function ($) {
-
-Implementation.
-Mulholland can generate most of Javascript's important constructs. Some are left out because they can be encoded in other ways. Importantly, Mulholland has first-class representations of
-Javascript's imperative features, unlike Caterwaul. This allows you to compose more efficient functions by eliminating closure GC and function call overhead. The Javascript constructs
-supported by this library are:
-
-| 1. Conditionals using if/else (no switch)
-  2. Loops using for and while
-  3. Variable addressing and automatic naming (local, closure-scoped, property accesses, this, arguments)
-  4. Function values (no declarative-mode function definitions; the syntax for this is a hideous abomination)
-  5. Expression-mode operators
-
-Here are some examples of Mulholland trees and their conversions into Javascript:
-
-| then-part /if cond /else else-part            -> if (cond) {then-part} else {else-part}
-  then-part /if cond                            -> if (cond) {then-part}
-  body /while cond                              -> while (cond) {body}
-  body /for [init; cond; inc]                   -> for (init; cond; inc) {body}
-  body /rescue x                                -> try {body} catch (e) {x}
-  v /var value                                  -> var v = value
-  (x, y, z) -> body                             -> function (x, y, z) {return body}
-  s1 ; s2 ; s3                                  -> s1 ; s2 ; s3
-
-  $.mulholland.js(parser, convert = result) = as_javascript
-
-  -where [js_marker                 = parser('@js'),
-          expand_match_parts(match) = match %k%[x.length > 1] %v*[as_javascript(new parser.syntax('#', [js_marker, x]))] -seq,
-          primitives                = [['@js (_body /if _cond)',                  'if (_cond) {_body}'.qs],  ['@js (_body /if _cond /else _else)',      'if (_cond) {_body} else {_else}'.qs],
-                                       ['@js (_body /while _cond)',            'while (_cond) {_body}'.qs],  ['@js (_body /for [_init; _cond; _inc])', 'for (_init; _cond; _inc) {_body}'.qs],
-                                       ['@js (_body /rescue _catch)', 'try {_body} catch (e) {_catch}'.qs],  ['@js (_v@0 /var _value)',                                 'var _v = _value'.qs],
-                                       ['@js (_xs /function _body)',          'function (_xs) {_body}'.qs],  ['@js (_x ; _y)',                                                  '_x ; _y'.qs],
-                                       ['@js (_x [_y])',                                      '_x[_y]'.qs],  ['@js (_f _x)',                                                     '_f(_x)'.qs]]
-
-                                      *+[[parser(x[0]), "_ && x[1].replace(_ /!expand_match_parts)".qf]] -seq,
-
-          as_javascript(t)          = primitives |[x[1](x[0] /~match/ t)] |seq || new caterwaul.syntax(t.resolved_data(), +t *as_javascript -seq)]});
-
-__
-meta::sdoc('waul::i/parse', <<'__');
-Mulholland parser | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-The parser is based on operator-precedence parsing using a regexp lexer. This should be very fast under recent Javascript VMs and should involve a minimal GC overhead. Symbols are interned
-into integers to accelerate access; the tree can be back-translated by dereferencing: tree.resolved_data(). This interning process is done before folding groups. Assigned numbers are coded
-according to their syntactic roles.
-
-Unlike the Caterwaul parser, this one uses a shunting yard algorithm to fold operators as the parse is running. We can get away with this because there are no special cases involving blocks
-and there are no patch-ups that need to be done. The algorithm is modified from the original shunting-yard algorithm in that it detects operator-value / value-value sequences so that it can
-parse implicit joins (e.g. f x = x + 1: in this case, 'f x' is an implicit join with high precedence).
-
-caterwaul.module('mulholland.parser', 'js_all', function ($) {
-  $.mulholland.parser(table = {}, table_i = {}, next = 0) = parser /-$.merge/ statics()
-
-Static data.
-You can access most of the internal state of a parser. You probably shouldn't poke around and change stuff, but you can at the very least inspect it and ask the parser questions. (For
-instance, you might want to know the precedence and associativity of a given operator.)
-
-  -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
-          syntax    = $.mulholland.syntax(parser),
-          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
-
-Lexer and token types.
-Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
-level, Mulholland supports these types of tokens:
-
-| 1. Identifiers, which have the form /[_@A-Za-z0-9\x7f-\uffff][^ \n\t\r.:,;()\[\]{}]*/
-  2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
-  3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
-  4. Brackets, which are any of [ ] ( ) { }
-  5. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
-  6. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z0-9@]*/
-
-It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
-treats any Unicode character as the beginning of an identifier.
-
-          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
-          lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
-
-Symbol interning.
-Symbols are interned into integers for performance reasons. The overhead involved in doing this is relatively small and the speedup for rewrites is quite significant. These symbols are
-transparently rendered by the syntax nodes, whose constructor is already parameterized with the symbol table. Note, however, that this means you need to use the same parser for all trees that
-are backed by symbol tables, at least until you render them into regular Caterwaul syntax trees. On the bright side, the syntax node constructor contains a reference to the parser that created
-it; so generally speaking you don't have to worry about it.
-
-          intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
-          extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
-
-Operator composition.
-Operators in Mulholland are far more expressive than they are in most languages. Each operator has a well-defined precedence, but it is possible to modify it to have a different precedence or
-associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Hinting is done by appending an operator character to an operator with letters in it.
-Operators without letters can't be hinted. For example, consider the = operator. Here are some ways you can use it:
-
-| f x = x + 1           <- semantic is =, no hint (uses default precedence/associativity for =)
-  f x =- x + 1          <- semantic is =-, no hint (uses default precedence/associativity for -)
-  f x =cps x + 1        <- semantic is =cps, no hint
-  f x =cps- x + 1       <- semantic is =cps, p/a is the same as -
-
-Redundancy and hint shading.
-Many precedence and associativity levels have several operators in them. Which one you choose has a subtle impact on the precedence of the outcome. For example, there are three operators that
-have multiplicative precedence: *, /, and %. Hint shading creates the following properties:
-
-| precedence(.) > precedence(*+) > precedence(/+) > precedence(%+) > precedence(+)
-  precedence(*) = precedence(/+) = precedence(%)
-
-The ordering here is somewhat arbitrary, but it is based on QWERTY keyboard ergonomics. In general, anything you can type without the shift key will have 'default' precedence. Anything else is
-shaded. In general, characters progress from right to left on a QWERTY keyboard: * is to the right of %, so it has higher precedence when used as a shaded hint.
-
-You can use shading to alter the precedence of ordinary operators. For example, ++ has slightly higher precedence than + but has the same meaning otherwise.
-
-Precedence and associativity table.
-The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
-
-| .             left    micro-operator, but can be used as a hint.
-  adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
-  ` ~(>)        right
-  / *(>) %(<)   left
-  \ :(>) !(<)   right
-  - +(>)        left
-  < >(>)        right
-  &             left
-  | ^(>)        left
-  = ?(>)        right
-  $             right
-  ,             left
-  ;             left
-
-Shunting yard implementation.
-Most of the implementation here is the classical shunting yard algorithm. The only real point of divergence is that it maintains a flag that indicates whether a value should be interpreted as
-an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
-did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
-
-          base_operators         = '\\. # [`~] [/*%] [\\\\:!] [-+] [<>] & [|^] [=?] \\$ , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
-          right_associative      = /^[\\:!<>`~=?(\[{]$/.qf,
-          shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
-
-          precedence(t)          = t.length > 1 && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
-          unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,
-          shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
-          operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,
-
-          is_value(t)            = /^['"$_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
-          node(op, x2, x1)       = new syntax(op, [x1, x2]),
-
-          parse(ts)              = ts *!route -seq -re- pop_everything()
-                           -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
-
-                                   defer(op)    = operator_stack /~push/ op,
-                                   use(op)      = output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
-
-                                   pop()        = use(operator_stack.pop()),
-                                   pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
-
-                                   route(t)     = t /!is_value ? binary('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
-                                                               : expect_value = !!decide(t),
-
-                                   binary(o)    = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
-                                   decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), op() === '(' ? !operator_stack.pop()
-                                                                                                               : !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
-                                                  o /!opens_a_group  ? (binary('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : binary(o),
-
-                                   pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
-
-__
-meta::sdoc('waul::i/rewrite', <<'__');
-Mulholland rewriter | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-Mulholland code needs to be rewritten into something runnable in order to be at all useful. This module implements a general-purpose optimizing rewriter for this purpose. It takes as input a
-series of rewrite rules and returns a function that will rewrite a tree accordingly.
-
-caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
-
-Compile-time rewriting.
-All rewriting rules are localized to a given expression tree in the source; there is no such thing as a toplevel rewrite. You can introduce anonymous rewriting rules as well as using shared
-ones. This is done by using the anonymous-rewriting operator /@. So, for example:
-
-| foo + bar /@- foo =/ baz ,+ bar =/ bif
-  foo + bar /@- [foo = bar, bar = bif]           <- same thing, but with explicit grouping
-
-Compile-time rewrite sections can be nested for abstraction. In this case they apply outside-in. For example:
-
-| foo + bar /@- [foo = bif + baz, _x + bar = _x /@- [bif = bok]]
-
-Rewriting optimizations.
-Most of the time Mulholland spends compiling things is taken up by the rewriting process, so a number of optimizations are implemented to make this fast. First, each rule is closed under
-transitivity with each other rule. This means that if x -> y and y -> z, then the rule 'x -> y' is replaced with 'x -> z'. This is quadratic in the number of rules that are present. For
-example, this is a case where transitivity would apply:
-
-| foo + bif = bar + bif                 <- this would be rewritten as foo + bif = 1 because bar + _x matches bar + bif
-  bar + _x = 1
-
-  $.mulholland.rewriter(rules) = rewrite /-$.merge/ capture [rules = current_list, extend(rs) = $.mulholland.rewriter(current_list + rs -seq)]
-
-  -where [current_list         = +rules -seq,
-          rewrote_something    = null,
-
-          pattern_complexity() = current_list /[Infinity][x0 /-Math.min/ x[0].complexity()] -seq,
-          rewrite_once(t)      = rewrote_something = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq,
-
-          deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
-          fixed_point(r = deep_rewriter(), fix = result)(t) = (rewrote_something = null, r(t) -re [rewrote_something ? fix(it) : it]),
-          transitive_limit(r)                               = r[1].constructor === Function ? r : [r[0], fixed_point()(r[1])],
-
-          uniq(rs)             = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
-          current_list         = uniq(current_list + current_list *transitive_limit -seq),
-          rewrite              = fixed_point()]});
-
-__
-meta::sdoc('waul::i/tree', <<'__');
-Mulholland syntax trees | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-Mulholland uses interned strings rather than representing node data directly. As such, its syntax representation is a little different from Caterwaul's trees. It also has a different set of
-methods that it uses to detect the roles of various things. Finally, it uses node-level transformations to render Javascript and machine code from its syntactic representation. This happens
-with low-level Mulholland nodes, which are usually generated with @cps.
-
-caterwaul.module('mulholland.tree', 'js_all', function ($) {
-
-Idioms.
-These trees behave differently from Caterwaul syntax trees in a few ways. The overall structure is similar: each node has a 'data' and 'length' property along with zero or more
-numerically-indexed children. However, the constructor protocol differs significantly. Instead of a flexible constructor that supports copying, the constructor rigidly requires exactly two
-arguments. The first is the data, which is copied onto the node verbatim; the second is an array of children. The array of children can itself be a node. The data must be an integer that
-indexes into the symbol table.
-
-  $.mulholland.syntax(parser, result.prototype /-$.merge/ methods(parser))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
-  where [methods(parser) = capture [
-
-    resolved_data() = parser.extern(this.data),
-    structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
-    toString()      = this.structure(),
-    as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
-
-    push(x, this[this.length++] = x)             = this,
-    map(f, r = this *f -seq, r.data = this.data) = r,
-    rmap(f, ft = f(this))                        = ft || this /~map/ "_ /~rmap/ f".qf,
-
-Transformations.
-These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
-',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
-
-    flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
-    flatten_all(op)   = this.resolved_data() === op ? this[0].flatten_all(op) /~concat/ this[1].flatten_all(op) : [this],
-    left_flatten(op)  = this.resolved_data() === op ? this[0].left_flatten(op) /~concat/ [this[1]]  : [this],
-    right_flatten(op) = this.resolved_data() === op ? [this[0]] /~concat/ this[1].right_flatten(op) : [this],
-
-Attributes.
-Attributes arise from the structure of an identifier. These are orthogonal to syntactic roles, which determine parse behavior; attributes determine purely semantic things like whether one
-identifier matches another. Mulholland supports the following cases:
-
-| 1. Regular constant term; this matches only itself, and at its own arity.
-  2. Wildcard term; this matches any leaf or subtree. Wildcards start with '_' and are at least two characters long.
-  3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
-  4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
-
-    is_wildcard()   = this._is_wildcard   === undefined ? this._is_wildcard   = /^_./.test(this.resolved_data())                            : this._is_wildcard,
-    match_arity()   = this._match_arity   === undefined ? this._match_arity   = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._match_arity,
-    without_arity() = this._without_arity === undefined ? this._without_arity = this.resolved_data().replace(/@(\d+)$/, '')                 : this._without_arity,
-
-Bloom filters.
-Trees are annotated with Bloom filters that indicate which constants they contain. This optimizes rewriting by quickly eliminating subtrees that don't contain constants that are present in a
-pattern. For example, if your pattern is _x + foo, then its filter contains the constants '+' and 'foo'; target trees that don't contain these constants can't match the pattern.
-
-    create_bloom() = $.bloom(["_ * 5471".qf, "_ * 8707".qf], 8),
-    self_bloom()   = this.is_wildcard() ? this.create_bloom() : this.create_bloom() /~add/ this.data,
-    bloom()        = this._bloom || this /[this._bloom = this.self_bloom()][x0 /~merge/ x.bloom()] -seq,
-
-Complexity computation.
-This is a fairly straightforward way to reject low-level leaf nodes in recursive match cases. Each tree has a total 'complexity', which is a measure of the number of descendants it has. A
-simple rule is that a pattern cannot have higher complexity than a target.
-
-    complexity() = this._complexity || (this._complexity = 1 + this /[0][x0 + x.complexity()] /seq),
-
-Pattern matching and replacement.
-Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well. Unlike Caterwaul, a failed match returns the boolean value
-false instead of null or undefined. This allows you to inspect its match variables, all of which will be undefined. If passed into the replace() function, 'false' causes false to be returned.
-This allows replacement to be closed over match failure.
-
-The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
-positives, we re-check at every match level.
-
-Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
-
-    match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
-                           (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
-
-    replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
-
-    can_match(t)         = this.bloom() /~subset/ t.bloom() && this.complexity() <= t.complexity(),
-    level_matches(t)     = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
-                                              : this.data === t.data && this.length === t.length,
-    children_match(t, m) = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});
-
-__
-meta::sdoc('waul::mh/mh', <<'__');
-Mulholland compiler runtime | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-The Mulholland compiler runs or precompiles Mulholland source. It does this by applying rewrite rules to the source code, transforming the result into a Javascript expression using the
-as_caterwaul() method, and then either evaluating or serializing the tree. It provides a few builtin rewriting rules and compiler directives to bootstrap the process.
-
-caterwaul.module('mulholland.mh', 'js_all', function ($) {
-
-Mulholland module format.
-Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you the following primitive operations:
-
-| 1. Global rewrite definition: foo =@ bar
-  2. Local anonymous rewrite: foo /@ (bar = bif)
-  3. Inline Javascript evaluation: @js (x -> x + 1)
-
-Rewrites always apply outside-in, so you can use global rewrite definitions for abstraction. For example, if you write @foo _f =@ _f = x + 1 in one file and then write @foo g inside an
-anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before the anonymous rewrite is executed. (This happens because anonymous rewrites pre-expand their rewriting
-contexts under the toplevel macroexpander.)
-
-  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh()] : $.mulholland.mh_repl(argv),
-  $.mulholland.mh_repl(argv) = require('repl').start('mh> ', undefined, evaluator) -where [mh                       = $.mulholland.mh(),
-                                                                                           evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
-
-  $.mulholland.mh() = "parse(_).flatten_all(';') *toplevel_rewriter -seq -re- it.pop()".qf /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, js: js, output: output}
-
-  -where [parse     = $.mulholland(),          define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
-          js        = $.mulholland.js(parse),  rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(','))(match._x),
-          blank     = parse('_'),              compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = js(toplevel_rewriter(match._x))],
-
-          toplevel_rewriter = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js _x'), compile]])],
-
-  where [read_file(f) = require('fs').readFileSync(f, 'utf8'),
-         output(t)    = process.stdout.write(t.as_caterwaul().toString() + ';\n', 'utf8')]});
-
-__
-meta::template('comment', '\'\';     # A mechanism for line or block comments.');
-meta::template('eval', <<'__');
-my $result = eval $_[0];
-terminal::warning("Error during template evaluation: $@") if $@;
-$result;
-__
-meta::template('failing_conditional', <<'__');
-my ($commands)    = @_;
-my $should_return = $commands =~ / if (.*)$/ && ! eval $1;
-terminal::warning("eval of template condition failed: $@") if $@;
-$should_return;
-__
-meta::template('include', <<'__');
-my ($commands) = @_;
-return '' if template::failing_conditional($commands);
-join "\n", map retrieve($_), split /\s+/, $commands;
-__
-meta::template('pinclude', <<'__');
-# Just like the regular include, but makes sure to insert paragraph boundaries
-# (this is required for SDoc to function properly).
-
-my ($commands) = @_;
-return '' if template::failing_conditional($commands);
-my $text = join "\n\n", map retrieve($_), split /\s+/, $commands;
-"\n\n$text\n\n";
-__
-meta::template('script-include', <<'__');
-my ($name) = @_;
-my $s      = 'script';
-my $script = retrieve($name);
-"<$s>\n$script\n</$s>";
-
-__
-meta::template('style-include', <<'__');
-my ($name) = @_;
-my $s      = 'style';
-my $style  = retrieve($name);
-"<$s>\n$style\n</$s>";
-
-__
 meta::vim_highlighter('mh', <<'__');
 " Mulholland programming language | Spencer Tipping
 " Licensed under the terms of the MIT source code license
 
 syn case match
+
+syn match  mh_wildcard           /_[^ \n\t\r.:,;()\[\]{}]\+/ contains=mh_arity_restriction
+syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_arity_restriction  /@\d/ contained
+syn match  mh_simple_op          /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}]/
+syn match  mh_complex_op         /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]\+/
+syn match  mh_single_string      /'\([^'\\]\|\\.\)*'[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_double_string      /"\([^"\\]\|\\.\)*"[^ \n\t\r.:,;()\[\]{}]*/
+
+syn match  mh_group              /[()\[\]{}]/
 
 syn region mh_line_comment       start=/#/ end=/$/
 syn region mh_sdoc_comment       start=/\(^$\n^\|\%^\)\s*[A-Z\|]/ end=/^\s*$\|\%$/ contains=mh_sdoc_coerce,mh_sdoc_numbered_list,mh_sdoc_heading keepend
@@ -2083,16 +1256,6 @@ syn region mh_sdoc_numbered_list start=/^\s*|\s*\d\{1,2\}\.\s\{1,2\}[A-Za-z]/me=
 syn match  mh_sdoc_numbered_item /^\s*|\?\s*\d\{1,2\}\.\s\{1,2\}/    contained
 syn match  mh_sdoc_heading       /\(^$\n^\|\%^\)\s*[A-Z].\{,60\}\.$/ contained
 syn match  mh_sdoc_coerce        /^\s*|\(\s\|$\)/                    contained
-
-syn match  mh_wildcard           /_[^ \n\t\r.:,;()\[\]{}]\+/ contains=mh_arity_restriction
-syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
-syn match  mh_arity_restriction  /@\d/ contained
-syn match  mh_simple_op          /[^ \n\t\r$_@A-Za-z0-9.:,;()\[\]{}]/
-syn match  mh_complex_op         /[^ \n\t\r$_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]\+/
-syn match  mh_single_string      /'\([^'\\]\|\\.\)*'[^ \n\t\r.:,;()\[\]{}]*/
-syn match  mh_double_string      /"\([^"\\]\|\\.\)*"[^ \n\t\r.:,;()\[\]{}]*/
-
-syn match  mh_group              /[()\[\]{}]/
 
 hi link mh_line_comment       Comment
 hi link mh_sdoc_comment       Comment
