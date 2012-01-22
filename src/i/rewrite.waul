@@ -26,7 +26,7 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
 # | foo + bif = bar + bif                 <- this would be rewritten as foo + bif = 1 because bar + _x matches bar + bif
 #   bar + _x = 1
 
-  $.mulholland.rewriter(rules) = rewrite
+  $.mulholland.rewriter(rules) = rewrite /-$.merge/ capture [rules = current_list, extend(rs) = $.mulholland.rewriter(current_list + rs -seq)]
 
   -where [current_list         = +rules -seq,
           rewrote_something    = null,

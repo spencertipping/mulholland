@@ -31,6 +31,7 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
 # ',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
 
     flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
+    flatten_all(op)   = this.resolved_data() === op ? this[0].flatten_all(op) /~concat/ this[1].flatten_all(op) : [this],
     left_flatten(op)  = this.resolved_data() === op ? this[0].left_flatten(op) /~concat/ [this[1]]  : [this],
     right_flatten(op) = this.resolved_data() === op ? [this[0]] /~concat/ this[1].right_flatten(op) : [this],
 

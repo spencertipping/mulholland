@@ -219,7 +219,8 @@ return xr} ) .call(this,this) ;
  (r.data=this.data) ;
 return r} ,rmap:function(f) {var ft=f(this) ;
 return ft|| (this) .map(function(_) {return(_) .rmap(f) } ) } ,flatten:function(op) {;
-return parser.right_associative(op) ?this.right_flatten(op) :this.left_flatten(op) } ,left_flatten:function(op) {;
+return parser.right_associative(op) ?this.right_flatten(op) :this.left_flatten(op) } ,flatten_all:function(op) {;
+return this.resolved_data() ===op? (this[0] .flatten_all(op) ) .concat(this[1] .flatten_all(op) ) : [this] } ,left_flatten:function(op) {;
 return this.resolved_data() ===op? (this[0] .left_flatten(op) ) .concat( [this[1] ] ) : [this] } ,right_flatten:function(op) {;
 return this.resolved_data() ===op? ( [this[0] ] ) .concat(this[1] .right_flatten(op) ) : [this] } ,is_wildcard:function() {;
 return this._is_wildcard===undefined?this._is_wildcard= /^_./ .test(this.resolved_data() ) :this._is_wildcard} ,match_arity:function() {;
@@ -350,7 +351,8 @@ for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( (transitive_limit) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
 return xr} ) .call(this,current_list) ) ) ) ,rewrite=fixed_point() ;
-return(rewrite) } ) .call(this) } } ) ;
+return($.merge(rewrite, {rules:current_list,extend:function(rs) {;
+return $.mulholland.rewriter( (current_list) .concat( (rs) ) ) } } ) ) } ) .call(this) } } ) ;
 
 caterwaul.module( 'mulholland.js' , (function(qs,qs1,qs2,qs3,qs4,qs5,qs6,qs7,qs8,qs9) {var result1= (function($) {$.mulholland.js=function(parser) {;
 var result= (function( ) {var rules= (function(xs) {var x,x0,xi,xl,xr;
@@ -389,23 +391,23 @@ result1.caterwaul_expression_ref_table= {qs: ( "new caterwaul.syntax( \"if\" ,ne
 return(result1) } ) .call(this,new caterwaul.syntax( "if" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( "if" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ,new caterwaul.syntax( "else" ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_else" ) ) ) ) ,new caterwaul.syntax( "while" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( "for" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( ";" ,new caterwaul.syntax( ";" ,new caterwaul.syntax( "_init" ) ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "_inc" ) ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( "try" ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ,new caterwaul.syntax( "catch" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "e" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_catch" ) ) ) ) ,new caterwaul.syntax( "var" ,new caterwaul.syntax( "=" ,new caterwaul.syntax( "_v" ) ,new caterwaul.syntax( "_value" ) ) ) ,new caterwaul.syntax( "function" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_xs" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( ";" ,new caterwaul.syntax( "_x" ) ,new caterwaul.syntax( "_y" ) ) ,new caterwaul.syntax( "[]" ,new caterwaul.syntax( "_x" ) ,new caterwaul.syntax( "_y" ) ) ,new caterwaul.syntax( "()" ,new caterwaul.syntax( "_f" ) ,new caterwaul.syntax( "_x" ) ) ) ) ;
 
 
-caterwaul.module( 'mulholland.mh' ,function($) { (function( ) {var parse=$.mulholland() ,js=$.mulholland.js(parse) ,rewrite_form=parse( '_x /@ [_y]' ) ,rewrite=function(match) {;
-return match&&$.mulholland.rewriter(match._y.flatten( ',' ) ) (match._x) } ,read_file=function(f) {;
+caterwaul.module( 'mulholland.mh' ,function($) { (function( ) {var parse=$.mulholland() ,rewrite_form=parse( '_x /@ _y' ) ,js=$.mulholland.js(parse) ,rewrite=function(match) {;
+return match&&toplevel_rewriter.extend(toplevel_rewriter(match._y) .flatten_all( ',' ) ) (match._x) } ,read_file=function(f) {;
 return require( 'fs' ) .readFileSync(f, 'utf8' ) } ,toplevel_rewriter=$.mulholland.rewriter( [ [rewrite_form,rewrite] ] ) ;
 return($.mulholland.mh_main=function(argv) {;
 return argv.length? (function(xs) {var x,x0,xi,xl,xr;
 for(var xi=0,xl=xs.length;
 xi<xl;
- ++xi)x=xs[xi] , (console.log( '%s' ,js(x) .toString() ) ) ;
+ ++xi)x=xs[xi] , ( (output) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ;
 return xs} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
- ++xi)x=xs[xi] ,xr.push( ( ($.mulholland.mh) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
+ ++xi)x=xs[xi] ,xr.push( ( (execute) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
 return xr} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( (read_file) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
-return xr} ) .call(this,argv) ) ) :$.mulholland.mh_repl() } ,$.mulholland.mh_repl=function() {;
+return xr} ) .call(this,argv) ) ) :$.mulholland.mh_repl(argv) } ,$.mulholland.mh_repl=function(argv) {;
 return(function( ) {var evaluator=function(s,_1,_2,cc) {;
 return(function( ) {try{return(cc(null,$.mulholland.mh(s) .structure() ) ) }catch(e) {return(cc(e,undefined) ) } } ) .call(this) } ;
 return(require( 'repl' ) .start( 'mh> ' ,undefined,evaluator) ) } ) .call(this) } ,$.mulholland.mh=function(source) {;

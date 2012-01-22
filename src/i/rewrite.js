@@ -36,4 +36,5 @@ for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( (transitive_limit) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
 return xr} ) .call(this,current_list) ) ) ) ,rewrite=fixed_point() ;
-return(rewrite) } ) .call(this) } } ) ;
+return($.merge(rewrite, {rules:current_list,extend:function(rs) {;
+return $.mulholland.rewriter( (current_list) .concat( (rs) ) ) } } ) ) } ) .call(this) } } ) ;
