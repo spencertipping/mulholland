@@ -1731,7 +1731,7 @@ Returning values this way is inconvenient, so Mulholland's implementation of ret
 
   -where [rules                     = [['return (_s1 ; _s2)',                                '_s1 ; return _s2'],  ['return (_x /if _cond)',          'return _x /if _cond'],
                                        ['return (_x /if _cond /else _y)', 'return _x /if _cond /else return _y'],  ['return (_x /rescue _y)', 'return _x /rescue return _y'],
-                                       ['return (_v@0 /var _value)',                '_v /var _value; return _v']]
+                                       ['return (_v@0 /var _value)',                '_v /var _value; return _v'],  ['_x -> _y',                    '_x /function return _y']]
 
                                       *~[x *parser] -seq,
 
@@ -1739,7 +1739,7 @@ Returning values this way is inconvenient, so Mulholland's implementation of ret
           primitives                = [['_body /if _cond',                  'if (_cond) {_body}'.qs],  ['_body /if _cond /else _else',      'if (_cond) {_body} else {_else}'.qs],
                                        ['_body /while _cond',            'while (_cond) {_body}'.qs],  ['_body /for [_init; _cond; _inc]', 'for (_init; _cond; _inc) {_body}'.qs],
                                        ['_body /rescue _catch', 'try {_body} catch (e) {_catch}'.qs],  ['_v@0 /var _value',                                 'var _v = _value'.qs],
-                                       ['_xs -> _body',                 'function (_xs) {_body}'.qs],  ['_x ; _y',                                                  '_x ; _y'.qs],
+                                       ['_xs /function _body',          'function (_xs) {_body}'.qs],  ['_x ; _y',                                                  '_x ; _y'.qs],
                                        ['_x [_y]',                                      '_x[_y]'.qs],  ['_f _x',                                                     '_f(_x)'.qs]]
 
                                       *+[[parser(x[0]), "_ && x[1].replace(_ /!expand_match_parts)".qf]] -seq,

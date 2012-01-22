@@ -7,7 +7,7 @@ for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( (parser) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
 return xr} ) .call(this,x) ) ) ;
-return xr} ) .call(this, [ [ 'return (_s1 ; _s2)' , '_s1 ; return _s2' ] , [ 'return (_x /if _cond)' , 'return _x /if _cond' ] , [ 'return (_x /if _cond /else _y)' , 'return _x /if _cond /else return _y' ] , [ 'return (_x /rescue _y)' , 'return _x /rescue return _y' ] , [ 'return (_v@0 /var _value)' , '_v /var _value; return _v' ] ] ) ,expand_match_parts=function(match) {;
+return xr} ) .call(this, [ [ 'return (_s1 ; _s2)' , '_s1 ; return _s2' ] , [ 'return (_x /if _cond)' , 'return _x /if _cond' ] , [ 'return (_x /if _cond /else _y)' , 'return _x /if _cond /else return _y' ] , [ 'return (_x /rescue _y)' , 'return _x /rescue return _y' ] , [ 'return (_v@0 /var _value)' , '_v /var _value; return _v' ] , [ '_x -> _y' , '_x /function return _y' ] ] ) ,expand_match_parts=function(match) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 var xr=new xs.constructor() ;
 for(var k in xs)if(Object.prototype.hasOwnProperty.call(xs,k) )x=xs[k] ,xr[k] = ( (as_javascript) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ;
@@ -18,7 +18,7 @@ return xr} ) .call(this,match) ) } ,primitives= (function(xs) {var x,x0,xi,xl,xr
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( (function(x,x0,xi,xl,xs,xr) {return[parser(x[0] ) ,function(_) {return _&&x[1] .replace(expand_match_parts(_) ) } ] } ) .call(this,x,x0,xi,xl,xs,xr) ) ) ;
-return xr} ) .call(this, [ [ '_body /if _cond' ,qs] , [ '_body /if _cond /else _else' ,qs1] , [ '_body /while _cond' ,qs2] , [ '_body /for [_init; _cond; _inc]' ,qs3] , [ '_body /rescue _catch' ,qs4] , [ '_v@0 /var _value' ,qs5] , [ '_xs -> _body' ,qs6] , [ '_x ; _y' ,qs7] , [ '_x [_y]' ,qs8] , [ '_f _x' ,qs9] ] ) ,as_javascript=function(t) {;
+return xr} ) .call(this, [ [ '_body /if _cond' ,qs] , [ '_body /if _cond /else _else' ,qs1] , [ '_body /while _cond' ,qs2] , [ '_body /for [_init; _cond; _inc]' ,qs3] , [ '_body /rescue _catch' ,qs4] , [ '_v@0 /var _value' ,qs5] , [ '_xs /function _body' ,qs6] , [ '_x ; _y' ,qs7] , [ '_x [_y]' ,qs8] , [ '_f _x' ,qs9] ] ) ,as_javascript=function(t) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var x=xs[0] ,xi=0,xl=xs.length,x1;
 xi<xl;
