@@ -638,7 +638,7 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite mh/mh|;
+file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite i/js mh/mh|;
 sh("waul src/*.waul src/*/*.waul");
 
 file::write('mh', retrieve('pp::js::mh'));
@@ -646,7 +646,7 @@ chmod 0755, 'mh';
 
 __
 meta::function('repl', <<'__');
-my @modules = qw|i i/tree i/parse i/rewrite|;
+my @modules = qw|i i/tree i/parse i/rewrite i/js|;
 my %filenames = map {$_ => temporary_name() . '.waul.sdoc'} @modules;
 file::write($filenames{$_}, retrieve("sdoc::waul::$_")) for @modules;
 
@@ -1668,6 +1668,7 @@ Licensed under the terms of the MIT source code license
 - include src/i/tree.js
 - include src/i/parse.js
 - include src/i/rewrite.js
+- include src/i/js.js
 
 - include src/mh/mh.js
 
@@ -1683,6 +1684,67 @@ This introduces the Mulholland property on Caterwaul.
 
 caterwaul.module('mulholland', 'js_all', function ($) {
   $.mulholland() = $.mulholland.parser.apply(this, arguments)});
+
+__
+meta::sdoc('waul::i/js', <<'__');
+Mulholland -> Javascript bindings | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Mulholland is ultimately compiled down to Javascript. For various reasons, primarily optimization, it's important that this bottom layer provide lots of control about how to represent things.
+For instance, there are several different ways to encode closures and continuations in Javascript, and some are faster (and more memory-efficient) than others. I'm leaving the decision about
+which one to use up to other higher-level rewriting rules.
+
+caterwaul.module('mulholland.js', 'js_all', function ($) {
+
+Implementation.
+Mulholland can generate most of Javascript's important constructs. Some are left out because they can be encoded in other ways. Importantly, Mulholland has first-class representations of
+Javascript's imperative features, unlike Caterwaul. This allows you to compose more efficient functions by eliminating closure GC and function call overhead. The Javascript constructs
+supported by this library are:
+
+| 1. Conditionals using if/else (no switch)
+  2. Loops using for and while
+  3. Variable addressing and automatic naming (local, closure-scoped, property accesses, this, arguments)
+  4. Function values (no declarative-mode function definitions; the syntax for this is a hideous abomination)
+  5. Expression-mode operators
+
+Here are some examples of Mulholland trees and their conversions into Javascript:
+
+| then-part /if cond /else else-part            -> if (cond) {then-part} else {else-part}
+  then-part /if cond                            -> if (cond) {then-part}
+  body /while cond                              -> while (cond) {body}
+  body /for [init; cond; inc]                   -> for (init; cond; inc) {body}
+  body /rescue x                                -> try {body} catch (e) {x}
+  v /var value                                  -> var v = value
+  (x, y, z) -> body                             -> function (x, y, z) {return body}
+  s1 ; s2 ; s3                                  -> s1 ; s2 ; s3
+
+Returning values this way is inconvenient, so Mulholland's implementation of return distributes over several control-flow constructs:
+
+| return (s1 ; s2)                              -> s1 ; return s2
+  return (x /if cond)                           -> if (cond) {return x}
+  return (x /if cond /else y)                   -> if (cond) {return x} else {return y}
+  return (x /rescue y)                          -> try {return x} catch (e) {return y}
+  return (v /var value)                         -> var v = value ; return v             // It's important to do it this way instead of 'return value'; self-referential closure.
+
+  $.mulholland.js(parser, rewrite = result) = $.mulholland.rewriter(rules)
+
+  -where [expand_match_parts(match) = match %k%[x.length > 1] %v*rewrite -seq,
+
+          primitives                = [['_body /if _cond',      'if (_cond) {_body}'.qs],              ['_body /if _cond /else _else',     'if (_cond) {_body} else {_else}'.qs],
+                                       ['_body /while _cond',   'while (_cond) {_body}'.qs],           ['_body /for [_init; _cond; _inc]', 'for (_init; _cond; _inc) {_body}'.qs],
+                                       ['_body /rescue _catch', 'try {_body} catch (e) {_catch}'.qs],  ['_v@0 /var _value',                'var _v = _value'.qs],
+                                       ['_xs -> _body',         'function (_xs) {_body}'.qs],          ['_x ; _y',                         '_x ; _y'.qs]]
+
+                                      *+[[parser(x[0]), "x[1].replace(_ /!expand_match_parts)".qf]] -seq,
+
+          return_distribution       = [['return (_s1 ; _s2)',             '_s1 ; return _s2'],                    ['return (_x /if _cond)',  'return _x /if _cond'],
+                                       ['return (_x /if _cond /else _y)', 'return _x /if _cond /else return _y'], ['return (_x /rescue _y)', 'return _x /rescue return _y'],
+                                       ['return (_v@0 /var _value)',      '_v /var _value; return _v']]
+
+                                      *~[x *parser] -seq,
+
+          rules                     = primitives + return_distribution -seq]});
 
 __
 meta::sdoc('waul::i/parse', <<'__');
@@ -1738,20 +1800,20 @@ it; so generally speaking you don't have to worry about it.
 
 Operator composition.
 Operators in Mulholland are far more expressive than they are in most languages. Each operator has a well-defined precedence, but it is possible to modify it to have a different precedence or
-associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Operators take roughly this form:
+associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Operators take one of these two forms:
 
-| [precedence/associativity hint][semantics]
+| [semantics][precedence/associativity hint]
 
 For example, consider the = operator. Here are some ways you can use it:
 
 | f x = x + 1           <- semantic is =, no hint (uses default precedence/associativity for =)
-  f x -= x + 1          <- semantic is =, precedence/associativity is the same as -
+  f x =- x + 1          <- semantic is =, precedence/associativity is the same as -
   f x =cps x + 1        <- semantic is =cps, no hint
-  f x -=cps x + 1       <- semantic is =cps, p/a is the same as -
+  f x =cps- x + 1       <- semantic is =cps, p/a is the same as -
 
 This is a parse-level property of all except for micro-operators. To adjust the precedence of a micro-operator, you need to surround it with whitespace:
 
-| foo -.cps bif         <- semantic is .cps, p/a hint is -
+| foo .cps- bif         <- semantic is .cps, p/a hint is -
 
 Redundancy and hint shading.
 Many precedence and associativity levels have several operators in them. Which one you choose has a subtle impact on the precedence of the outcome. For example, there are three operators that
@@ -1791,10 +1853,10 @@ did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted
           right_associative      = /^[\\:!<>`~=?(\[{]$/.qf,
           shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
 
-          precedence(t)          = t.length === 1 ? t /!unshaded_precedence : t.charAt(0) /!shaded_precedence,
+          precedence(t)          = t.length === 1 ? t /!unshaded_precedence : t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
           unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,
           shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
-          operator_semantic(t)   = t.length === 1 ? t : t.substr(1),
+          operator_semantic(t)   = t.length === 1 || /\w$/.test(t) ? t : t.substr(0, t.length - 1),
 
           is_value(t)            = /^['"$_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
           node(op, x2, x1)       = new syntax(op, [x1, x2]),
@@ -1813,7 +1875,7 @@ did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted
 
                                    binary(o)    = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
                                    decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
-                                                  o /!opens_a_group  ? (binary('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : binary(o),
+                                                  o /!opens_a_group  ? (binary('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o /unless [o === '(']) : binary(o),
 
                                    pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
 
@@ -1832,24 +1894,12 @@ Compile-time rewriting.
 All rewriting rules are localized to a given expression tree in the source; there is no such thing as a toplevel rewrite. You can introduce anonymous rewriting rules as well as using shared
 ones. This is done by using the anonymous-rewriting operator /@. So, for example:
 
-| foo + bar -/@ foo /= baz +, bar /= bif
-  foo + bar -/@ [foo = bar, bar = bif]           <- same thing, but with explicit grouping
+| foo + bar /@- foo =/ baz ,+ bar =/ bif
+  foo + bar /@- [foo = bar, bar = bif]           <- same thing, but with explicit grouping
 
 Compile-time rewrite sections can be nested for abstraction. In this case they apply outside-in. For example:
 
-| foo + bar -/@ [foo = bif + baz, _x + bar = _x -/@ [bif = bok]]
-
-Generating Javascript intrinsics.
-There are more and less creative ways to do this. The simplest is almost certainly to cast a regular word into an operator using a precedence/associativity prefix hint. For example, you can
-generate a for loop like this:
-
-| (i = 0; i < 10; i ++= 1) -for {stuff}
-
-You can also generate if/else and other block structures, though they won't have as much structure as they do in Caterwaul. In general, generating block structures isn't that challenging. The
-real problems come in when you want to use unary operators such as 'var' or '++'. To do this, you need to provide an artificial right-hand side that will later be deleted. Mulholland reserves
-the _ symbol for this purpose. For example:
-
-| x /= 10 -var _ -; _                   -> var x = 10;
+| foo + bar /@- [foo = bif + baz, _x + bar = _x /@- [bif = bok]]
 
 Rewriting optimizations.
 Most of the time Mulholland spends compiling things is taken up by the rewriting process, so a number of optimizations are implemented to make this fast. First, each rule is closed under
@@ -1988,17 +2038,18 @@ as_caterwaul() method, and then either evaluating or serializing the tree. It pr
 caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
 Rewriting operators.
-Mulholland needs a way to trigger the initial rewriting pass, so it gives you the following toplevel rewrite rule: _x //@ [...] = rewriter(...)(_x). This says, "for every subtree of the form
-_x //@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators.
-At that point it is converted into Caterwaul and compiled or saved.
+Mulholland needs a way to trigger the initial rewriting pass, so it gives you the following toplevel rewrite rule: _x /@ [...] = rewriter(...)(_x). This says, "for every subtree of the form _x
+/@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators. At
+that point it is converted into Caterwaul and compiled or saved.
 
-  $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', x.as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
+  $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', js(x).as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
   $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh(source) = source /!parse /!toplevel_rewriter
 
   -where [parse             = $.mulholland(),
-          rewrite_form      = parse('_x //@ [_y]'),
+          js                = $.mulholland.js(parse),
+          rewrite_form      = parse('_x /@ [_y]'),
           rewrite(match)    = match && $.mulholland.rewriter(match._y.flatten(','))(match._x),
 
           toplevel_rewriter = $.mulholland.rewriter([[rewrite_form, rewrite]])]});

@@ -8,17 +8,18 @@
 caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
 # Rewriting operators.
-# Mulholland needs a way to trigger the initial rewriting pass, so it gives you the following toplevel rewrite rule: _x //@ [...] = rewriter(...)(_x). This says, "for every subtree of the form
-# _x //@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators.
-# At that point it is converted into Caterwaul and compiled or saved.
+# Mulholland needs a way to trigger the initial rewriting pass, so it gives you the following toplevel rewrite rule: _x /@ [...] = rewriter(...)(_x). This says, "for every subtree of the form _x
+# /@ [_y], rewrite _x using _y." This rewrite operator can be used to construct other rewrite operator forms; the syntax tree will be rewritten until it contains no more rewriting operators. At
+# that point it is converted into Caterwaul and compiled or saved.
 
-  $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', x.as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
+  $.mulholland.mh_main(argv) = argv.length ? argv *$.mulholland.mh *![console.log('%s', js(x).as_caterwaul().toString())] -seq : $.mulholland.mh_repl(),
   $.mulholland.mh_repl()     = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh(source) = source /!parse /!toplevel_rewriter
 
   -where [parse             = $.mulholland(),
-          rewrite_form      = parse('_x //@ [_y]'),
+          js                = $.mulholland.js(parse),
+          rewrite_form      = parse('_x /@ [_y]'),
           rewrite(match)    = match && $.mulholland.rewriter(match._y.flatten(','))(match._x),
 
           toplevel_rewriter = $.mulholland.rewriter([[rewrite_form, rewrite]])]});

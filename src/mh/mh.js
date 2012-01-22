@@ -2,7 +2,7 @@ caterwaul.module( 'mulholland.mh' ,function($) {$.mulholland.mh_main=function(ar
 return argv.length? (function(xs) {var x,x0,xi,xl,xr;
 for(var xi=0,xl=xs.length;
 xi<xl;
- ++xi)x=xs[xi] , (console.log( '%s' ,x.as_caterwaul() .toString() ) ) ;
+ ++xi)x=xs[xi] , (console.log( '%s' ,js(x) .as_caterwaul() .toString() ) ) ;
 return xs} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
@@ -11,6 +11,6 @@ return xr} ) .call(this,argv) ) :$.mulholland.mh_repl() } ,$.mulholland.mh_repl=
 return(function( ) {var evaluator=function(s,_1,_2,cc) {;
 return(function( ) {try{return(cc(null,$.mulholland.mh(s) .structure() ) ) }catch(e) {return(cc(e,undefined) ) } } ) .call(this) } ;
 return(require( 'repl' ) .start( 'mh> ' ,undefined,evaluator) ) } ) .call(this) } ,$.mulholland.mh=function(source) {;
-return(function( ) {var parse=$.mulholland() ,rewrite_form=parse( '_x //@ [_y]' ) ,rewrite=function(match) {;
+return(function( ) {var parse=$.mulholland() ,js=$.mulholland.js(parse) ,rewrite_form=parse( '_x /@ [_y]' ) ,rewrite=function(match) {;
 return match&&$.mulholland.rewriter(match._y.flatten( ',' ) ) (match._x) } ,toplevel_rewriter=$.mulholland.rewriter( [ [rewrite_form,rewrite] ] ) ;
 return(toplevel_rewriter(parse(source) ) ) } ) .call(this) } } ) ;
