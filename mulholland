@@ -646,7 +646,7 @@ chmod 0755, 'mh';
 
 __
 meta::function('repl', <<'__');
-my @modules = qw|i i/tree i/parse i/rewrite i/js|;
+my @modules = qw|i i/tree i/parse i/rewrite i/js mh/mh|;
 my %filenames = map {$_ => temporary_name() . '.waul.sdoc'} @modules;
 file::write($filenames{$_}, retrieve("sdoc::waul::$_")) for @modules;
 
@@ -2044,14 +2044,20 @@ Rewrites always apply outside-in, so you can use global rewrite definitions for 
 anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before the anonymous rewrite is executed. (This happens because anonymous rewrites pre-expand their rewriting
 contexts under the toplevel macroexpander.)
 
-  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *execute *!output -seq : $.mulholland.mh_repl(argv),
-  $.mulholland.mh_repl(argv) = require('repl').start('mh> ', undefined, evaluator) -where [evaluator(s, _1, _2, cc) = cc(null, $.mulholland.mh(s).structure()) -rescue- cc(e, undefined)],
+  $.mulholland.mh_main(argv) = argv.length ? argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh()] : $.mulholland.mh_repl(argv),
+  $.mulholland.mh_repl(argv) = require('repl').start('mh> ', undefined, evaluator) -where [mh                       = $.mulholland.mh(),
+                                                                                           evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
 
-  $.mulholland.mh(source) = source /!parse /!toplevel_rewriter,
+  $.mulholland.mh() = "parse(_).flatten_all(';') *toplevel_rewriter -seq -re- it.pop()".qf /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, js: js, output: output}
 
-  where [parse        = $.mulholland(),                         rewrite_form      = parse('_x /@ _y'),
-         js           = $.mulholland.js(parse),                 rewrite(match)    = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(','))(match._x),
-         read_file(f) = require('fs').readFileSync(f, 'utf8'),  toplevel_rewriter = $.mulholland.rewriter([[rewrite_form, rewrite]])]});
+  -where [parse     = $.mulholland(),          define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
+          js        = $.mulholland.js(parse),  rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(','))(match._x),
+          blank     = parse('_'),              compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = js(toplevel_rewriter(match._x))],
+
+          toplevel_rewriter = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js _x'), compile]])],
+
+  where [read_file(f) = require('fs').readFileSync(f, 'utf8'),
+         output(t)    = process.stdout.write(t.as_caterwaul().toString() + ';\n', 'utf8')]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
