@@ -17,11 +17,10 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
   $.mulholland.syntax(parser, result.prototype /-$.merge/ methods(parser))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
   where [methods(parser) = capture [
 
-    resolved_data()   = parser.extern(this.data),
-    structure()       = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
-    toString()        = this.structure(),
-    as_caterwaul()    = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
-    with_children(xs) = new this.constructor(this.data, xs),
+    resolved_data() = parser.extern(this.data),
+    structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
+    toString()      = this.structure(),
+    as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
@@ -91,7 +90,7 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
                            (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
-    replace(m)           = m && (m[this.resolved_data()] -re [it && this.length ? it.with_children(this *[x.replace(m)] -seq) : it] || this /~map/ "_.replace(m)".qf),
+    replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
 
     can_match(t)         = (this.bloom() & t.bloom()) === this.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
