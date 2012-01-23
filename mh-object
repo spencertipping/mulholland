@@ -1226,10 +1226,11 @@ meta::vim_highlighter('mh', <<'__');
 syn case match
 
 syn match  mh_wildcard           /_[^ \n\t\r.:,;()\[\]{}]\+/ contains=mh_arity_restriction
-syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
 syn match  mh_arity_restriction  /@\d/ contained
-syn match  mh_simple_op          /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}]/
-syn match  mh_complex_op         /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]\+/
+syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_op                 /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}]\+/
+syn match  mh_word_op            /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]*[A-Za-z]\+[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_hinted_word_op     /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]*[A-Za-z]\+[^ \n\t\r.:,;()\[\]{}]*[^A-Za-z \n\t\r.:,;()\[\]{}]\+/
 syn match  mh_single_string      /'\([^'\\]\|\\.\)*'[^ \n\t\r.:,;()\[\]{}]*/
 syn match  mh_double_string      /"\([^"\\]\|\\.\)*"[^ \n\t\r.:,;()\[\]{}]*/
 
@@ -1250,8 +1251,9 @@ hi link mh_sdoc_coerce        Special
 
 hi link mh_wildcard           Identifier
 hi link mh_marker             Type
-hi link mh_simple_op          Operator
-hi link mh_complex_op         Special
+hi link mh_op                 Operator
+hi link mh_word_op            Type
+hi link mh_hinted_word_op     Special
 hi link mh_single_string      String
 hi link mh_double_string      String
 hi link mh_group              Special

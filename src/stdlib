@@ -1092,7 +1092,7 @@ you can use imperative constructs as if they were values).
 
 @js (return (_s1 ; _s2))             =@ @js (_s1 ; return _s2);
 @js (return (_x /if _cond))          =@ @js (return _x /if _cond);
-@js (return (_x /if _cond /else _y)) =@ @js (return _x /if _cond /else _y);
+@js (return (_x /if _cond /else _y)) =@ @js (return _x /if _cond /else return _y);
 @js (return (_x /rescue _y))         =@ @js (return _x /rescue return _y);
 @js (return (_v /var _x))            =@ @js (_v /var _x; return _v)
 
