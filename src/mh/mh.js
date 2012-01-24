@@ -23,10 +23,10 @@ return xr} ) .call(this,argv) ) ) ) } ) .call(this) :$.mulholland.mh_repl(argv) 
 return(function( ) {var mh=$.mulholland.mh() ,evaluator=function(s,_1,_2,cc) {;
 return(function( ) {try{return(cc(null,mh(s) .structure() ) ) }catch(e) {return(cc(e,undefined) ) } } ) .call(this) } ;
 return( (function(it) {return(require( 'repl' ) .start( 'mh> ' ,undefined,evaluator) ) ,it} ) .call(this, ( (function(xs) {var x,x0,xi,xl,xr;
-for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
+for(var xi=0,xl=xs.length;
 xi<xl;
- ++xi)x=xs[xi] ,xr.push( ( (mh) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
-return xr} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
+ ++xi)x=xs[xi] , ( (mh) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ;
+return xs} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( (read_file) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
@@ -38,9 +38,9 @@ return xr} ) .call(this,argv) ) ) ) ) ) } ) .call(this) } ,$.mulholland.mh=funct
 return(function( ) {var parse=$.mulholland() ,define=function(match) {;
 return match&& (function(it) {return(blank) } ) .call(this, ( (toplevel_rewriter= (toplevel_rewriter) .extend( [ [match._x,toplevel_rewriter(match._y) ] ] ) ) ) ) } ,js=$.mulholland.js(parse) ,rewrite=function(match) {;
 return match&&toplevel_rewriter.extend(toplevel_rewriter(match._y) .flatten_all( ',' ) ) (match._x) } ,blank=parse( '_' ) ,compile=function(match) {;
-return match&& (function( ) {var f=js(toplevel_rewriter(match._x) ) ;
+return match&& (function( ) {var f=$.compile(js(toplevel_rewriter(match._x) ) ) ;
 return( (function(it) {return(it.replace=function(m) {;
-return f(m) } ) ,it} ) .call(this, (match._x) ) ) } ) .call(this) } ,toplevel_rewriter=$.mulholland.rewriter( [ [parse( '_x /@ _y' ) ,rewrite] , [parse( '_x =@ _y' ) ,define] , [parse( '@js _x' ) ,compile] ] ) ;
+return f(m) } ) ,it} ) .call(this, (match._x) ) ) } ) .call(this) } ,toplevel_rewriter=$.mulholland.rewriter( [ [parse( '_x /@ _y' ) ,rewrite] , [parse( '_x =@ _y' ) ,define] , [parse( '@js! _x' ) ,compile] ] ) ;
 return($.merge(function(_) {return(function(it) {return(it.pop() ) } ) .call(this, ( (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;

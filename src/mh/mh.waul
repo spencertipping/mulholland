@@ -19,7 +19,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # contexts under the toplevel macroexpander.)
 
   $.mulholland.mh_main(argv) = argv.length && argv |![x === '-i'] |seq ? argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh()] : $.mulholland.mh_repl(argv),
-  $.mulholland.mh_repl(argv) = argv %![/^-/.test(x)] *read_file *mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
+  $.mulholland.mh_repl(argv) = argv %![/^-/.test(x)] *read_file *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
                        -where [mh                       = $.mulholland.mh(),
                                evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
 
@@ -27,9 +27,9 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
   -where [parse     = $.mulholland(),          define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
           js        = $.mulholland.js(parse),  rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(','))(match._x),
-          blank     = parse('_'),              compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = js(toplevel_rewriter(match._x))],
+          blank     = parse('_'),              compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = js(toplevel_rewriter(match._x)) /!$.compile],
 
-          toplevel_rewriter = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js _x'), compile]])],
+          toplevel_rewriter = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js! _x'), compile]])],
 
   where [read_file(f) = require('fs').readFileSync(f, 'utf8'),
          output(t)    = process.stdout.write(t.as_caterwaul().toString() + ';\n', 'utf8')]});

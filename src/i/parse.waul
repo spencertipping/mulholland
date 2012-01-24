@@ -74,16 +74,16 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
 
 # | .             left    micro-operator, but can be used as a hint.
-#   adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
 #   ` ~(>)        right
+#   adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
 #   / *(>) %(<)   left
 #   \ :(>) !(<)   right
 #   - +(>)        left
 #   < >(>)        right
 #   &             left
+#   $             right
 #   | ^(>)        left
 #   = ?(>)        right
-#   $             right
 #   ,             left
 #   ;             left
 
@@ -92,8 +92,8 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
 # did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
 
-          base_operators         = '\\. # [`~] [/*%] [\\\\:!] [-+] [<>] & [|^] [=?] \\$ , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
-          right_associative      = /^[\\:!<>`~=?(\[{]$/.qf,
+          base_operators         = '\\. [`~] # [/*%] [\\\\:!] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
+          right_associative      = /^[$\\:!<>`~=?(\[{]$/.qf,
           shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
 
           precedence(t)          = t.length > 1 && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
@@ -101,7 +101,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
           shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
           operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,
 
-          is_value(t)            = /^['"$_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
+          is_value(t)            = /^['"_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
           node(op, x2, x1)       = new syntax(op, [x1, x2]),
 
           parse(ts)              = ts *!route -seq -re- pop_everything()

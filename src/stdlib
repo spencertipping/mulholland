@@ -520,6 +520,7 @@ meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^
 meta::function('repl', <<'__');
 my @files = @_ ? select_keys('--criteria' => join('|', map "^mh::.*$_", @_)) : select_keys('--criteria' => '^mh::');
 with_exported(@files, sub {
+  terminal::info("starting mulholland repl with @files");
   sh("mh -i $_[0]")});
 
 __
@@ -1082,6 +1083,17 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::mh('js/notation', <<'__');
+Javascript notation | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This module converts from canonical low-level constructs into Javascript-specific macro forms. You should use this in conjunction with mh::js/return so that things like x -> y do the right
+thing.
+
+@js (_x -> _y) =@ @js (_x /function _y)
+
+__
 meta::mh('js/return', <<'__');
 Return shorthands for the Javascript binding | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1097,11 +1109,22 @@ you can use imperative constructs as if they were values).
 @js (return (_v /var _x))            =@ @js (_v /var _x; return _v)
 
 __
+meta::mh('syntax', <<'__');
+Syntactic substitutions | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This module defines basic Mulholland user-space syntax.
+
+ _x $ _y =@ _x _y;
+ foo = bar
+
+__
 meta::parent('../mh-object', <<'__');
-function::repl            a31cc95a82c67b1a4797bb456adc6667
+function::repl            c2e5027de147bd262f998694a9e68807
 meta::type::mh            0b10222b800b45a0e3cb98e8d7607645
 parent::vim-highlighters  77c9231e0b6ba6e7aa6ed74193c02d2c
-vim_highlighter::mh       35a7cfb3889fbb280ad4e9abc18097cc
+vim_highlighter::mh       8b7e481e9e99c2517ccdbb24a471de0c
 
 __
 meta::parent('object', <<'__');
@@ -1248,10 +1271,11 @@ meta::vim_highlighter('mh', <<'__');
 syn case match
 
 syn match  mh_wildcard           /_[^ \n\t\r.:,;()\[\]{}]\+/ contains=mh_arity_restriction
-syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
 syn match  mh_arity_restriction  /@\d/ contained
-syn match  mh_simple_op          /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}]/
-syn match  mh_complex_op         /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]\+/
+syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_op                 /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}]\+/
+syn match  mh_word_op            /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]*[A-Za-z]\+[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_hinted_word_op     /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]*[A-Za-z]\+[^ \n\t\r.:,;()\[\]{}]*[^A-Za-z \n\t\r.:,;()\[\]{}]\+/
 syn match  mh_single_string      /'\([^'\\]\|\\.\)*'[^ \n\t\r.:,;()\[\]{}]*/
 syn match  mh_double_string      /"\([^"\\]\|\\.\)*"[^ \n\t\r.:,;()\[\]{}]*/
 
@@ -1272,8 +1296,9 @@ hi link mh_sdoc_coerce        Special
 
 hi link mh_wildcard           Identifier
 hi link mh_marker             Type
-hi link mh_simple_op          Operator
-hi link mh_complex_op         Special
+hi link mh_op                 Operator
+hi link mh_word_op            Type
+hi link mh_hinted_word_op     Special
 hi link mh_single_string      String
 hi link mh_double_string      String
 hi link mh_group              Special

@@ -18,7 +18,7 @@ return Object.prototype.hasOwnProperty.call(table,n) ?table[n] :n} ,base_operato
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( (new RegExp( ( '^' + (x) + '' ) ) ) ) ;
-return xr} ) .call(this, [ '\\.' , '#' , '[`~]' , '[/*%]' , '[\\\\:!]' , '[-+]' , '[<>]' , '&' , '[|^]' , '[=?]' , '\\$' , ',' , ';' , '[(\[{]' ] ) ,right_associative=function(_) {return/^[\\:!<>`~=?(\[{]$/ .exec(_) } ,shading= (function(xs) {var x,x0,xi,xl,xr;
+return xr} ) .call(this, [ '\\.' , '[`~]' , '#' , '[/*%]' , '[\\\\:!]' , '[-+]' , '[<>]' , '&' , '\\$' , '[|^]' , '[=?]' , ',' , ';' , '[(\[{]' ] ) ,right_associative=function(_) {return/^[$\\:!<>`~=?(\[{]$/ .exec(_) } ,shading= (function(xs) {var x,x0,xi,xl,xr;
 var xr=new xs.constructor() ;
 for(var k in xs)if(Object.prototype.hasOwnProperty.call(xs,k) )x=xs[k] ,xr[k] = ( -x) ;
 return xr} ) .call(this, { '~' : '1' , '*' : '1' , ':' : '1' , '+' : '1' , '>' : '1' , '^' : '1' , '?' : '1' , '%' : '-1' , '!' : '-1' } ) ,precedence=function(t) {;
@@ -30,7 +30,7 @@ xi<xl;
 if(x3= (x.test(c) &&xi+1<<2) )return x3}return false} ) .call(this,base_operators) } ,shaded_precedence=function(c) {;
 return unshaded_precedence(c) + ( (shading[c] ) || (0) ) } ,operator_semantic=function(t) {;
 return/\w/ .test(t) ?t.replace( /\W$/ , '' ) :t} ,is_value=function(t) {;
-return/^['"$_@A-Za-z0-9\x7f-\uffff]/ .test(t) } ,opens_a_group=function(t) {;
+return/^['"_@A-Za-z0-9\x7f-\uffff]/ .test(t) } ,opens_a_group=function(t) {;
 return/^[(\[{]/ .test(t) } ,closes_a_group=function(t) {;
 return/^[)\]}]/ .test(t) } ,node=function(op,x2,x1) {;
 return new syntax(op, [x1,x2] ) } ,parse=function(ts) {;

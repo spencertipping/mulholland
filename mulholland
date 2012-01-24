@@ -650,7 +650,8 @@ my @modules = qw|i i/tree i/parse i/rewrite i/js mh/mh|;
 my %filenames = map {$_ => temporary_name() . '.waul.sdoc'} @modules;
 file::write($filenames{$_}, retrieve("sdoc::waul::$_")) for @modules;
 
-my @options = map "--extension $filenames{$_}", @modules;
+my @external_modules = qw|bloom|;
+my @options = (map("--extension deps/$_.js", @external_modules), map("--extension $filenames{$_}", @modules));
 system("waul @options --configure js_all");
 unlink $_ for values %filenames;
 
@@ -1812,16 +1813,16 @@ Precedence and associativity table.
 The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
 
 | .             left    micro-operator, but can be used as a hint.
-  adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
   ` ~(>)        right
+  adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
   / *(>) %(<)   left
   \ :(>) !(<)   right
   - +(>)        left
   < >(>)        right
   &             left
+  $             right
   | ^(>)        left
   = ?(>)        right
-  $             right
   ,             left
   ;             left
 
@@ -1830,8 +1831,8 @@ Most of the implementation here is the classical shunting yard algorithm. The on
 an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
 did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
 
-          base_operators         = '\\. # [`~] [/*%] [\\\\:!] [-+] [<>] & [|^] [=?] \\$ , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
-          right_associative      = /^[\\:!<>`~=?(\[{]$/.qf,
+          base_operators         = '\\. [`~] # [/*%] [\\\\:!] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
+          right_associative      = /^[$\\:!<>`~=?(\[{]$/.qf,
           shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
 
           precedence(t)          = t.length > 1 && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
@@ -1839,7 +1840,7 @@ did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted
           shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
           operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,
 
-          is_value(t)            = /^['"$_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
+          is_value(t)            = /^['"_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
           node(op, x2, x1)       = new syntax(op, [x1, x2]),
 
           parse(ts)              = ts *!route -seq -re- pop_everything()
@@ -2016,7 +2017,7 @@ anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before
 contexts under the toplevel macroexpander.)
 
   $.mulholland.mh_main(argv) = argv.length && argv |![x === '-i'] |seq ? argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh()] : $.mulholland.mh_repl(argv),
-  $.mulholland.mh_repl(argv) = argv %![/^-/.test(x)] *read_file *mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
+  $.mulholland.mh_repl(argv) = argv %![/^-/.test(x)] *read_file *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
                        -where [mh                       = $.mulholland.mh(),
                                evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
 
@@ -2024,9 +2025,9 @@ contexts under the toplevel macroexpander.)
 
   -where [parse     = $.mulholland(),          define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
           js        = $.mulholland.js(parse),  rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(','))(match._x),
-          blank     = parse('_'),              compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = js(toplevel_rewriter(match._x))],
+          blank     = parse('_'),              compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = js(toplevel_rewriter(match._x)) /!$.compile],
 
-          toplevel_rewriter = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js _x'), compile]])],
+          toplevel_rewriter = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js! _x'), compile]])],
 
   where [read_file(f) = require('fs').readFileSync(f, 'utf8'),
          output(t)    = process.stdout.write(t.as_caterwaul().toString() + ';\n', 'utf8')]});
