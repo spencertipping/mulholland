@@ -519,9 +519,15 @@ __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('repl', <<'__');
 my @files = @_ ? select_keys('--criteria' => join('|', map "^mh::.*$_", @_)) : select_keys('--criteria' => '^mh::');
-with_exported(@files, sub {
-  terminal::info("starting mulholland repl with @files");
-  sh("mh -i $_[0]")});
+my %filenames;
+$filenames{$_} = exported($_) for @files;
+
+my @filename_options = map "'$filenames{$_}'", @files;
+
+dangerous("starting mulholland repl with @files", sub {
+  sh("mh -i @filename_options")});
+
+unlink for values %filenames;
 
 __
 meta::function('rm', <<'__');

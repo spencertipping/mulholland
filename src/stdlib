@@ -519,9 +519,15 @@ __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('repl', <<'__');
 my @files = @_ ? select_keys('--criteria' => join('|', map "^mh::.*$_", @_)) : select_keys('--criteria' => '^mh::');
-with_exported(@files, sub {
-  terminal::info("starting mulholland repl with @files");
-  sh("mh -i $_[0]")});
+my %filenames;
+$filenames{$_} = exported($_) for @files;
+
+my @filename_options = map "'$filenames{$_}'", @files;
+
+dangerous("starting mulholland repl with @files", sub {
+  sh("mh -i @filename_options")});
+
+unlink for values %filenames;
 
 __
 meta::function('rm', <<'__');
@@ -1083,6 +1089,17 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::mh('c/syntax', <<'__');
+Syntactic substitutions | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This module defines basic Mulholland user-space syntax.
+
+ _x $ _y =@ _x _y;
+ foo =@ bar
+
+__
 meta::mh('js/notation', <<'__');
 Javascript notation | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1109,19 +1126,8 @@ you can use imperative constructs as if they were values).
 @js (return (_v /var _x))            =@ @js (_v /var _x; return _v)
 
 __
-meta::mh('syntax', <<'__');
-Syntactic substitutions | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-This module defines basic Mulholland user-space syntax.
-
- _x $ _y =@ _x _y;
- foo = bar
-
-__
 meta::parent('../mh-object', <<'__');
-function::repl            c2e5027de147bd262f998694a9e68807
+function::repl            f5b4248a4943ae1040e9ed0e6126ce13
 meta::type::mh            0b10222b800b45a0e3cb98e8d7607645
 parent::vim-highlighters  77c9231e0b6ba6e7aa6ed74193c02d2c
 vim_highlighter::mh       8b7e481e9e99c2517ccdbb24a471de0c
