@@ -1113,7 +1113,7 @@ Licensed under the terms of the MIT source code license
 Introduction.
 This module defines basic Mulholland user-space syntactic rewrites.
 
-_x $ _y =@ _x _y
+_x $ _y = _x _y
 
 __
 meta::parent('../mh-object', <<'__');

@@ -1806,16 +1806,15 @@ have multiplicative precedence: *, /, and %. Hint shading creates the following 
 The ordering here is somewhat arbitrary, but it is based on QWERTY keyboard ergonomics. In general, anything you can type without the shift key will have 'default' precedence. Anything else is
 shaded. In general, characters progress from right to left on a QWERTY keyboard: * is to the right of %, so it has higher precedence when used as a shaded hint.
 
-You can use shading to alter the precedence of ordinary operators. For example, ++ has slightly higher precedence than + but has the same meaning otherwise.
-
 Precedence and associativity table.
 The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
 
-| .             left    micro-operator, but can be used as a hint.
+| .             left            micro-operator, but can be used as a hint.
   ` ~(>)        right
-  adjoinment    left    no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
+  adjoinment    left            no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
+  !             unary right
   / *(>) %(<)   left
-  \ :(>) !(<)   right
+  \ :(>)        right
   - +(>)        left
   < >(>)        right
   &             left
@@ -1830,34 +1829,35 @@ Most of the implementation here is the classical shunting yard algorithm. The on
 an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
 did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
 
-          base_operators         = '\\. [`~] # [/*%] [\\\\:!] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
+          base_operators         = '\\. [`~] # ! [/*%] [\\\\:] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
           right_associative      = /^[$\\:!<>`~=?(\[{]$/.qf,
-          shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1 ! -1'.qh %v*[-x] -seq,
+          shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1'.qh %v*[-x] -seq,
 
           precedence(t)          = t.length > 1 && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
-          unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,
-          shaded_precedence(c)   = c /!unshaded_precedence + shading[c] /or[0],
-          operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,
+          unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,    shaded_precedence(c) = c /!unshaded_precedence + shading[c] /or[0],
+          operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,            node(op, x2, x1)     = new syntax(op, [x1, x2]),
 
-          is_value(t)            = /^['"_@A-Za-z0-9\x7f-\uffff]/.test(t),  opens_a_group(t) = /^[(\[{]/.test(t),  closes_a_group(t) = /^[)\]}]/.test(t),
-          node(op, x2, x1)       = new syntax(op, [x1, x2]),
+          is_unary(op)           = /\w/.test(op) ? /[!]$/.test(op) : /^[!]/.test(op),  opens_a_group(t)     = /^[(\[{]/.test(t),
+          is_value(t)            = /^['"_@A-Za-z0-9\x7f-\uffff]/.test(t),              closes_a_group(t)    = /^[)\]}]/.test(t),
 
           parse(ts)              = ts *!route -seq -re- pop_everything()
                            -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
 
                                    defer(op)    = operator_stack /~push/ op,
-                                   use(op)      = output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
+                                   use(op)      = is_unary(op) ? output /~push/ new syntax(op /!operator_semantic /!intern, [output.pop()])
+                                                               : output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
 
                                    pop()        = use(operator_stack.pop()),
                                    pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
 
-                                   route(t)     = t /!is_value ? binary('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
+                                   route(t)     = t /!is_unary ? operator('#') /when [expect_value !== (expect_value = true)]  -re- operator_stack /~push/ t :
+                                                  t /!is_value ? operator('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
                                                                : expect_value = !!decide(t),
 
-                                   binary(o)    = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
+                                   operator(o)  = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
                                    decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), op() === '(' ? !operator_stack.pop()
                                                                                                                : !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
-                                                  o /!opens_a_group  ? (binary('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : binary(o),
+                                                  o /!opens_a_group  ? (operator('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : operator(o),
 
                                    pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
 
