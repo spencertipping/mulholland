@@ -1689,17 +1689,50 @@ caterwaul.module('mulholland', 'js_all', function ($) {
 
 __
 meta::sdoc('waul::i/jsi', <<'__');
-Javascript -> Mulholland conversion | Spencer Tipping
+Javascript <-> Mulholland interface | Spencer Tipping
 Licensed under the terms of the MIT source code license
 
 Introduction.
-Mulholland is bidirectionally convertible to Javascript through Caterwaul source tree construction. This module provides a way to convert Caterwaul trees into Mulholland trees; this is useful
-for doing declarative rewrites on Javascript faster than Caterwaul would be able to do them. The basic mechanism is that we just prepend a / to each Javascript node type. Literals are
-transcribed directly, with the exception of things that start with $ (these are converted into @dollar). This transformation is invertible using the as_caterwaul() method of Mulholland source
-trees.
+Mulholland is bidirectionally convertible to Javascript through Caterwaul source tree construction. This module provides a way to convert Caterwaul trees into Mulholland trees and back; this
+is useful for doing declarative rewrites on Javascript faster than Caterwaul would be able to do them. The basic mechanism is that we just prepend a / to each Javascript node type. Literals
+are transcribed directly, with the exception of things that start with $ (these are converted into @$). This transformation is invertible using the as_js() method of Mulholland source trees.
+
+There are some conversion rules used to help Mulholland and Caterwaul interoperate. They are:
+
+| 1. (# (_f) (_x))              <-> (() (_f) (_x))
+  2. (/@b (_f) (_x))            <-> ([] (_f) (_x))
+  3. (/@p (@) (_x))             <-> (( (_x))
+  4. (_op (_x) (@))             <-> (_op (_x))                  <- unary/binary conversion
+  5. (_op (_x) (/@: (_y) (_z))) <-> (_op (_x) (_y) (_z))        <- binary/ternary conversion
+  6. ($_stuff)                  <-> (@$_stuff)                  <- conversion of $ in an operator position
+  7. ("/_string/_mods"r)        <-> (/_string/_mods)
+
+It should be noted that this library doesn't make Caterwaul interfacing easy; it makes it possible. The standard library builds better abstractions on top of this.
 
 caterwaul.module('mulholland.jsi', 'js_all', function ($) {
-  $ /~syntax_extend/ capture [as_mulholland(p) = new p.syntax(this.data.replace(/^\$/, '@dollar') /!p.intern, +this *[x /~as_mulholland/ p] -seq)]});
+  $ /~syntax_extend/ {as_mh: as_mh},
+  $.mulholland.syntax_common.as_js = as_js,
+
+  where [as_mh(p) = this.data === '()' ? new p.syntax('#'   /!p.intern, [this[0].as_mh(p), this[1].data.length ? this[1].as_mh(p) : new p.syntax('@' /!p.intern)]) :
+                    this.data === '[]' ? new p.syntax('/@b' /!p.intern, [this[0].as_mh(p), this[1].data.length ? this[1].as_mh(p) : new p.syntax('@' /!p.intern)]) :
+                    this.data === '('  ? new p.syntax('/@p' /!p.intern, [new p.syntax('_' /!p.intern), this[0].as_mh(p)]) :
+                    this.length === 0  ? new p.syntax(this.data /!mh_encode_literal /!p.intern) :
+                    this.length === 1  ? new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), new p.syntax('@' /!p.intern)]) :
+                    this.length === 3  ? new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), new p.syntax('/@:' /!p.intern, [this[1].as_mh(p), this[2].as_mh(p)])]) :
+                                         new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), this[1].as_mh(p)]),
+
+         as_js()  = this.resolved_data() === '#'                           ? new $.syntax('()', this[0].as_js(), this[1].resolved_data() === '@' ? $.empty : this[1].as_js()) :
+                    this.resolved_data() === '/@b'                         ? new $.syntax('[]', this[0].as_js(), this[1].resolved_data() === '@' ? $.empty : this[1].as_js()) :
+                    this.resolved_data() === '/@p'                         ? new $.syntax('(',  this[1].as_js()) :
+                    this.length === 2 && this[1].resolved_data() === '/@:' ? new $.syntax(this.resolved_data() /!mh_decode, [this[0].as_js(), this[1][0].as_js(), this[1][1].as_js()]) :
+                    this.length === 0                                      ? new $.syntax(this.resolved_data() /!mh_decode_literal) :
+                                                                             new $.syntax(this.resolved_data() /!mh_decode, +this %~![x.resolved_data() !== '@' && x.as_js()] -seq),
+
+         mh_encode_literal(s) = /\/./.test(s) ? '"' + s.replace(/"/g, '\\"') + '"r' : s.replace(/^\$/, '@$'),
+         mh_encode(s)         = /^[()\[\]{}\.,;:]/.test(s) ? s : '/' + s,
+
+         mh_decode_literal(s) = /^".*"r$/.test(s) ? '/' + s.replace(/\\"/g, '"').replace(/"r$/, '') : s.replace(/^@\$/, '$'),
+         mh_decode(s)         = s.replace(/^\//, '')]});
 
 __
 meta::sdoc('waul::i/parse', <<'__');
@@ -1892,7 +1925,11 @@ numerically-indexed children. However, the constructor protocol differs signific
 arguments. The first is the data, which is copied onto the node verbatim; the second is an array of children. The array of children can itself be a node. The data must be an integer that
 indexes into the symbol table.
 
-  $.mulholland.syntax(parser, result.prototype /-$.merge/ methods(parser))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
+  $.mulholland.syntax_common = {},
+
+  $.mulholland.syntax(parser, result.prototype / $.mulholland.syntax_common /-$.merge/ methods(parser))
+                     (data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
+
   where [methods(parser) = capture [
 
     resolved_data() = parser.extern(this.data),
@@ -1902,15 +1939,6 @@ indexes into the symbol table.
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
     rmap(f, ft = f(this))                        = ft || this /~map/ "_ /~rmap/ f".qf,
-
-Mulholland and Caterwaul trees are mostly convertible to one another. The only significant difference is that Caterwaul source trees are more variadic than Mulholland trees; this means that
-Mulholland needs a way to encode unary and ternary nodes. Right now it has no encoding for ternary nodes. Unary nodes can be encoded by dropping one side or the other; to do this, use _ as one
-of the operands of a binary operator. For example:
-
-| 5 /% 6        -> (% (5) (6))
-  5 /% _        -> (% (5))
-
-    as_caterwaul()  = new $.syntax(this.resolved_data().replace(/^@dollar/, '$').replace(/^\//, ''), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
 Transformations.
 These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
@@ -1961,7 +1989,7 @@ Note that match() forms a partial ordering over trees. In particular, it is tran
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
                            (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
-    replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
+    replace(m)           = m && (m[this.resolved_data()] || this /~map/ "_.replace(m)".qf),
 
     can_match(t)         = this.bloom() /~subset/ t.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
@@ -1984,7 +2012,7 @@ Like waul, mh specifies a minimal toplevel execution context. This is used to de
 
 | 1. Global rewrite definition: foo =@ bar
   2. Local anonymous rewrite: foo /@ (bar = bif)
-  3. Inline Javascript evaluation: @js (x -> x + 1)
+  3. Inline Javascript evaluation: @js! (x /function {_ /return x})
 
 Rewrites always apply outside-in, so you can use global rewrite definitions for abstraction. For example, if you write @foo _f =@ _f = x + 1 in one file and then write @foo g inside an
 anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before the anonymous rewrite is executed. (This happens because anonymous rewrites pre-expand their rewriting
@@ -1996,12 +2024,13 @@ contexts under the toplevel macroexpander.)
                                evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh() = "parse(_).flatten_all(';') *toplevel_rewriter /seq -re- it.pop()".qf
-           /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, js: js, output: output}
+           /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, output: output}
 
   -where [parse = $.mulholland(),  define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
           blank = parse('_'),      rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(',') *!assert_valid_rewrite -seq)(match._x),
-                                   compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = toplevel_rewriter(match._x) /~as_caterwaul/ parse /!$.compile],
+                                   compile(match) = match && toplevel_rewriter(match._x) /~as_js/ parse /-$.compile/ environment,
 
+          environment                = {caterwaul: $, require: require, parse: parse, define: define, rewrite: rewrite, compile: compile},
           assert_valid_rewrite(tree) = tree.resolved_data() === '=' || raise [new Error('/@: #{tree.structure()} is not a valid rewrite rule')],
           toplevel_rewriter          = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js! _x'), compile]])],
 

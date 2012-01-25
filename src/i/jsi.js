@@ -1,6 +1,12 @@
-caterwaul.module( 'mulholland.jsi' ,function($) { ($) .syntax_extend( {as_mulholland:function(p) {;
-return new p.syntax(p.intern(this.data.replace( /^\$/ , '@dollar' ) ) , (function(xs) {var x,x0,xi,xl,xr;
-for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
+caterwaul.module( 'mulholland.jsi' ,function($) { (function( ) {var as_mh=function(p) {;
+return this.data=== '()' ?new p.syntax(p.intern( '#' ) , [this[0] .as_mh(p) ,this[1] .data.length?this[1] .as_mh(p) :new p.syntax(p.intern( '@' ) ) ] ) :this.data=== '[]' ?new p.syntax(p.intern( '/@b' ) , [this[0] .as_mh(p) ,this[1] .data.length?this[1] .as_mh(p) :new p.syntax(p.intern( '@' ) ) ] ) :this.data=== '(' ?new p.syntax(p.intern( '/@p' ) , [new p.syntax(p.intern( '_' ) ) ,this[0] .as_mh(p) ] ) :this.length===0?new p.syntax(p.intern(mh_encode_literal(this.data) ) ) :this.length===1?new p.syntax(p.intern(mh_encode(this.data) ) , [this[0] .as_mh(p) ,new p.syntax(p.intern( '@' ) ) ] ) :this.length===3?new p.syntax(p.intern(mh_encode(this.data) ) , [this[0] .as_mh(p) ,new p.syntax(p.intern( '/@:' ) , [this[1] .as_mh(p) ,this[2] .as_mh(p) ] ) ] ) :new p.syntax(p.intern(mh_encode(this.data) ) , [this[0] .as_mh(p) ,this[1] .as_mh(p) ] ) } ,as_js=function() {;
+return this.resolved_data() === '#' ?new $.syntax( '()' ,this[0] .as_js() ,this[1] .resolved_data() === '@' ?$.empty:this[1] .as_js() ) :this.resolved_data() === '/@b' ?new $.syntax( '[]' ,this[0] .as_js() ,this[1] .resolved_data() === '@' ?$.empty:this[1] .as_js() ) :this.resolved_data() === '/@p' ?new $.syntax( '(' ,this[1] .as_js() ) :this.length===2&&this[1] .resolved_data() === '/@:' ?new $.syntax(mh_decode(this.resolved_data() ) , [this[0] .as_js() ,this[1] [0] .as_js() ,this[1] [1] .as_js() ] ) :this.length===0?new $.syntax(mh_decode_literal(this.resolved_data() ) ) :new $.syntax(mh_decode(this.resolved_data() ) , (function(xs) {var x,x0,xi,xl,xr;
+for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0,_y;
 xi<xl;
- ++xi)x=xs[xi] ,xr.push( ( (x) .as_mulholland(p) ) ) ;
-return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) } } ) } ) ;
+ ++xi)x=xs[xi] , (_y= (x.resolved_data() !== '@' &&x.as_js() ) ) &&xr.push(_y) ;
+return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) } ,mh_encode_literal=function(s) {;
+return/\/./ .test(s) ? '"' +s.replace( /"/g , '\\"' ) + '"r' :s.replace( /^\$/ , '@$' ) } ,mh_encode=function(s) {;
+return/^[()\[\]{}\.,;:]/ .test(s) ?s: '/' +s} ,mh_decode_literal=function(s) {;
+return/^".*"r$/ .test(s) ? '/' +s.replace( /\\"/g , '"' ) .replace( /"r$/ , '' ) :s.replace( /^@\$/ , '$' ) } ,mh_decode=function(s) {;
+return s.replace( /^\// , '' ) } ;
+return( ($) .syntax_extend( {as_mh:as_mh} ) ,$.mulholland.syntax_common.as_js=as_js) } ) .call(this) } ) ;

@@ -1099,32 +1099,6 @@ This module defines basic Mulholland user-space syntax.
  _x $ _y =@ _x _y
 
 __
-meta::mh('js/notation', <<'__');
-Javascript notation | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-This module converts from canonical low-level constructs into Javascript-specific macro forms. You should use this in conjunction with mh::js/return so that things like x -> y do the right
-thing.
-
-@js (_x -> _y) =@ @js (_x /function _y)
-
-__
-meta::mh('js/return', <<'__');
-Return shorthands for the Javascript binding | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-Mulholland makes it easy to build Javascript trees at a low level. This library propagates 'return' through those trees so that you don't have to worry about manually placing it (and so that
-you can use imperative constructs as if they were values).
-
-@js (return (_s1 ; _s2))             =@ @js (_s1 ; return _s2);
-@js (return (_x /if _cond))          =@ @js (return _x /if _cond);
-@js (return (_x /if _cond /else _y)) =@ @js (return _x /if _cond /else return _y);
-@js (return (_x /rescue _y))         =@ @js (return _x /rescue return _y);
-@js (return (_v /var _x))            =@ @js (_v /var _x; return _v)
-
-__
 meta::parent('../mh-object', <<'__');
 function::repl            f5b4248a4943ae1040e9ed0e6126ce13
 meta::type::mh            0b10222b800b45a0e3cb98e8d7607645

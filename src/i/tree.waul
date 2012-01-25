@@ -14,7 +14,11 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
 # arguments. The first is the data, which is copied onto the node verbatim; the second is an array of children. The array of children can itself be a node. The data must be an integer that
 # indexes into the symbol table.
 
-  $.mulholland.syntax(parser, result.prototype /-$.merge/ methods(parser))(data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
+  $.mulholland.syntax_common = {},
+
+  $.mulholland.syntax(parser, result.prototype / $.mulholland.syntax_common /-$.merge/ methods(parser))
+                     (data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
+
   where [methods(parser) = capture [
 
     resolved_data() = parser.extern(this.data),
@@ -24,15 +28,6 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
     rmap(f, ft = f(this))                        = ft || this /~map/ "_ /~rmap/ f".qf,
-
-# Mulholland and Caterwaul trees are mostly convertible to one another. The only significant difference is that Caterwaul source trees are more variadic than Mulholland trees; this means that
-# Mulholland needs a way to encode unary and ternary nodes. Right now it has no encoding for ternary nodes. Unary nodes can be encoded by dropping one side or the other; to do this, use _ as one
-# of the operands of a binary operator. For example:
-
-# | 5 /% 6        -> (% (5) (6))
-#   5 /% _        -> (% (5))
-
-    as_caterwaul()  = new $.syntax(this.resolved_data().replace(/^@dollar/, '$').replace(/^\//, ''), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
 # Transformations.
 # These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
@@ -83,7 +78,7 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
                            (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
-    replace(m)           = m === false ? false : m[this.resolved_data()] || this /~map/ "_.replace(m)".qf,
+    replace(m)           = m && (m[this.resolved_data()] || this /~map/ "_.replace(m)".qf),
 
     can_match(t)         = this.bloom() /~subset/ t.bloom() && this.complexity() <= t.complexity(),
     level_matches(t)     = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())

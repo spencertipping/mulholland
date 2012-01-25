@@ -12,7 +12,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
 # | 1. Global rewrite definition: foo =@ bar
 #   2. Local anonymous rewrite: foo /@ (bar = bif)
-#   3. Inline Javascript evaluation: @js (x -> x + 1)
+#   3. Inline Javascript evaluation: @js! (x /function {_ /return x})
 
 # Rewrites always apply outside-in, so you can use global rewrite definitions for abstraction. For example, if you write @foo _f =@ _f = x + 1 in one file and then write @foo g inside an
 # anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before the anonymous rewrite is executed. (This happens because anonymous rewrites pre-expand their rewriting
@@ -24,12 +24,13 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
                                evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
 
   $.mulholland.mh() = "parse(_).flatten_all(';') *toplevel_rewriter /seq -re- it.pop()".qf
-           /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, js: js, output: output}
+           /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, output: output}
 
   -where [parse = $.mulholland(),  define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
           blank = parse('_'),      rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(',') *!assert_valid_rewrite -seq)(match._x),
-                                   compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = toplevel_rewriter(match._x) /~as_caterwaul/ parse /!$.compile],
+                                   compile(match) = match && toplevel_rewriter(match._x) /~as_js/ parse /-$.compile/ environment,
 
+          environment                = {caterwaul: $, require: require, parse: parse, define: define, rewrite: rewrite, compile: compile},
           assert_valid_rewrite(tree) = tree.resolved_data() === '=' || raise [new Error('/@: #{tree.structure()} is not a valid rewrite rule')],
           toplevel_rewriter          = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js! _x'), compile]])],
 
