@@ -2027,12 +2027,12 @@ contexts under the toplevel macroexpander.)
            /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, output: output}
 
   -where [parse = $.mulholland(),  define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
-          blank = parse('_'),      rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(',') *!assert_valid_rewrite -seq)(match._x),
+          blank = parse('_'),      rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(';') *!assert_valid_rewrite -seq)(match._x),
                                    compile(match) = match && toplevel_rewriter(match._x) /~as_js/ parse /-$.compile/ environment,
 
           environment                = {caterwaul: $, require: require, parse: parse, define: define, rewrite: rewrite, compile: compile},
           assert_valid_rewrite(tree) = tree.resolved_data() === '=' || raise [new Error('/@: #{tree.structure()} is not a valid rewrite rule')],
-          toplevel_rewriter          = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js! _x'), compile]])],
+          toplevel_rewriter          = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x = _y'), define], [parse('@js! _x'), compile]])],
 
   where [contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
          read_file(f)            = require('fs').readFileSync(f, 'utf8'),

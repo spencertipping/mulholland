@@ -1089,12 +1089,29 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
-meta::mh('c/syntax', <<'__');
+meta::mh('std/js', <<'__');
+Javascript syntactic shorthands | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This module makes it more straightforward to introduce Javascript values into your code. It is separated into a few separate pieces. First, there are a bunch of rewrites that make it simpler
+to write Javascript in the first place; these all use @js as a rewriting marker. Second, there are value generators that allow you to construct replace-triggered functions. These are
+Mulholland syntax trees whose replace() method enters Javascript code; this allows you to assign arbitrary side-effects (or processing) to a rewriting operation, making these trees ideal for
+use inside a /@ or similar.
+
+@js _x@0 = _x;  @js _x._y = (@js _x)._y;  @js [_x] = [@js _x];
+@js (_x _y) = (@js _x)(@js _y);           @js {_x} = {@js _x};
+
+@js (_x -> _y) = (@ /@p @js _x) /function {@ /return @js _y};
+@js (_x => _y) = @js ((t, f) -> ((@) -> f.apply(t, arguments))) (this, @js (_x -> _y))
+
+__
+meta::mh('std/syntax', <<'__');
 Syntactic substitutions | Spencer Tipping
 Licensed under the terms of the MIT source code license
 
 Introduction.
-This module defines basic Mulholland user-space syntax.
+This module defines basic Mulholland user-space syntactic rewrites.
 
 _x $ _y =@ _x _y
 
