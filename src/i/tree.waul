@@ -20,11 +20,19 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
     resolved_data() = parser.extern(this.data),
     structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
     toString()      = this.structure(),
-    as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
     rmap(f, ft = f(this))                        = ft || this /~map/ "_ /~rmap/ f".qf,
+
+# Mulholland and Caterwaul trees are mostly convertible to one another. The only significant difference is that Caterwaul source trees are more variadic than Mulholland trees; this means that
+# Mulholland needs a way to encode unary and ternary nodes. Right now it has no encoding for ternary nodes. Unary nodes can be encoded by dropping one side or the other; to do this, use _ as one
+# of the operands of a binary operator. For example:
+
+# | 5 /% 6        -> (% (5) (6))
+#   5 /% _        -> (% (5))
+
+    as_caterwaul()  = new $.syntax(this.resolved_data().replace(/^@dollar/, '$').replace(/^\//, ''), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
 # Transformations.
 # These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under

@@ -40,8 +40,10 @@ i<l;++i){n=n.push(t[i]).push(i<l-2?new t.constructor(t.data):t[i])[1]}}else{for(
 },contains:function(f){var result=f(this);if(result){return result}for(var i=0,l=this.length;i<l;++i){if(result=this[i].contains(f)){return result}}},match:function(target,variables){target=target.constructor===String?caterwaul_global.parse(target):target;
 variables||(variables={_:target});if(this.is_wildcard()&&(!this.leaf_nodes_only()||!this.length)){return variables[this.without_metadata()]=target,variables}else{if(this.length===target.length&&this.data===target.data){for(var i=0,l=this.length;
 i<l;++i){if(!this[i].match(target[i],variables)){return null}}return variables}}},toString:function(){var xs=[""];this.serialize(xs);return xs.join("")},structure:function(){if(this.length){return"("+['"'+this.data+'"'].concat(map(function(x){return x.structure()
-},this)).join(" ")+")"}else{return this.data}}};caterwaul_global.syntax_subclass=function(ctor){var extensions=Array.prototype.slice.call(arguments,1),proxy=function(){return ctor.apply(this,arguments)
-};caterwaul_global.merge.apply(this,[proxy.prototype,syntax_common].concat(extensions));proxy.prototype.constructor=proxy;return proxy};var parse_hex=caterwaul_global.parse_hex=function(digits){for(var result=0,i=0,l=digits.length,d;
+},this)).join(" ")+")"}else{return this.data}}};caterwaul_global.syntax_subclasses=[];caterwaul_global.syntax_subclass=function(ctor){var extensions=Array.prototype.slice.call(arguments,1),proxy=function(){return ctor.apply(this,arguments)
+};caterwaul_global.merge.apply(this,[proxy.prototype,syntax_common].concat(extensions));caterwaul_global.syntax_subclasses.push(proxy);proxy.prototype.constructor=proxy;
+return proxy};caterwaul_global.syntax_extend=function(){for(var i=0,l=caterwaul_global.syntax_subclasses.length,es=Array.prototype.slice.call(arguments);i<l;++i){caterwaul_global.merge.apply(this,[caterwaul_global.syntax_subclasses[i].prototype].concat(es))
+}caterwaul_global.merge.apply(this,[syntax_common].concat(es));return caterwaul_global};var parse_hex=caterwaul_global.parse_hex=function(digits){for(var result=0,i=0,l=digits.length,d;
 i<l;++i){result*=16,result+=(d=digits.charCodeAt(i))<=58?d-48:(d&95)-55}return result},parse_octal=caterwaul_global.parse_octal=function(digits){for(var result=0,i=0,l=digits.length;
 i<l;++i){result*=8,result+=digits.charCodeAt(i)-48}return result},unescape_string=caterwaul_global.unescape_string=function(s){for(var i=0,c,l=s.length,result=[],is_escaped=false;
 i<l;++i){if(is_escaped){is_escaped=false,result.push((c=s.charAt(i))==="\\"?"\\":c==="n"?"\n":c==="r"?"\r":c==="b"?"\b":c==="f"?"\f":c==="0"?"\u0000":c==="t"?"\t":c==="v"?"\v":c==='"'||c==="'"?c:c==="x"?String.fromCharCode(parse_hex(s.substring(i,++i+1))):c==="u"?String.fromCharCode(parse_hex(s.substring(i,(i+=3)+1))):String.fromCharCode(parse_octal(s.substring(i,(i+=2)+1))))
@@ -320,12 +322,7 @@ for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( " " +x.structure() ) ) ;
 return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) ) ) + ')' ) } ,toString:function() {;
-return this.structure() } ,as_caterwaul:function() {;
-return new $.syntax(this.resolved_data() , (function(xs) {var x,x0,xi,xl,xr;
-for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0,_y;
-xi<xl;
- ++xi)x=xs[xi] , (_y= (x.resolved_data() !== '_' &&x.as_caterwaul() ) ) &&xr.push(_y) ;
-return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) } ,push:function(x) { (this[this.length++ ] =x) ;
+return this.structure() } ,push:function(x) { (this[this.length++ ] =x) ;
 return this} ,map:function(f) {var r= (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
@@ -333,7 +330,12 @@ xi<xl;
 return xr} ) .call(this,this) ;
  (r.data=this.data) ;
 return r} ,rmap:function(f) {var ft=f(this) ;
-return ft|| (this) .map(function(_) {return(_) .rmap(f) } ) } ,flatten:function(op) {;
+return ft|| (this) .map(function(_) {return(_) .rmap(f) } ) } ,as_caterwaul:function() {;
+return new $.syntax(this.resolved_data() .replace( /^@dollar/ , '$' ) .replace( /^\// , '' ) , (function(xs) {var x,x0,xi,xl,xr;
+for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0,_y;
+xi<xl;
+ ++xi)x=xs[xi] , (_y= (x.resolved_data() !== '_' &&x.as_caterwaul() ) ) &&xr.push(_y) ;
+return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) } ,flatten:function(op) {;
 return parser.right_associative(op) ?this.right_flatten(op) :this.left_flatten(op) } ,flatten_all:function(op) {;
 return this.resolved_data() ===op? (this[0] .flatten_all(op) ) .concat(this[1] .flatten_all(op) ) : [this] } ,left_flatten:function(op) {;
 return this.resolved_data() ===op? (this[0] .left_flatten(op) ) .concat( [this[1] ] ) : [this] } ,right_flatten:function(op) {;
@@ -464,33 +466,12 @@ return xr} ) .call(this,current_list) ) ) ) ,rewrite=fixed_point() ;
 return($.merge(rewrite, {rules:current_list,extend:function(rs) {;
 return $.mulholland.rewriter( (current_list) .concat( (rs) ) ) } } ) ) } ) .call(this) } } ) ;
 
-caterwaul.module( 'mulholland.js' , (function(qs,qs1,qs2,qs3,qs4,qs5,qs6,qs7,qs8,qs9) {var result1= (function($) {$.mulholland.js=function(parser) {;
-var result= (function( ) {var js_marker=parser( '@js' ) ,expand_match_parts=function(match) {;
-return(function(xs) {var x,x0,xi,xl,xr;
-var xr=new xs.constructor() ;
-for(var k in xs)if(Object.prototype.hasOwnProperty.call(xs,k) )x=xs[k] ,xr[k] = (as_javascript(new parser.syntax( '#' , [js_marker,x] ) ) ) ;
-return xr} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
-var xr=new xs.constructor() ;
-for(var x in xs)if(Object.prototype.hasOwnProperty.call(xs,x) && (x.length>1) )xr[x] =xs[x] ;
-return xr} ) .call(this,match) ) } ,primitives= (function(xs) {var x,x0,xi,xl,xr;
+caterwaul.module( 'mulholland.jsi' ,function($) { ($) .syntax_extend( {as_mulholland:function(p) {;
+return new p.syntax(p.intern(this.data.replace( /^\$/ , '@dollar' ) ) , (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
- ++xi)x=xs[xi] ,xr.push( ( (function(x,x0,xi,xl,xs,xr) {return[parser(x[0] ) ,function(_) {return _&&x[1] .replace(expand_match_parts(_) ) } ] } ) .call(this,x,x0,xi,xl,xs,xr) ) ) ;
-return xr} ) .call(this, [ [ '@js (_body /if _cond)' ,qs] , [ '@js (_body /if _cond /else _else)' ,qs1] , [ '@js (_body /while _cond)' ,qs2] , [ '@js (_body /for [_init; _cond; _inc])' ,qs3] , [ '@js (_body /rescue _catch)' ,qs4] , [ '@js (_v@0 /var _value)' ,qs5] , [ '@js (_xs /function _body)' ,qs6] , [ '@js (_x ; _y)' ,qs7] , [ '@js (_x [_y])' ,qs8] , [ '@js (_f _x)' ,qs9] ] ) ,as_javascript=function(t) {;
-return(function(xs) {var x,x0,xi,xl,xr;
-for(var x=xs[0] ,xi=0,xl=xs.length,x1;
-xi<xl;
- ++xi) {x=xs[xi] ;
-if(x1= (x[1] ( (x[0] ) .match(t) ) ) )return x1}return false} ) .call(this,primitives) ||new caterwaul.syntax(t.resolved_data() , (function(xs) {var x,x0,xi,xl,xr;
-for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
-xi<xl;
- ++xi)x=xs[xi] ,xr.push( ( (as_javascript) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
-return xr} ) .call(this,Array.prototype.slice.call( (t) ) ) ) } ;
-return(as_javascript) } ) .call(this) ;
-var convert=result;
-return result} } ) ;
-result1.caterwaul_expression_ref_table= {qs: ( "new caterwaul.syntax( \"if\" ,new caterwaul.syntax( \"(\" ,new caterwaul.syntax( \"_cond\" ) ) ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_body\" ) ) )" ) ,qs1: ( "new caterwaul.syntax( \"if\" ,new caterwaul.syntax( \"(\" ,new caterwaul.syntax( \"_cond\" ) ) ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_body\" ) ) ,new caterwaul.syntax( \"else\" ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_else\" ) ) ) )" ) ,qs2: ( "new caterwaul.syntax( \"while\" ,new caterwaul.syntax( \"(\" ,new caterwaul.syntax( \"_cond\" ) ) ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_body\" ) ) )" ) ,qs3: ( "new caterwaul.syntax( \"for\" ,new caterwaul.syntax( \"(\" ,new caterwaul.syntax( \";\" ,new caterwaul.syntax( \";\" ,new caterwaul.syntax( \"_init\" ) ,new caterwaul.syntax( \"_cond\" ) ) ,new caterwaul.syntax( \"_inc\" ) ) ) ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_body\" ) ) )" ) ,qs4: ( "new caterwaul.syntax( \"try\" ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_body\" ) ) ,new caterwaul.syntax( \"catch\" ,new caterwaul.syntax( \"(\" ,new caterwaul.syntax( \"e\" ) ) ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_catch\" ) ) ) )" ) ,qs5: ( "new caterwaul.syntax( \"var\" ,new caterwaul.syntax( \"=\" ,new caterwaul.syntax( \"_v\" ) ,new caterwaul.syntax( \"_value\" ) ) )" ) ,qs6: ( "new caterwaul.syntax( \"function\" ,new caterwaul.syntax( \"(\" ,new caterwaul.syntax( \"_xs\" ) ) ,new caterwaul.syntax( \"{\" ,new caterwaul.syntax( \"_body\" ) ) )" ) ,qs7: ( "new caterwaul.syntax( \";\" ,new caterwaul.syntax( \"_x\" ) ,new caterwaul.syntax( \"_y\" ) )" ) ,qs8: ( "new caterwaul.syntax( \"[]\" ,new caterwaul.syntax( \"_x\" ) ,new caterwaul.syntax( \"_y\" ) )" ) ,qs9: ( "new caterwaul.syntax( \"()\" ,new caterwaul.syntax( \"_f\" ) ,new caterwaul.syntax( \"_x\" ) )" ) } ;
-return(result1) } ) .call(this,new caterwaul.syntax( "if" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( "if" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ,new caterwaul.syntax( "else" ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_else" ) ) ) ) ,new caterwaul.syntax( "while" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( "for" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( ";" ,new caterwaul.syntax( ";" ,new caterwaul.syntax( "_init" ) ,new caterwaul.syntax( "_cond" ) ) ,new caterwaul.syntax( "_inc" ) ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( "try" ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ,new caterwaul.syntax( "catch" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "e" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_catch" ) ) ) ) ,new caterwaul.syntax( "var" ,new caterwaul.syntax( "=" ,new caterwaul.syntax( "_v" ) ,new caterwaul.syntax( "_value" ) ) ) ,new caterwaul.syntax( "function" ,new caterwaul.syntax( "(" ,new caterwaul.syntax( "_xs" ) ) ,new caterwaul.syntax( "{" ,new caterwaul.syntax( "_body" ) ) ) ,new caterwaul.syntax( ";" ,new caterwaul.syntax( "_x" ) ,new caterwaul.syntax( "_y" ) ) ,new caterwaul.syntax( "[]" ,new caterwaul.syntax( "_x" ) ,new caterwaul.syntax( "_y" ) ) ,new caterwaul.syntax( "()" ,new caterwaul.syntax( "_f" ) ,new caterwaul.syntax( "_x" ) ) ) ) ;
+ ++xi)x=xs[xi] ,xr.push( ( (x) .as_mulholland(p) ) ) ;
+return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) } } ) } ) ;
 
 
 caterwaul.module( 'mulholland.mh' ,function($) { (function( ) {var contains_short=function(argv,o) {;
@@ -533,13 +514,13 @@ xi<xl;
  ++xi)x=xs[xi] , ( /^-/ .test(x) ) ||xr.push(x) ;
 return xr} ) .call(this,argv) ) ) ) ) ) } ) .call(this) } ,$.mulholland.mh=function() {;
 return(function( ) {var parse=$.mulholland() ,define=function(match) {;
-return match&& (function(it) {return(blank) } ) .call(this, ( (toplevel_rewriter= (toplevel_rewriter) .extend( [ [match._x,toplevel_rewriter(match._y) ] ] ) ) ) ) } ,js=$.mulholland.js(parse) ,rewrite=function(match) {;
+return match&& (function(it) {return(blank) } ) .call(this, ( (toplevel_rewriter= (toplevel_rewriter) .extend( [ [match._x,toplevel_rewriter(match._y) ] ] ) ) ) ) } ,blank=parse( '_' ) ,rewrite=function(match) {;
 return match&&toplevel_rewriter.extend( (function(xs) {var x,x0,xi,xl,xr;
 for(var xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] , ( (assert_valid_rewrite) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ;
-return xs} ) .call(this,toplevel_rewriter(match._y) .flatten_all( ',' ) ) ) (match._x) } ,blank=parse( '_' ) ,compile=function(match) {;
-return match&& (function( ) {var f=$.compile(js(toplevel_rewriter(match._x) ) ) ;
+return xs} ) .call(this,toplevel_rewriter(match._y) .flatten_all( ',' ) ) ) (match._x) } ,compile=function(match) {;
+return match&& (function( ) {var f=$.compile( (toplevel_rewriter(match._x) ) .as_caterwaul(parse) ) ;
 return( (function(it) {return(it.replace=function(m) {;
 return f(m) } ) ,it} ) .call(this, (match._x) ) ) } ) .call(this) } ,assert_valid_rewrite=function(tree) {;
 return tree.resolved_data() === '=' || (function( ) {throw new Error( ( '/@: ' + (tree.structure() ) + ' is not a valid rewrite rule' ) ) } ) .call(this) } ,toplevel_rewriter=$.mulholland.rewriter( [ [parse( '_x /@ _y' ) ,rewrite] , [parse( '_x =@ _y' ) ,define] , [parse( '@js! _x' ) ,compile] ] ) ;

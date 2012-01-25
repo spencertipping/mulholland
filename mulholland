@@ -638,7 +638,7 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite i/js mh/mh|;
+file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite i/jsi mh/mh|;
 sh("waul src/*.waul src/*/*.waul");
 
 file::write('mh', retrieve('pp::js::mh'));
@@ -1670,7 +1670,7 @@ Licensed under the terms of the MIT source code license
 - include src/i/tree.js
 - include src/i/parse.js
 - include src/i/rewrite.js
-- include src/i/js.js
+- include src/i/jsi.js
 
 - include src/mh/mh.js
 
@@ -1688,52 +1688,18 @@ caterwaul.module('mulholland', 'js_all', function ($) {
   $.mulholland() = $.mulholland.parser.apply(this, arguments)});
 
 __
-meta::sdoc('waul::i/js', <<'__');
-Mulholland -> Javascript bindings | Spencer Tipping
+meta::sdoc('waul::i/jsi', <<'__');
+Javascript -> Mulholland conversion | Spencer Tipping
 Licensed under the terms of the MIT source code license
 
 Introduction.
-Mulholland is ultimately compiled down to Javascript. For various reasons, primarily optimization, it's important that this bottom layer provide lots of control about how to represent things.
-For instance, there are several different ways to encode closures and continuations in Javascript, and some are faster (and more memory-efficient) than others. I'm leaving the decision about
-which one to use up to other higher-level rewriting rules.
+Mulholland is bidirectionally convertible to Javascript through Caterwaul source tree construction. This module provides a way to convert Caterwaul trees into Mulholland trees; this is useful
+for doing declarative rewrites on Javascript faster than Caterwaul would be able to do them. The basic mechanism is that we just prepend a / to each Javascript node type. Literals are
+transcribed directly, with the exception of things that start with $ (these are converted into @dollar). This transformation is invertible using the as_caterwaul() method of Mulholland source
+trees.
 
-caterwaul.module('mulholland.js', 'js_all', function ($) {
-
-Implementation.
-Mulholland can generate most of Javascript's important constructs. Some are left out because they can be encoded in other ways. Importantly, Mulholland has first-class representations of
-Javascript's imperative features, unlike Caterwaul. This allows you to compose more efficient functions by eliminating closure GC and function call overhead. The Javascript constructs
-supported by this library are:
-
-| 1. Conditionals using if/else (no switch)
-  2. Loops using for and while
-  3. Variable addressing and automatic naming (local, closure-scoped, property accesses, this, arguments)
-  4. Function values (no declarative-mode function definitions; the syntax for this is a hideous abomination)
-  5. Expression-mode operators
-
-Here are some examples of Mulholland trees and their conversions into Javascript:
-
-| then-part /if cond /else else-part            -> if (cond) {then-part} else {else-part}
-  then-part /if cond                            -> if (cond) {then-part}
-  body /while cond                              -> while (cond) {body}
-  body /for [init; cond; inc]                   -> for (init; cond; inc) {body}
-  body /rescue x                                -> try {body} catch (e) {x}
-  v /var value                                  -> var v = value
-  (x, y, z) -> body                             -> function (x, y, z) {return body}
-  s1 ; s2 ; s3                                  -> s1 ; s2 ; s3
-
-  $.mulholland.js(parser, convert = result) = as_javascript
-
-  -where [js_marker                 = parser('@js'),
-          expand_match_parts(match) = match %k%[x.length > 1] %v*[as_javascript(new parser.syntax('#', [js_marker, x]))] -seq,
-          primitives                = [['@js (_body /if _cond)',                  'if (_cond) {_body}'.qs],  ['@js (_body /if _cond /else _else)',      'if (_cond) {_body} else {_else}'.qs],
-                                       ['@js (_body /while _cond)',            'while (_cond) {_body}'.qs],  ['@js (_body /for [_init; _cond; _inc])', 'for (_init; _cond; _inc) {_body}'.qs],
-                                       ['@js (_body /rescue _catch)', 'try {_body} catch (e) {_catch}'.qs],  ['@js (_v@0 /var _value)',                                 'var _v = _value'.qs],
-                                       ['@js (_xs /function _body)',          'function (_xs) {_body}'.qs],  ['@js (_x ; _y)',                                                  '_x ; _y'.qs],
-                                       ['@js (_x [_y])',                                      '_x[_y]'.qs],  ['@js (_f _x)',                                                     '_f(_x)'.qs]]
-
-                                      *+[[parser(x[0]), "_ && x[1].replace(_ /!expand_match_parts)".qf]] -seq,
-
-          as_javascript(t)          = primitives |[x[1](x[0] /~match/ t)] |seq || new caterwaul.syntax(t.resolved_data(), +t *as_javascript -seq)]});
+caterwaul.module('mulholland.jsi', 'js_all', function ($) {
+  $ /~syntax_extend/ capture [as_mulholland(p) = new p.syntax(this.data.replace(/^\$/, '@dollar') /!p.intern, +this *[x /~as_mulholland/ p] -seq)]});
 
 __
 meta::sdoc('waul::i/parse', <<'__');
@@ -1932,11 +1898,19 @@ indexes into the symbol table.
     resolved_data() = parser.extern(this.data),
     structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
     toString()      = this.structure(),
-    as_caterwaul()  = new $.syntax(this.resolved_data(), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
     push(x, this[this.length++] = x)             = this,
     map(f, r = this *f -seq, r.data = this.data) = r,
     rmap(f, ft = f(this))                        = ft || this /~map/ "_ /~rmap/ f".qf,
+
+Mulholland and Caterwaul trees are mostly convertible to one another. The only significant difference is that Caterwaul source trees are more variadic than Mulholland trees; this means that
+Mulholland needs a way to encode unary and ternary nodes. Right now it has no encoding for ternary nodes. Unary nodes can be encoded by dropping one side or the other; to do this, use _ as one
+of the operands of a binary operator. For example:
+
+| 5 /% 6        -> (% (5) (6))
+  5 /% _        -> (% (5))
+
+    as_caterwaul()  = new $.syntax(this.resolved_data().replace(/^@dollar/, '$').replace(/^\//, ''), +this %~![x.resolved_data() !== '_' && x.as_caterwaul()] -seq),
 
 Transformations.
 These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
@@ -2024,9 +1998,9 @@ contexts under the toplevel macroexpander.)
   $.mulholland.mh() = "parse(_).flatten_all(';') *toplevel_rewriter /seq -re- it.pop()".qf
            /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, js: js, output: output}
 
-  -where [parse     = $.mulholland(),          define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
-          js        = $.mulholland.js(parse),  rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(',') *!assert_valid_rewrite -seq)(match._x),
-          blank     = parse('_'),              compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = js(toplevel_rewriter(match._x)) /!$.compile],
+  -where [parse = $.mulholland(),  define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
+          blank = parse('_'),      rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(',') *!assert_valid_rewrite -seq)(match._x),
+                                   compile(match) = match && match._x -se [it.replace(m) = f(m)] -where [f = toplevel_rewriter(match._x) /~as_caterwaul/ parse /!$.compile],
 
           assert_valid_rewrite(tree) = tree.resolved_data() === '=' || raise [new Error('/@: #{tree.structure()} is not a valid rewrite rule')],
           toplevel_rewriter          = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x =@ _y'), define], [parse('@js! _x'), compile]])],
