@@ -1,2 +1,0 @@
-#!/bin/bash
-../mh ../src/c/module.mh ../src/std/js.mh "$@" > ${1%%.mh}.js

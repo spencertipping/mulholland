@@ -2025,11 +2025,34 @@ All of this in mind, here is how Mulholland manages to provide a stateful interp
 
 Each mh() function manages its own state by using a context object. This context object contains a parser and a rewriter, and the rewriter is updated for each global definition.
 
-  $.mulholland /-$.merge/ wcapture [mh_main(argv)    = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl : argv /!mh_offline,
+Command-line invocation.
+mh is designed to be used from the command line. The 'argv' passed into these functions is the list of net arguments; that is, no 'node' or 'mh'. You can get this from node by saying
+process.argv.slice(2); this eliminates node and the Javascript file. All options are parsed in short form; that is, a single dash. mh looks for these arguments:
+
+| -i  interactive mode: starts a REPL after loading all files
+  -r  compiles the given source output into Javascript statements and executes it immediately
+  -c  compiles a new 'mh' file with the given libraries bundled in and emits it to stdout
+
+For example:
+
+| $ mh -i foo.mh        # start a REPL after loading foo.mh
+  $ mh foo.mh           # compile foo.mh to Javascript and print result to stdout
+  $ mh -r foo.mh        # compile foo.mh to Javascript and execute it immediately
+
+  $.mulholland /-$.merge/ wcapture [mh_main(argv)    = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl :
+                                                                            argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
+
+                                    mh_compile(argv) = '#{header}\n#{resulting_tree}\n#{footer}' /!output
+                                               -where [bundled_source = $.syntax.from_array(source_for(argv) *$.syntax.from_string -seq),
+                                                       resulting_tree = $.replicator().toString(),
+                                                       header         = '#!/usr/bin/env node',
+                                                       footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
 
                                     mh_offline(argv) = source_for(argv) *!mhc -seq
-                                               -where [mh     = $.mulholland.mh(),
-                                                       mhc(t) = mh(t, {cc: "output(_.as_js().toString())".qf})],
+                                               -where [mh          = $.mulholland.mh(),
+                                                       cc          = argv /-contains_short/ 'r' ? "_.as_js() /-$.compile/ environment".qf : "_.as_js().toString() /!output".qf,
+                                                       environment = {c: $, mh: mh, require: require, process: process},
+                                                       mhc(t)      = mh(t, {cc: cc})],
 
                                     mh_repl(argv)    = source_for(argv) *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
                                                -where [mh                       = $.mulholland.mh(),
@@ -2048,11 +2071,10 @@ Each mh() function manages its own state by using a context object. This context
                                                                                      rewrite(t)                     = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
                                                                                      define(equation)               = c.toplevel = c.toplevel /~extend/ [equation]]]
 
-                            -where [options_for(argv)       = {verbose: contains_short(argv, 'v')},
-                                    source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
+                            -where [source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
                                     contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
 
-                                    read_file(f)            = require('fs').readFileSync(f, 'utf8'),
+                                    read_file(f)            = require('fs').readFileSync(f, 'utf8') -rescue- f,
                                     output(t)               = process.stdout.write(t + ';\n', 'utf8'),
 
                                     defaults                = {cc: output}]});

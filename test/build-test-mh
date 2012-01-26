@@ -1,0 +1,3 @@
+#!/bin/bash
+../mh -c ../src/c/module.mh ../src/std/js.mh > test-mh
+chmod u+x test-mh

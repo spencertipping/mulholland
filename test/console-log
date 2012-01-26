@@ -1,4 +1,4 @@
-#!./compile
+#!./test-mh -r
 # vim: set syntax=mh :
 
 @js (console.log('hello world')) // using @js
