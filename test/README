@@ -14,3 +14,5 @@ work as they should. For example, 'console-log' looks like this:
 The shebang line causes test-mh to compile it to Javascript and run the result.
 test-mh has the Mulholland standard library baked in, so @js and 'using' are
 both defined when the code is rewritten.
+
+./make-sure-everything-works does exactly what you would expect.
