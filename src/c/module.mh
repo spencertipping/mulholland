@@ -1,0 +1,8 @@
+Module definition library | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Mulholland modules are just collections of rewrite rules that are later expanded into a // context.
+
+module _name@0 _body = (using _name = @qualify _body)
+                    // (@qualify (_x = _y) = _name _x = _y; @qualify (_x ; _y) = (@qualify _x ; @qualify _y))

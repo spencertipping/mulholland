@@ -1,0 +1,2 @@
+#!./compile
+@js ((x -> console.log x) 'hello world') // using @js

@@ -1,0 +1,2 @@
+#!./compile
+@js (console.log('hello world')) // using @js

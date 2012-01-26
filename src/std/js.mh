@@ -1,0 +1,26 @@
+Javascript core syntactic transform | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This module makes it more straightforward to introduce Javascript values into your code. It is separated into a few separate pieces. First, there are a bunch of rewrites that make it simpler
+to write Javascript in the first place; these all use @js as a rewriting marker. Second, there are value generators that allow you to construct replace-triggered functions. These are
+Mulholland syntax trees whose replace() method enters Javascript code; this allows you to assign arbitrary side-effects (or processing) to a rewriting operation, making these trees ideal for
+use inside a /@ or similar.
+
+module @js (_x@0 = _x;  _x._y@0 = (@js _x)._y;  [_x] = [@js _x];  !  _x = /u!!      @js _x;  !+ _x = /u+! @js _x;  (_x, _y) = (@js _x, @js _y);
+            _x _y = (@js _x) (@js _y);          {_x} = {@js _x};  !! _x = /u!! /u!! @js _x;  !- _x = /u-! @js _x;  (_x; _y) = (@js _x; @js _y);
+
+            !++ _x = /u++! @js _x;  !-- _x = /u--! @js _x;  !~ _x = /u~! @js _x;
+
+            _x + _y = @js _x + @js _y;  _x - _y = @js _x - @js _y;  (_x =! _y) = @js _x !== @js _y;  _x * _y = @js _x * @js _y;  _x % _y = @js _x % @js _y;
+            _x < _y = @js _x < @js _y;  _x > _y = @js _x > @js _y;  (_x == _y) = @js _x === @js _y;  _x / _y = @js _x / @js _y;
+            _x >> _y = @js _x >> @js _y;  _x << _y = @js _x << @js _y;  _x >>> _y = @js _x >>> @js _y;
+
+            _x -> _y   = /@p! ((/@p! @js _x) /function {@js /return! _y});                       _x -// _bindings = @js (/var! _bindings; _x);
+            (_x => _y) = @js ((t, f) -> ((@) -> f.apply(t, arguments))) (this, @js (_x -> _y));  (_x ? _y ?: _z)  = @js (_x /if {_y} /else {_z});
+
+Return propagation.
+This allows 'return' to settle into the bottom of a function instead of being inappropriately placed at the top. This is useful when you're using the above -> and => rules to build functions,
+since those insert a return for you.
+
+            /return! _x = /return! @js _x;  /return! (_x; _y) = @js (_x; /return! _y);  /return! (_x /if {_y} /else {_z}) = @js (_x /if {/return! _y} /else {/return! _z}))

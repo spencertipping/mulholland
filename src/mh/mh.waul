@@ -29,7 +29,10 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
   $.mulholland /-$.merge/ wcapture [mh_main(argv)    = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl : argv /!mh_offline,
 
-                                    mh_offline(argv) = source_for(argv) *!mh -seq -where [mh = $.mulholland.mh()],
+                                    mh_offline(argv) = source_for(argv) *!mhc -seq
+                                               -where [mh     = $.mulholland.mh(),
+                                                       mhc(t) = mh(t, {cc: "output(_.as_js().toString())".qf})],
+
                                     mh_repl(argv)    = source_for(argv) *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
                                                -where [mh                       = $.mulholland.mh(),
                                                        evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e)
