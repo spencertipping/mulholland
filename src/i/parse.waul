@@ -92,10 +92,10 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
 
           base_operators         = '\\. [`~] # ! [/*%] [\\\\:] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
-          right_associative      = /^[$\\:!<>`~=?(\[{]$/.qf,
+          right_associative      = /^[$\\:!<>`~=?(\[{]/.qf,
           shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1'.qh %v*[-x] -seq,
 
-          precedence(t)          = t.length > 1 && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
+          precedence(t)          = /\w/.test(t) && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
           unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,    shaded_precedence(c) = c /!unshaded_precedence + shading[c] /or[0],
           operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,            node(op, x2, x1)     = new syntax(op, [x1, x2]),
 

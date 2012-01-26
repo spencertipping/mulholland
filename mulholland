@@ -1830,10 +1830,10 @@ an operand or whether a join should be inserted. For example, in the expression 
 did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
 
           base_operators         = '\\. [`~] # ! [/*%] [\\\\:] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
-          right_associative      = /^[$\\:!<>`~=?(\[{]$/.qf,
+          right_associative      = /^[$\\:!<>`~=?(\[{]/.qf,
           shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1'.qh %v*[-x] -seq,
 
-          precedence(t)          = t.length > 1 && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
+          precedence(t)          = /\w/.test(t) && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
           unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,    shaded_precedence(c) = c /!unshaded_precedence + shading[c] /or[0],
           operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,            node(op, x2, x1)     = new syntax(op, [x1, x2]),
 
@@ -2027,31 +2027,34 @@ All of this in mind, here is how Mulholland manages to provide a stateful interp
 
 Each mh() function manages its own state by using a context object. This context object contains a parser and a rewriter, and the rewriter is updated for each global definition.
 
-  $.mulholland /-$.merge/ wcapture [mh_main(argv)                 = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl : argv /!mh_offline,
+  $.mulholland /-$.merge/ wcapture [mh_main(argv)    = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl : argv /!mh_offline,
 
-                                    mh_offline(argv)              = source_for(argv) *!mh -seq -where [mh = $.mulholland.mh()],
-                                    mh_repl(argv)                 = source_for(argv) *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
-                                                                     -where [mh                       = $.mulholland.mh(),
-                                                                             evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, _)".qf}) -rescue- cc(e, undefined)],
+                                    mh_offline(argv) = source_for(argv) *!mh -seq -where [mh = $.mulholland.mh()],
+                                    mh_repl(argv)    = source_for(argv) *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
+                                               -where [mh                       = $.mulholland.mh(),
+                                                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e)
+                                                                                  -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
-                                    mh(c = context())(s, options) = c.split(s) *!evaluate -seq
-                                                                     -where [cc(x)                          = (options -or- defaults) /~cc/ x,
-                                                                             evaluate(t, e = c.toplevel(t)) = e.resolved_data() === '=' ? e /!define -se- c.toplevel.rules.length /!cc
-                                                                                                                                        : e.toString() /!cc,
-                                                                             define(equation)               = c.toplevel = c.toplevel /~extend/ [equation]],
+                                    context()        = capture [parse    = $.mulholland(),
+                                                                split(s) = this /~parse/ s /~flatten_all/ ';',
+                                                                toplevel = [] /!$.mulholland.rewriter],
 
-                                    context()                     = capture [parse    = $.mulholland(),
-                                                                             split(s) = this /~parse/ s /~flatten_all/ ';',
-                                                                             toplevel = [] /!$.mulholland.rewriter]]
+                                    mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
+                                                                             -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === '='  ? e /!define :
+                                                                                                                      e.resolved_data() === '//' ? e /!rewrite /!evaluate : e /!cc,
 
-                            -where [options_for(argv)             = {verbose: contains_short(argv, 'v')},
-                                    source_for(argv)              = argv %![/^-/.test(x)] *read_file -seq,
-                                    contains_short(argv, o)       = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+                                                                                     cc(x)                          = (options -or- defaults) /~cc/ x,
+                                                                                     rewrite(t)                     = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
+                                                                                     define(equation)               = c.toplevel = c.toplevel /~extend/ [equation]]]
 
-                                    read_file(f)                  = require('fs').readFileSync(f, 'utf8'),
-                                    output(t)                     = process.stdout.write(t + ';\n', 'utf8'),
+                            -where [options_for(argv)       = {verbose: contains_short(argv, 'v')},
+                                    source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
+                                    contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
 
-                                    defaults                      = {cc: output}]});
+                                    read_file(f)            = require('fs').readFileSync(f, 'utf8'),
+                                    output(t)               = process.stdout.write(t + ';\n', 'utf8'),
+
+                                    defaults                = {cc: output}]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');

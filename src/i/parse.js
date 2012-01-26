@@ -18,11 +18,11 @@ return Object.prototype.hasOwnProperty.call(table,n) ?table[n] :n} ,base_operato
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( (new RegExp( ( '^' + (x) + '' ) ) ) ) ;
-return xr} ) .call(this, [ '\\.' , '[`~]' , '#' , '!' , '[/*%]' , '[\\\\:]' , '[-+]' , '[<>]' , '&' , '\\$' , '[|^]' , '[=?]' , ',' , ';' , '[(\[{]' ] ) ,right_associative=function(_) {return/^[$\\:!<>`~=?(\[{]$/ .exec(_) } ,shading= (function(xs) {var x,x0,xi,xl,xr;
+return xr} ) .call(this, [ '\\.' , '[`~]' , '#' , '!' , '[/*%]' , '[\\\\:]' , '[-+]' , '[<>]' , '&' , '\\$' , '[|^]' , '[=?]' , ',' , ';' , '[(\[{]' ] ) ,right_associative=function(_) {return/^[$\\:!<>`~=?(\[{]/ .exec(_) } ,shading= (function(xs) {var x,x0,xi,xl,xr;
 var xr=new xs.constructor() ;
 for(var k in xs)if(Object.prototype.hasOwnProperty.call(xs,k) )x=xs[k] ,xr[k] = ( -x) ;
 return xr} ) .call(this, { '~' : '1' , '*' : '1' , ':' : '1' , '+' : '1' , '>' : '1' , '^' : '1' , '?' : '1' , '%' : '-1' } ) ,precedence=function(t) {;
-return t.length>1&&shaded_precedence(t.charAt(t.length-1) ) ||unshaded_precedence(t.charAt(0) ) } ,unshaded_precedence=function(c) {;
+return/\w/ .test(t) &&shaded_precedence(t.charAt(t.length-1) ) ||unshaded_precedence(t.charAt(0) ) } ,unshaded_precedence=function(c) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var x=xs[0] ,xi=0,xl=xs.length,x3;
 xi<xl;
