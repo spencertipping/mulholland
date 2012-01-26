@@ -644,6 +644,11 @@ sh("waul src/*.waul src/*/*.waul");
 file::write('mh', retrieve('pp::js::mh'));
 chmod 0755, 'mh';
 
+dangerous('bootstrapping mh', sub {
+  my $mh = join '', qx|./mh -c|;
+  file::write('mh', $mh);
+  chmod 0755, 'mh'}) for 0 .. 1;
+
 __
 meta::function('repl', <<'__');
 my @modules = qw|i i/tree i/parse i/rewrite i/js mh/mh|;
