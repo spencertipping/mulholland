@@ -3,53 +3,54 @@
 
 # Introduction.
 # The Mulholland compiler runs or precompiles Mulholland source. It does this by applying rewrite rules to the source code, transforming the result into a Javascript expression using the
-# as_caterwaul() method, and then either evaluating or serializing the tree. It provides a few builtin rewriting rules and compiler directives to bootstrap the process.
+# as_js() method, and then either evaluating or serializing the tree. It provides a few builtin rewriting rules and compiler directives to bootstrap the process.
 
 caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
 # Mulholland module format.
 # Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you the following primitive operations:
 
-# | 1. Global rewrite definition: foo =@ bar
-#   2. Local anonymous rewrite: foo /@ (bar = bif)
+# | 1. Global rewrite definition: foo = bar
+#   2. Local anonymous rewrite: foo // (bar = bif)
 #   3. Inline Javascript evaluation: @js! (x /function {_ /return x})
 
-# Rewrites always apply outside-in, so you can use global rewrite definitions for abstraction. For example, if you write @foo _f =@ _f = x + 1 in one file and then write @foo g inside an
-# anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before the anonymous rewrite is executed. (This happens because anonymous rewrites pre-expand their rewriting
-# contexts under the toplevel macroexpander.)
+# Semantics.
+# Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
+# and you shouldn't do this. The reason purity is so important here is that Mulholland's rewriter tries to find the transitive closure of every expression it rewrites; so when you have an
+# equation like 'foo = bar', even though no 'foo' exists at the moment, it is free to construct a 'foo' and test the rewrite rule to see whether it can inline something.
 
-  $.mulholland.mh_main(argv) = !argv.length || argv /-contains_short/ 'i' ? $.mulholland.mh_repl(argv)
-                                                                          : argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh(options_for(argv))],
+# All of this in mind, here is how Mulholland manages to provide a stateful interpreter and maintain a pure rewriter at the same time:
 
-  $.mulholland.mh_repl(argv) = argv %![/^-/.test(x)] *read_file *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
-                       -where [mh                       = $.mulholland.mh(options_for(argv)),
-                               evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
+# | 1. Start with a blank toplevel rewriter.
+#   2. For each global rewrite in the file, replace (!) the current toplevel rewriter with a new one that contains an additional rewriting rule.
+#   3. For each toplevel thing that isn't a rewrite, emit its compiled output after rewriting.
 
-  $.mulholland.mh(options, options || (options = {})) = "parse(_).flatten_all(';') *top /seq -re- it.pop()".qf
-                                             /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, output: output}
+# Each mh() function manages its own state by using a context object. This context object contains a parser and a rewriter, and the rewriter is updated for each global definition.
 
-                                                -where [parse                = $.mulholland(),
-                                                        blank                = parse('_'),
-                                                        environment          = {caterwaul: $, require: require, parse: parse, define: define, rewrite: rewrite, compile: compile},
-                                                        log_definition(p, r) = log('defining #{p} as #{r}')     -when- options.verbose,
-                                                        log_compile(t, js)   = log('compiling #{t} into #{js}') -when- options.verbose,
+  $.mulholland /-$.merge/ wcapture [mh_main(argv)                 = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl : argv /!mh_offline,
 
-                                                        define(match)        = (match._x /-log_definition/ match._y, top = top /~extend/ [[match._x, top(match._y)]], blank) -when.match,
-                                                        rewrite(match)       = this.extend(top(match._y).flatten_all(';') *!check_rewrite -seq)(match._x)                    -when.match,
-                                                        compile(match)       = new parse.syntax(blank.data)
-                                                                               -se [log_compile(match._x, this(match._x) /~as_js/ parse),
-                                                                                    it.replace = this(match._x) /~as_js/ parse /-$.compile/ environment]                     -when.match,
+                                    mh_offline(argv)              = source_for(argv) *!mh -seq -where [mh = $.mulholland.mh()],
+                                    mh_repl(argv)                 = source_for(argv) *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
+                                                                     -where [mh                       = $.mulholland.mh(),
+                                                                             evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, _)".qf}) -rescue- cc(e, undefined)],
 
-                                                        check_rewrite(tree)  = tree.resolved_data() === '=' || raise [new Error('/@: #{tree.structure()} is not a valid rewrite rule')],
+                                    mh(c = context())(s, options) = c.split(s) *!evaluate -seq
+                                                                     -where [cc(x)                          = (options -or- defaults) /~cc/ x,
+                                                                             evaluate(t, e = c.toplevel(t)) = e.resolved_data() === '=' ? e /!define -se- c.toplevel.rules.length /!cc
+                                                                                                                                        : e.toString() /!cc,
+                                                                             define(equation)               = c.toplevel = c.toplevel /~extend/ [equation]],
 
-                                                        top                  = $.mulholland.rewriter([[parse('@ (_x /@ _y)'), rewrite],
-                                                                                                      [parse('@ (_x = _y)'),  define],
-                                                                                                      [parse('@ (@js! _x)'),  compile]])],
-  where [options_for(argv)       = {verbose: contains_short(argv, 'v')},
-         contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+                                    context()                     = capture [parse    = $.mulholland(),
+                                                                             split(s) = this /~parse/ s /~flatten_all/ ';',
+                                                                             toplevel = [] /!$.mulholland.rewriter]]
 
-         read_file(f)            = require('fs').readFileSync(f, 'utf8'),
-         log(x)                  = process.stdout.write('\033[1;32mmh: \033[0;0m#{x}\n', 'utf8'),
-         output(t)               = process.stdout.write(t.as_caterwaul().toString() + ';\n', 'utf8')]});
+                            -where [options_for(argv)             = {verbose: contains_short(argv, 'v')},
+                                    source_for(argv)              = argv %![/^-/.test(x)] *read_file -seq,
+                                    contains_short(argv, o)       = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+
+                                    read_file(f)                  = require('fs').readFileSync(f, 'utf8'),
+                                    output(t)                     = process.stdout.write(t + ';\n', 'utf8'),
+
+                                    defaults                      = {cc: output}]});
 
 # Generated by SDoc 
