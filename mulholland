@@ -1900,7 +1900,7 @@ example, this is a case where transitivity would apply:
           rewrite_once(t)      = current_list |~![x[1].constructor === Function ? x[1].call(rewrite, x[0] /~match/ t) : x[1] /~replace/ x[0].match(t)] |seq |se [change = change || it],
 
           deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
-          fixed_point(r = deep_rewriter(), fix = result)(t) = (change = null, r(t) -re [change ? fix(it) : it]),
+          fixed_point(r = deep_rewriter(), fix = result)(t) = (change = null, r(t) -re [change ? (console.log(it.structure()), fix(it)) : it]),
           transitive_limit(r)                               = r[1].constructor === Function ? r : [r[0], fixed_point()(r[1])],
 
           uniq(rs)             = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
@@ -2018,24 +2018,38 @@ Rewrites always apply outside-in, so you can use global rewrite definitions for 
 anonymous rewrite in another file, @foo g will be expanded into g = x + 1 before the anonymous rewrite is executed. (This happens because anonymous rewrites pre-expand their rewriting
 contexts under the toplevel macroexpander.)
 
-  $.mulholland.mh_main(argv) = !argv.length || argv /-contains_short/ 'i' ? $.mulholland.mh_repl(argv) : argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh()],
+  $.mulholland.mh_main(argv) = !argv.length || argv /-contains_short/ 'i' ? $.mulholland.mh_repl(argv)
+                                                                          : argv *read_file *mh *!output -seq -where [mh = $.mulholland.mh(options_for(argv))],
+
   $.mulholland.mh_repl(argv) = argv %![/^-/.test(x)] *read_file *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
-                       -where [mh                       = $.mulholland.mh(),
+                       -where [mh                       = $.mulholland.mh(options_for(argv)),
                                evaluator(s, _1, _2, cc) = cc(null, mh(s).structure()) -rescue- cc(e, undefined)],
 
-  $.mulholland.mh() = "parse(_).flatten_all(';') *toplevel_rewriter /seq -re- it.pop()".qf
-           /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, output: output}
+  $.mulholland.mh(options, options || (options = {})) = "parse(_).flatten_all(';') *top /seq -re- it.pop()".qf
+                                             /-$.merge/ {define: define, rewrite: rewrite, compile: compile, parse: parse, output: output}
 
-  -where [parse = $.mulholland(),  define(match)  = match && (toplevel_rewriter = toplevel_rewriter /~extend/ [[match._x, toplevel_rewriter(match._y)]]) -re- blank,
-          blank = parse('_'),      rewrite(match) = match && toplevel_rewriter.extend(toplevel_rewriter(match._y).flatten_all(';') *!assert_valid_rewrite -seq)(match._x),
-                                   compile(match) = match && toplevel_rewriter(match._x) /~as_js/ parse /-$.compile/ environment,
+                                                -where [parse                = $.mulholland(),
+                                                        blank                = parse('_'),
+                                                        environment          = {caterwaul: $, require: require, parse: parse, define: define, rewrite: rewrite, compile: compile},
+                                                        log_definition(p, r) = log('defining #{p} as #{r}')     -when- options.verbose,
+                                                        log_compile(t, js)   = log('compiling #{t} into #{js}') -when- options.verbose,
 
-          environment                = {caterwaul: $, require: require, parse: parse, define: define, rewrite: rewrite, compile: compile},
-          assert_valid_rewrite(tree) = tree.resolved_data() === '=' || raise [new Error('/@: #{tree.structure()} is not a valid rewrite rule')],
-          toplevel_rewriter          = $.mulholland.rewriter([[parse('_x /@ _y'), rewrite], [parse('_x = _y'), define], [parse('@js! _x'), compile]])],
+                                                        define(match)        = (match._x /-log_definition/ match._y, top = top /~extend/ [[match._x, top(match._y)]], blank) -when.match,
+                                                        rewrite(match)       = this.extend(top(match._y).flatten_all(';') *!check_rewrite -seq)(match._x)                    -when.match,
+                                                        compile(match)       = new parse.syntax(blank.data)
+                                                                               -se [log_compile(match._x, this(match._x) /~as_js/ parse),
+                                                                                    it.replace = this(match._x) /~as_js/ parse /-$.compile/ environment]                     -when.match,
 
-  where [contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+                                                        check_rewrite(tree)  = tree.resolved_data() === '=' || raise [new Error('/@: #{tree.structure()} is not a valid rewrite rule')],
+
+                                                        top                  = $.mulholland.rewriter([[parse('@ (_x /@ _y)'), rewrite],
+                                                                                                      [parse('@ (_x = _y)'),  define],
+                                                                                                      [parse('@ (@js! _x)'),  compile]])],
+  where [options_for(argv)       = {verbose: contains_short(argv, 'v')},
+         contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+
          read_file(f)            = require('fs').readFileSync(f, 'utf8'),
+         log(x)                  = process.stdout.write('\033[1;32mmh: \033[0;0m#{x}\n', 'utf8'),
          output(t)               = process.stdout.write(t.as_caterwaul().toString() + ';\n', 'utf8')]});
 
 __

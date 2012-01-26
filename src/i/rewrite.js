@@ -13,7 +13,7 @@ if(x1= (x[1] .constructor===Function?x[1] .call(rewrite, (x[0] ) .match(t) ) : (
 return function(t) {;
 return t.complexity() >=c? (t) .rmap(rewrite_once) :t} } ,fixed_point=function() {var r=deep_rewriter() ;
 var result=function(t) {;
-return(change=null, (function(it) {return(change?fix(it) :it) } ) .call(this, (r(t) ) ) ) } ;
+return(change=null, (function(it) {return(change? (console.log(it.structure() ) ,fix(it) ) :it) } ) .call(this, (r(t) ) ) ) } ;
 var fix=result;
 return result} ,transitive_limit=function(r) {;
 return r[1] .constructor===Function?r: [r[0] ,fixed_point() (r[1] ) ] } ,uniq=function(rs) {;

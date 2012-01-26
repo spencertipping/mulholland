@@ -518,6 +518,9 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('repl', <<'__');
+my @options;
+push @options, shift @_ if $_[0] =~ /^-/;
+
 my @files = @_ ? select_keys('--criteria' => join('|', map "^mh::.*$_", @_)) : select_keys('--criteria' => '^mh::');
 my %filenames;
 $filenames{$_} = exported($_) for @files;
@@ -525,7 +528,7 @@ $filenames{$_} = exported($_) for @files;
 my @filename_options = map "'$filenames{$_}'", @files;
 
 dangerous("starting mulholland repl with @files", sub {
-  sh("mh -i @filename_options")});
+  sh("mh -i @options @filename_options")});
 
 unlink for values %filenames;
 
@@ -1089,6 +1092,27 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::mh('c/core', <<'__');
+Mulholland core | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+These are core rewriting rules used to control things like evaluation.
+
+@ ((_x =@ _y) = (_x = @ _y));
+@ (@@ _x = @ (@ _x))
+
+__
+meta::mh('c/module', <<'__');
+Module definition library | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Mulholland modules are just collections of rewrite rules that are later expanded into a /@ context.
+
+@ (module _name@0 _body = ((using _name = @qualify _body) /@ (@qualify (_x = _y) = _name _x = _y; @qualify (_x ; _y) = (@qualify _x ; @qualify _y))))
+
+__
 meta::mh('std/js', <<'__');
 Javascript core syntactic transform | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1099,21 +1123,23 @@ to write Javascript in the first place; these all use @js as a rewriting marker.
 Mulholland syntax trees whose replace() method enters Javascript code; this allows you to assign arbitrary side-effects (or processing) to a rewriting operation, making these trees ideal for
 use inside a /@ or similar.
 
-@js _x@0 = _x;  @js _x._y = (@js _x)._y;  @js [_x] = [@js _x];  @js !  _x = /u!!      @js _x;  @js !+ _x = /u+! @js _x;  @js !~ _x = /u~! @js _x;   @js (_x, _y) = (@js _x, @js _y);
-@js (_x _y) = (@js _x)(@js _y);           @js {_x} = {@js _x};  @js !! _x = /u!! /u!! @js _x;  @js !- _x = /u-! @js _x;  @js !++ _x = /u++! @js _x; @js !-- _x = /u--! @js _x;
+@ (module @js (_x@0 = _x;  _x._y = (@js _x)._y;  [_x] = [@js _x];  !  _x = /u!!      @js _x;  !+ _x = /u+! @js _x;  (_x, _y) = (@js _x, @js _y);
+               (_x _y) = (@js _x)(@js _y);       {_x} = {@js _x};  !! _x = /u!! /u!! @js _x;  !- _x = /u-! @js _x;  (_x; _y) = (@js _x; @js _y);
 
-@js (_x + _y) = @js _x + @js _y;  @js (_x - _y) = @js _x - @js _y;  @js (_x !== _y) = @js _x !== @js _y;  @js (_x * _y) = @js _x * @js _y;  @js (_x % _y) = @js _x % @js _y;
-@js (_x < _y) = @js _x < @js _y;  @js (_x > _y) = @js _x > @js _y;  @js (_x === _y) = @js _x === @js _y;  @js (_x / _y) = @js _x / @js _y;
-@js (_x >> _y) = @js _x >> @js _y;  @js (_x << _y) = @js _x << @js _y;  @js (_x >>> _y) = @js _x >>> @js _y;
+               !++ _x = /u++! @js _x; !-- _x = /u--! @js _x;  !~ _x = /u~! @js _x;
 
-@js (_x -> _y) = (/@p! @js _x) /function {@js /return! _y};
-@js (_x => _y) = @js ((t, f) -> ((@) -> f.apply(t, arguments))) (this, @js (_x -> _y));
+               (_x + _y) = @js _x + @js _y;  (_x - _y) = @js _x - @js _y;  (_x !== _y) = @js _x !== @js _y;  (_x * _y) = @js _x * @js _y;  (_x % _y) = @js _x % @js _y;
+               (_x < _y) = @js _x < @js _y;  (_x > _y) = @js _x > @js _y;  (_x === _y) = @js _x === @js _y;  (_x / _y) = @js _x / @js _y;
+               (_x >> _y) = @js _x >> @js _y;  (_x << _y) = @js _x << @js _y;  (_x >>> _y) = @js _x >>> @js _y;
+
+               (_x -> _y) = (/@p! @js _x) /function {@js /return! _y};                              (_x -@ _bindings) = @js (/var! _bindings; _x);
+               (_x => _y) = @js ((t, f) -> ((@) -> f.apply(t, arguments))) (this, @js (_x -> _y));  (_x ? _y ?: _z)   = @js (_x /if {_y} /else {_z});
 
 Return propagation.
 This allows 'return' to settle into the bottom of a function instead of being inappropriately placed at the top. This is useful when you're using the above -> and => rules to build functions,
 since those insert a return for you.
 
-
+               (/return! (_x; _y)) = @js (_x; /return! _y);  (/return! (_x /if {_y} /else {_z})) = @js (_x /if {/return! _y} /else {/return! _z})))
 
 __
 meta::mh('std/syntax', <<'__');
@@ -1127,10 +1153,10 @@ _x $ _y = _x _y
 
 __
 meta::parent('../mh-object', <<'__');
-function::repl            f5b4248a4943ae1040e9ed0e6126ce13
+function::repl            981f1bc678bea710f9b11f253025c9ab
 meta::type::mh            0b10222b800b45a0e3cb98e8d7607645
 parent::vim-highlighters  77c9231e0b6ba6e7aa6ed74193c02d2c
-vim_highlighter::mh       8b7e481e9e99c2517ccdbb24a471de0c
+vim_highlighter::mh       705936c1d4724dd82a1126e532e60e39
 
 __
 meta::parent('object', <<'__');
@@ -1275,17 +1301,17 @@ meta::vim_highlighter('mh', <<'__');
 " Licensed under the terms of the MIT source code license
 
 syn case match
+syn sync minlines=5
 
 syn match  mh_wildcard           /_[^ \n\t\r.:,;()\[\]{}]\+/ contains=mh_arity_restriction
 syn match  mh_arity_restriction  /@\d/ contained
 syn match  mh_marker             /@[^ \n\t\r.:,;()\[\]{}]*/
-syn match  mh_op                 /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}]\+/
-syn match  mh_word_op            /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]*[A-Za-z]\+[^ \n\t\r.:,;()\[\]{}]*/
-syn match  mh_hinted_word_op     /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]*[A-Za-z]\+[^ \n\t\r.:,;()\[\]{}]*[^A-Za-z \n\t\r.:,;()\[\]{}]\+/
-syn match  mh_single_string      /'\([^'\\]\|\\.\)*'[^ \n\t\r.:,;()\[\]{}]*/
-syn match  mh_double_string      /"\([^"\\]\|\\.\)*"[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_op                 /[^ \n\t\r_@A-Za-z0-9.:,;()\[\]{}][^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_single_string      /'\([^'\\\n]\|\\.\)*'[^ \n\t\r.:,;()\[\]{}]*/
+syn match  mh_double_string      /"\([^"\\\n]\|\\.\)*"[^ \n\t\r.:,;()\[\]{}]*/
 
 syn match  mh_group              /[()\[\]{}]/
+syn match  mh_punctuation        /[,;.:]/
 
 syn region mh_line_comment       start=/#/ end=/$/
 syn region mh_sdoc_comment       start=/\(^$\n^\|\%^\)\s*[A-Z\|]/ end=/^\s*$\|\%$/ contains=mh_sdoc_coerce,mh_sdoc_numbered_list,mh_sdoc_heading keepend
@@ -1301,6 +1327,7 @@ hi link mh_sdoc_heading       Special
 hi link mh_sdoc_coerce        Special
 
 hi link mh_wildcard           Identifier
+hi link mh_arity_restriction  Keyword
 hi link mh_marker             Type
 hi link mh_op                 Operator
 hi link mh_word_op            Type
@@ -1308,6 +1335,7 @@ hi link mh_hinted_word_op     Special
 hi link mh_single_string      String
 hi link mh_double_string      String
 hi link mh_group              Special
+hi link mh_punctuation        Special
 
 __
 internal::main();
