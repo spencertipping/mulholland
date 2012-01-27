@@ -2020,7 +2020,7 @@ Like waul, mh specifies a minimal toplevel execution context. This is used to de
 
 | 1. Global rewrite definition: foo = bar
   2. Local anonymous rewrite: foo // (bar = bif)
-  3. Inline Javascript evaluation: @js! (x /function {_ /return x})
+  3. Rewriting into a pure (!) Javascript expression: foo =@js parse('hello world' + match._x.structure @)
 
 Semantics.
 Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
@@ -2069,17 +2069,26 @@ For example:
                                                        evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e)
                                                                                   -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
-                                    context()        = capture [parse    = $.mulholland(),
-                                                                split(s) = this /~parse/ s /~flatten_all/ ';',
-                                                                toplevel = [] /!$.mulholland.rewriter],
+                                    context()        = capture [parse         = $.mulholland(),
+                                                                split(s)      = this /~parse/ s /~flatten_all/ ';',
+                                                                environment() = {c: $, context: this, parse: this.parse},
+                                                                toplevel      = [] /!$.mulholland.rewriter],
 
                                     mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
-                                                                             -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === '='  ? e /!define :
-                                                                                                                      e.resolved_data() === '//' ? e /!rewrite /!evaluate : e /!cc,
+                                                                             -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === '='    ? e /!define :
+                                                                                                                      e.resolved_data() === '=@js' ? e /!js_define :
+                                                                                                                      e.resolved_data() === '//'   ? e /!rewrite /!evaluate : e /!cc,
 
-                                                                                     cc(x)                          = (options -or- defaults) /~cc/ x,
-                                                                                     rewrite(t)                     = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
-                                                                                     define(equation)               = c.toplevel = c.toplevel /~extend/ [equation]]]
+                                                                                     cc(x)               = (options -or- defaults) /~cc/ x,
+                                                                                     rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
+                                                                                     js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
+                                                                                     define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
+
+                                                                                     replacer(js)        = '(function (match) {return match && (_body)})'.qs.replace({_body: js}),
+
+                                                                                     js_evaluator(e)     = [e[0], js_marker(e[1])],
+                                                                                     js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().toString()}>' /!c.parse.intern)
+                                                                                                      -se [it.replace = t.as_js() /!replacer /-$.compile/ c.environment()]]]
 
                             -where [source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
                                     contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],

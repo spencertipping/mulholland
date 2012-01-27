@@ -4,3 +4,7 @@
 for file in *; do
   [[ -x $file ]] && head -n1 $file | grep -q '^#!.*test-mh' && (echo running $file && ./$file >& /dev/null || exit 1)
 done
+
+if [[ $? ]]; then
+  echo problem running $file
+fi

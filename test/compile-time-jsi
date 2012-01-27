@@ -1,0 +1,4 @@
+#!./test-mh
+# vim: set syntax=mh :
+say _x =@js (console.log((match /@b '_x').structure @), match /@b '_x');
+say hello
