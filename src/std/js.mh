@@ -12,12 +12,14 @@ module @js (_x@0 = _x;  _x._y@0 = (@js _x)._y;  [_x] = [@js _x];  !  _x = /u!!  
 
             !++ _x = /u++! @js _x;  !-- _x = /u--! @js _x;  !~ _x = /u~! @js _x;
 
-            _x + _y = @js _x + @js _y;  _x - _y = @js _x - @js _y;  (_x =! _y) = @js _x !== @js _y;  _x * _y = @js _x * @js _y;  _x % _y = @js _x % @js _y;
-            _x < _y = @js _x < @js _y;  _x > _y = @js _x > @js _y;  (_x == _y) = @js _x === @js _y;  _x / _y = @js _x / @js _y;
-            _x >> _y = @js _x >> @js _y;  _x << _y = @js _x << @js _y;  _x >>> _y = @js _x >>> @js _y;
+            _x +  _y = @js _x +  @js _y;  _x -  _y = @js _x -  @js _y;  (_x =! _y) = @js _x !== @js _y;  _x * _y = @js _x * @js _y;  _x % _y = @js _x % @js _y;
+            _x <  _y = @js _x <  @js _y;  _x >  _y = @js _x >  @js _y;  (_x == _y) = @js _x === @js _y;  _x / _y = @js _x / @js _y;
+            _x >> _y = @js _x >> @js _y;  _x << _y = @js _x << @js _y;  _x >>> _y  = @js _x >>> @js _y;
 
-            _x -> _y   = /@p! ((/@p! @js _x) /function {@js /return! _y});                       _x -// _bindings = @js (/var! _bindings; _x);
-            (_x => _y) = @js ((t, f) -> ((@) -> f.apply(t, arguments))) (this, @js (_x -> _y));  (_x ? _y ?: _z)  = @js (_x /if {_y} /else {_z});
+            @js/args (_x, _y) = @js (@js/args _x, @js/args _y);  @js/args _x@0 = @js _x;  @js/args (_x + _y) = @js (@js/args (_x, _y));
+
+            _x -> _y   = /@p! ((/@p! @js (@js/args _x)) /function {@js /return! _y});         _x -// _bindings = @js (/var! _bindings; _x);
+            (_x => _y) = @js (t + f -> (@ -> f.apply(t, arguments))) (this, @js (_x -> _y));  (_x ? _y ?: _z)  = @js (_x /if {_y} /else {_z});
 
 Return propagation.
 This allows 'return' to settle into the bottom of a function instead of being inappropriately placed at the top. This is useful when you're using the above -> and => rules to build functions,
