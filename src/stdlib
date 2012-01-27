@@ -1112,6 +1112,16 @@ module _@name@0 _@body = (using _@name = @qualify _@body)
 
 __
 meta::mh('std/js', <<'__');
+Javascript standard library | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This module ties together all of the other Javascript rewrites.
+
+module @js (using @js-core; using @js-loops)
+
+__
+meta::mh('std/js-core', <<'__');
 Javascript core syntactic transform | Spencer Tipping
 Licensed under the terms of the MIT source code license
 
@@ -1121,25 +1131,36 @@ to write Javascript in the first place; these all use @js as a rewriting marker.
 Mulholland syntax trees whose replace() method enters Javascript code; this allows you to assign arbitrary side-effects (or processing) to a rewriting operation, making these trees ideal for
 use inside a /@ or similar.
 
-module @js (_x@0 = _x;  _x._y@0 = (@js _x)._y;  [_x] = [@js _x];  !  _x = /u!!      @js _x;  !+ _x = /u+! @js _x;  (_x, _y) = (@js _x, @js _y);
-            _x _y = (@js _x) (@js _y);          {_x} = {@js _x};  !! _x = /u!! /u!! @js _x;  !- _x = /u-! @js _x;  (_x; _y) = (@js _x; @js _y);
+module @js-core (_x@0 = _x;  _x._y@0 = (@js _x)._y;  [_x] = [@js _x];  !  _x = /u!!      @js _x;  !+ _x = /u+! @js _x;  (_x, _y) = (@js _x, @js _y);
+                 _x _y = (@js _x) (@js _y);          {_x} = {@js _x};  !! _x = /u!! /u!! @js _x;  !- _x = /u-! @js _x;  (_x; _y) = (@js _x; @js _y);
 
-            !++ _x = /u++! @js _x;  !-- _x = /u--! @js _x;  !~ _x = /u~! @js _x;
+                 !++ _x = /u++! @js _x;  !-- _x = /u--! @js _x;  !~ _x = /u~! @js _x;
 
-            _x +  _y = @js _x +  @js _y;  _x -  _y = @js _x -  @js _y;  (_x =! _y) = @js _x !== @js _y;  _x * _y = @js _x * @js _y;  _x % _y = @js _x % @js _y;
-            _x <  _y = @js _x <  @js _y;  _x >  _y = @js _x >  @js _y;  (_x == _y) = @js _x === @js _y;  _x / _y = @js _x / @js _y;
-            _x >> _y = @js _x >> @js _y;  _x << _y = @js _x << @js _y;  _x >>> _y  = @js _x >>> @js _y;
+                 _x +  _y = @js _x +  @js _y;  _x -  _y = @js _x -  @js _y;  (_x =! _y) = @js _x !== @js _y;  _x * _y = @js _x * @js _y;  _x % _y = @js _x % @js _y;
+                 _x <  _y = @js _x <  @js _y;  _x >  _y = @js _x >  @js _y;  (_x == _y) = @js _x === @js _y;  _x / _y = @js _x / @js _y;
+                 _x >> _y = @js _x >> @js _y;  _x << _y = @js _x << @js _y;  _x >>> _y  = @js _x >>> @js _y;
 
-            @js/args (_x, _y) = @js (@js/args _x, @js/args _y);  @js/args _x@0 = @js _x;  @js/args (_x + _y) = @js (@js/args (_x, _y));
+                 @js/args (_x, _y) = @js (@js/args _x, @js/args _y);  @js/args _x@0 = @js _x;  @js/args (_x + _y) = @js (@js/args (_x, _y));
 
-            _x -> _y   = /@p! ((/@p! @js (@js/args _x)) /function {@js /return! _y});         _x -// _bindings = @js (/var! _bindings; _x);
-            (_x => _y) = @js (t + f -> (@ -> f.apply(t, arguments))) (this, @js (_x -> _y));  (_x ? _y ?: _z)  = @js (_x /if {_y} /else {_z});
+                 _x -> _y   = /@p! ((/@p! @js (@js/args _x)) /function {@js /return! _y});         _x -// _bindings = @js (/var! _bindings; _x);
+                 (_x => _y) = @js (t + f -> (@ -> f.apply(t, arguments))) (this, @js (_x -> _y));  (_x ? _y ?: _z)  = @js (_x /if {_y} /else {_z});
 
 Return propagation.
 This allows 'return' to settle into the bottom of a function instead of being inappropriately placed at the top. This is useful when you're using the above -> and => rules to build functions,
 since those insert a return for you.
 
-            /return! _x = /return! @js _x;  /return! (_x; _y) = @js (_x; /return! _y);  /return! (_x /if {_y} /else {_z}) = @js (_x /if {/return! _y} /else {/return! _z}))
+                 /return! _x = /return! @js _x;  /return! (_x; _y) = @js (_x; /return! _y);  /return! (_x /if {_y} /else {_z}) = @js (_x /if {/return! _y} /else {/return! _z}))
+
+__
+meta::mh('std/js-loops', <<'__');
+Javascript looping construct generators | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This module provides various forms of low-level Javascript loops with varying degrees of abstraction. These are all modeled as side-effects; other modules provide higher-level looping
+constructs that you can use to manipulate values directly.
+
+module @js-loops (_x /for-n _v _n = /@p! @js (/var! (_v = 0); _v < _n; !++ _v) /for {@js _x})
 
 __
 meta::parent('../mh-object', <<'__');

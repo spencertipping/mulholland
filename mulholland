@@ -2075,7 +2075,8 @@ For example:
                                                                 toplevel      = [] /!$.mulholland.rewriter],
 
                                     mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
-                                                                             -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === '='    ? e /!define :
+                                                                             -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
+                                                                                                                      e.resolved_data() === '='    ? e /!define :
                                                                                                                       e.resolved_data() === '=@js' ? e /!js_define :
                                                                                                                       e.resolved_data() === '//'   ? e /!rewrite /!evaluate : e /!cc,
 
@@ -2085,7 +2086,6 @@ For example:
                                                                                      define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
 
                                                                                      replacer(js)        = '(function (match) {return match && (_body)})'.qs.replace({_body: js}),
-
                                                                                      js_evaluator(e)     = [e[0], js_marker(e[1])],
                                                                                      js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().toString()}>' /!c.parse.intern)
                                                                                                       -se [it.replace = t.as_js() /!replacer /-$.compile/ c.environment()]]]
