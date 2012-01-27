@@ -1962,12 +1962,12 @@ identifier matches another. Mulholland supports the following cases:
   4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
   5. Universal wildcard; matches identifiers that start with @ (normal wildcards don't do this). These start with _@.
 
-    is_wildcard()     = this._is_wildcard     === undefined ? this._is_wildcard     = /^_./.test(this.resolved_data())                            : this._is_wildcard,
-    is_special()      = this._is_special      === undefined ? this._is_special      = /^@/.test(this.resolved_data())                             : this._is_special,
+    is_wildcard()      = this._is_wildcard      === undefined ? this._is_wildcard      = /^_./.test(this.resolved_data())                            : this._is_wildcard,
+    meta_level()       = this._meta_level       === undefined ? this._meta_level       = /^(@*)/.exec(this.resolved_data())[1].length                : this._meta_level,
 
-    match_arity()     = this._match_arity     === undefined ? this._match_arity     = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._match_arity,
-    matches_special() = this._matches_special === undefined ? this._matches_special = /^_@/.test(this.resolved_data())                            : this._matches_special,
-    without_arity()   = this._without_arity   === undefined ? this._without_arity   = this.resolved_data().replace(/@(\d+)$/, '')                 : this._without_arity,
+    match_arity()      = this._match_arity      === undefined ? this._match_arity      = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._match_arity,
+    match_meta_level() = this._match_meta_level === undefined ? this._match_meta_level = /^_(@*)/.exec(this.resolved_data())[1].length               : this._match_meta_level,
+    without_arity()    = this._without_arity    === undefined ? this._without_arity    = this.resolved_data().replace(/@(\d+)$/, '')                 : this._without_arity,
 
 Bloom filters.
 Trees are annotated with Bloom filters that indicate which constants they contain. This optimizes rewriting by quickly eliminating subtrees that don't contain constants that are present in a
@@ -1994,7 +1994,7 @@ positives, we re-check at every match level.
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
-                           (!this.is_wildcard() || this.matches_special() || !t.is_special()) &&
+                           (!this.is_wildcard() || this.match_meta_level() >= t.meta_level()) &&
                            (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
 
     replace(m)           = m && (m[this.resolved_data()] || this /~map/ "_.replace(m)".qf),
