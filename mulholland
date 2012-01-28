@@ -1866,8 +1866,19 @@ left-hand side is evaluated normally, but the opener remains on the operator sta
 remains on the stack. At this point there are two spare values on the value-stack and the opener on the operator stack. Finally, something will cause the operator stack to be forced; when a
 ternary is forced, it collects three values instead of two.
 
-          parse(ts)               = ts *destructure *!route -seq -re- pop_everything()
-                            -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
+          parse(ts)               = ts *destructure *!advance -seq -re- apply_all()
+                            -where [expect_value       = true,
+                                    values             = [],
+                                    operators          = [],
+                                    top()              = operators[operators.length - 1],
+
+                                    apply_unary()      = values /~push/ new syntax(operators.pop().id, [values.pop()]),
+                                    apply_binary()     = values /~push/ new syntax(operators.pop().id, [values.pop(), v])    -where [v = values.pop()],
+                                    apply_ternary()    = values /~push/ new syntax(operators.pop().id, [values.pop(), w, v]) -where [v = values.pop(), w = values.pop()],
+                                    apply(v = top().f) = v === 8 ? apply_ternary() : v & 2 ? apply_unary() : apply_binary(),
+                                    apply_until(f)     = null *~![operators.length && !f(top())][apply()] -seq,
+
+                                    
 
                                     defer(op)    = operator_stack /~push/ op,
                                     use(op)      = is_unary(op) ? output /~push/ new syntax(op /!operator_semantic /!intern, [output.pop()])
