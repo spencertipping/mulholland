@@ -1708,7 +1708,7 @@ There are some conversion rules used to help Mulholland and Caterwaul interopera
   2. (/@b (_f) (_x))            <-> ([] (_f) (_x))
   3. (/@p! (_x))                <-> (( (_x))
   4. (_op (_x) (/@: (_y) (_z))) <-> (_op (_x) (_y) (_z))        <- binary/ternary conversion
-  5. ($_stuff)                  <-> (@$_stuff)                  <- conversion of $ in an operator position
+  5. (@$_stuff)                 <-> ($_stuff)                   <- conversion of $ in an operator position
   6. ("/_string/_mods"r)        <-> (/_string/_mods)
 
 It should be noted that this library doesn't make Caterwaul interfacing easy; it makes it possible. The standard library builds better abstractions on top of this.
@@ -1726,7 +1726,7 @@ caterwaul.module('mulholland.jsi', 'js_all', function ($) {
 
          as_js()  = this.resolved_data() === '#'                           ? new $.syntax('()', this[0].as_js(), this[1].resolved_data() === '@' ? $.empty : this[1].as_js()) :
                     this.resolved_data() === '/@b'                         ? new $.syntax('[]', this[0].as_js(), this[1].resolved_data() === '@' ? $.empty : this[1].as_js()) :
-                    this.resolved_data() === '/@p'                         ? new $.syntax('(',  this[0].as_js()) :
+                    this.resolved_data() === '/@p!'                        ? new $.syntax('(',  this[0].as_js()) :
                     this.length === 2 && this[1].resolved_data() === '/@:' ? new $.syntax(this.resolved_data() /!mh_decode, [this[0].as_js(), this[1][0].as_js(), this[1][1].as_js()]) :
                     this.length === 0                                      ? new $.syntax(this.resolved_data() /!mh_decode_literal) :
                                                                              new $.syntax(this.resolved_data() /!mh_decode, +this %~![x.resolved_data() !== '@' && x.as_js()] -seq),
@@ -1777,7 +1777,7 @@ It also supports SDoc-style paragraph comments. These are removed just like line
 treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
+          lexer   = /(#.*|(?:[_@\w\d\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -1789,43 +1789,39 @@ it; so generally speaking you don't have to worry about it.
           intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
           extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
 
-Operator composition.
-Operators in Mulholland are far more expressive than they are in most languages. Each operator has a well-defined precedence, but it is possible to modify it to have a different precedence or
-associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Hinting is done by appending an operator character to an operator with letters in it.
-Operators without letters can't be hinted. For example, consider the = operator. Here are some ways you can use it:
+Operator precedence and associativity.
+Mulholland relies heavily on operators not only for semantic hints, but also to determine tree structure. To make it efficient to deal with these cases, Mulholland gives you a strange and
+irregular syntax to get stuff done quickly. Like many aspects of the language, it is highly motivated by QWERTY ergonomics.
 
-| f x = x + 1           <- semantic is =, no hint (uses default precedence/associativity for =)
-  f x =- x + 1          <- semantic is =-, no hint (uses default precedence/associativity for -)
-  f x =cps x + 1        <- semantic is =cps, no hint
-  f x =cps- x + 1       <- semantic is =cps, p/a is the same as -
+Operator structure.
+The following characters are erased and used as precedence/associativity hint (listed by descending precedence): / - \ | =. A mnemonic is that they are all comprised entirely of
+nonintersecting straight lines. For example, foo /bar/ bif /baz folds into (baz (bar/ foo bif)). On the other hand, foo / bar does what you'd expect: (/ foo bar). There are some situations
+where these rules don't apply. For example, any repeated character is not erased: // is rendered as //, not erased into /. The rationale for this is that there would be no point to modifying
+an operator with itself. The same is true when you have longer operators: //- is also preserved verbatim.
 
-Redundancy and hint shading.
-Many precedence and associativity levels have several operators in them. Which one you choose has a subtle impact on the precedence of the outcome. For example, there are three operators that
-have multiplicative precedence: *, /, and %. Hint shading creates the following properties:
+Sometimes you want to write a series of unary operators (or modifiers, or some such). To do this, use a splitter as the first non-erased character of the operator: * + ^ < >. For example, you
+can emulate the Caterwaul sequence library syntax: foo *~!bar[bif] -seq, which parses out to (seq (* foo (~ (! (bar ([ bif)))))). The mnemonic for these is that they are all rendered as
+intersecting straight lines. Splitters do not apply to themselves; for instance, ** is preserved, not converted into (* (* ...)).
 
-| precedence(.) > precedence(*+) > precedence(/+) > precedence(%+) > precedence(+)
-  precedence(*) = precedence(/+) = precedence(%)
+Micro-ops are separate from identifiers that precede and follow them. For instance, foo.bar is parsed as (. foo bar). However, you can suffix a micro-op with more operator characters: foo.+bar
+-> (.+ foo bar). Micro-ops have unmodifiable precedence, arity, and associativity. Note that you can use micro-ops inside other operators; in this context they no longer have micro-op
+behavior: foo /.bif bar -> (.bif foo bar).
 
-The ordering here is somewhat arbitrary, but it is based on QWERTY keyboard ergonomics. In general, anything you can type without the shift key will have 'default' precedence. Anything else is
-shaded. In general, characters progress from right to left on a QWERTY keyboard: * is to the right of %, so it has higher precedence when used as a shaded hint.
+The special operator $, when used as a prefix, is used to decrease the precedence of something and make it right-associative. When used alone, it is rewritten as an applicative node (#). $ in
+a prefix position is always erased. (Elsewhere it is preserved.) For example:
 
-Precedence and associativity table.
-The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
+| f $ g y       -> (# f (# g y))
+  f $ g $ h x   -> (# f (# g (# h x)))
+  f $ g x $$ y  -> (# (f (# g x)) y)
 
-| .             left            micro-operator, but can be used as a hint.
-  ` ~(>)        right
-  adjoinment    left            no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
-  !             unary right
-  / *(>) %(<)   left
-  \ :(>)        right
-  - +(>)        left
-  < >(>)        right
-  &             left
-  $             right
-  | ^(>)        left
-  = ?(>)        right
-  ,             left
-  ;             left
+| f $% g + x    -> (% f (+ g x))
+  f $% g < x    -> (< (% f g) x)
+  f $$% g < x   -> (% f (< g x))
+  f $$% g = x   -> (= (f % g) x)
+  f $$$% g = x  -> (% f (= g x))
+  f $% g /= x   -> (% f (= g x))        <- this is probably a better way to do it
+
+All remaining operator characters, ` ~ & ?, are interpreted normally. For instance, foo &/x bar -> (&/x foo bar).
 
 Shunting yard implementation.
 Most of the implementation here is the classical shunting yard algorithm. The only real point of divergence is that it maintains a flag that indicates whether a value should be interpreted as
