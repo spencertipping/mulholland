@@ -1797,7 +1797,7 @@ Operator structure.
 The following characters are erased and used as precedence/associativity hint (listed by descending precedence): / - \ | =. A mnemonic is that they are all comprised entirely of
 nonintersecting straight lines. For example, foo /bar/ bif /baz folds into (baz (bar/ foo bif)). On the other hand, foo / bar does what you'd expect: (/ foo bar). There are some situations
 where these rules don't apply. For example, any repeated character is not erased: // is rendered as //, not erased into /. The rationale for this is that there would be no point to modifying
-an operator with itself. The same is true when you have longer operators: //- is also preserved verbatim.
+an operator with itself. This stops applying when you have longer operators: //- becomes /-.
 
 Sometimes you want to write a series of unary operators (or modifiers, or some such). To do this, use a splitter as the first non-erased character of the operator: * + ^ < >. For example, you
 can emulate the Caterwaul sequence library syntax: foo *~!bar[bif] -seq, which parses out to (seq (* foo (~ (! (bar ([ bif)))))). The mnemonic for these is that they are all rendered as
@@ -1821,44 +1821,71 @@ a prefix position is always erased. (Elsewhere it is preserved.) For example:
   f $$$% g = x  -> (% f (= g x))
   f $% g /= x   -> (% f (= g x))        <- this is probably a better way to do it
 
-All remaining operator characters, ` ~ & ?, are interpreted normally. For instance, foo &/x bar -> (&/x foo bar).
+If the first unerased character is ?, the operator becomes ternary. This means that it opens a group and captures stuff until you close it. The ?: operator (and only this operator) closes any
+ternary group. For example, foo ? bar ?: bif folds into (? foo bar bif). Ternary operators can have their precedence adjusted like other operators; for instance:
+
+| foo + bar /? bif ?: baz       -> (+ foo (? bar bif baz))
+
+All remaining operator characters, ! ` ~ &, are interpreted normally. For instance, foo &/x bar -> (&/x foo bar).
+
+Destructured form.
+Operators are destructured by an operator parser. The result is a 3-tuple that contains flags, precedence, and the symbol ID, respectively. Identifiers and other values can be run through this
+parser as well; they are mapped to [0, 0, id]. Flags are a bitmask of the following form:
+
+| 1   right-associative
+  2   unary
+  8   some form of group:
+    0 ternary
+    1 paren
+    2 bracket
+    3 brace
+    4 closer, not opener
+
+The structure of openers and closers has the convenient property that A ^ B === 4 iff A and B are complementary. All ternary operators right-associate.
+
+          operator_lexer          = /^(\$*)([-\/\\|=]?)(.+)$/.qf,
+          operator_splitter       = /^[+*^<>]/.qf,
+          operator_split_lexer    = /\W|[\w\d\x7f-\uffff]+/,
+          precedence_table        = '\\. # [`~!] [/*%] [-+] [\\\\:] [<>] & [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
+          right_associative       = /^[`~!\\\\:=?]/.qf,
+          unary                   = /^[~!A-Za-z0-9]/.qf,
+          is_value                = /^['"_@A-Za-z0-9\x7f-\uffff]/.qf,
+          base_precedence(t)      = precedence_table |[x.test(t) && xi + 1] |seq,
+          is_closer(t)            = t === '?:' ? 12 : ')]}' /~indexOf/ t + 13,
+          is_opener(t)            = /^\?/.test(t) ? 8 : '([{' /~indexOf/ t + 9,
+
+          destructure(t)          = t /!is_value ? {f: 0, p: 0, id: t /!intern} : t /!destructure_operator,
+          destructure_operator(t) = {f: base /!is_opener || base /!is_closer || right_associative(base) | unary(base) << 1, p: adjustment + base /!base_precedence, id: canonical /!intern}
+                            -where [pieces     = operator_lexer(t),      base      = pieces[2] || pieces[3],
+                                    adjustment = pieces[1].length << 2,  canonical = pieces[2] === pieces[3] ? pieces[2] + pieces[3] : pieces[3]],
 
 Shunting yard implementation.
 Most of the implementation here is the classical shunting yard algorithm. The only real point of divergence is that it maintains a flag that indicates whether a value should be interpreted as
-an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
-did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
+an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Ternary operators are handled in two pieces. The
+left-hand side is evaluated normally, but the opener remains on the operator stack. The closer then causes everything back to the opener to be grouped into a ternary node, and the opener
+remains on the stack. At this point there are two spare values on the value-stack and the opener on the operator stack. Finally, something will cause the operator stack to be forced; when a
+ternary is forced, it collects three values instead of two.
 
-          base_operators         = '\\. [`~] # ! [/*%] [\\\\:] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
-          right_associative      = /^[$\\:!<>`~=?(\[{]/.qf,
-          shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1'.qh %v*[-x] -seq,
+          parse(ts)               = ts *destructure *!route -seq -re- pop_everything()
+                            -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
 
-          precedence(t)          = /\w/.test(t) && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
-          unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,    shaded_precedence(c) = c /!unshaded_precedence + shading[c] /or[0],
-          operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,            node(op, x2, x1)     = new syntax(op, [x1, x2]),
+                                    defer(op)    = operator_stack /~push/ op,
+                                    use(op)      = is_unary(op) ? output /~push/ new syntax(op /!operator_semantic /!intern, [output.pop()])
+                                                                : output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
 
-          is_unary(op)           = /\w/.test(op) ? /[!]$/.test(op) : /^[!]/.test(op),  opens_a_group(t)     = /^[(\[{]/.test(t),
-          is_value(t)            = /^['"_@A-Za-z0-9\x7f-\uffff]/.test(t),              closes_a_group(t)    = /^[)\]}]/.test(t),
+                                    pop()        = use(operator_stack.pop()),
+                                    pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
 
-          parse(ts)              = ts *!route -seq -re- pop_everything()
-                           -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
+                                    route(t)     = t /!is_unary ? operator('#') /when [expect_value !== (expect_value = true)]  -re- operator_stack /~push/ t :
+                                                   t /!is_value ? operator('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
+                                                                : expect_value = !!decide(t),
 
-                                   defer(op)    = operator_stack /~push/ op,
-                                   use(op)      = is_unary(op) ? output /~push/ new syntax(op /!operator_semantic /!intern, [output.pop()])
-                                                               : output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
+                                    operator(o)  = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
+                                    decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), op() === '(' ? !operator_stack.pop()
+                                                                                                                : !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
+                                                   o /!opens_a_group  ? (operator('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : operator(o),
 
-                                   pop()        = use(operator_stack.pop()),
-                                   pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
-
-                                   route(t)     = t /!is_unary ? operator('#') /when [expect_value !== (expect_value = true)]  -re- operator_stack /~push/ t :
-                                                  t /!is_value ? operator('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
-                                                               : expect_value = !!decide(t),
-
-                                   operator(o)  = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
-                                   decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), op() === '(' ? !operator_stack.pop()
-                                                                                                               : !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
-                                                  o /!opens_a_group  ? (operator('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : operator(o),
-
-                                   pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
+                                    pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
 
 __
 meta::sdoc('waul::i/rewrite', <<'__');
