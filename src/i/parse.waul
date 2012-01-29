@@ -19,7 +19,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 
   -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
           syntax    = $.mulholland.syntax(parser),
-          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, precedence = precedence, right_associative = right_associative],
+          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex],
 
 # Lexer and token types.
 # Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
@@ -36,7 +36,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
-          lexer   = /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
+          lexer   = /(#.*|(?:[_@\w\d\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 # Symbol interning.
@@ -48,79 +48,116 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
           intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
           extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
 
-# Operator composition.
-# Operators in Mulholland are far more expressive than they are in most languages. Each operator has a well-defined precedence, but it is possible to modify it to have a different precedence or
-# associativity; this allows you to keep explicit grouping constructs like brackets to an absolute minimum. Hinting is done by appending an operator character to an operator with letters in it.
-# Operators without letters can't be hinted. For example, consider the = operator. Here are some ways you can use it:
+# Operator precedence and associativity.
+# Mulholland relies heavily on operators not only for semantic hints, but also to determine tree structure. To make it efficient to deal with these cases, Mulholland gives you a strange and
+# irregular syntax to get stuff done quickly. Like many aspects of the language, it is highly motivated by QWERTY ergonomics.
 
-# | f x = x + 1           <- semantic is =, no hint (uses default precedence/associativity for =)
-#   f x =- x + 1          <- semantic is =-, no hint (uses default precedence/associativity for -)
-#   f x =cps x + 1        <- semantic is =cps, no hint
-#   f x =cps- x + 1       <- semantic is =cps, p/a is the same as -
+# Operator structure.
+# The following characters are erased and used as precedence/associativity hint (listed by descending precedence): / - \ | =. A mnemonic is that they are all comprised entirely of
+# nonintersecting straight lines. For example, foo /bar/ bif /baz folds into (baz (bar/ foo bif)). On the other hand, foo / bar does what you'd expect: (/ foo bar). There are some situations
+# where these rules don't apply. For example, any repeated character is not erased: // is rendered as //, not erased into /. The rationale for this is that there would be no point to modifying
+# an operator with itself. This stops applying when you have longer operators: //- becomes /-.
 
-# Redundancy and hint shading.
-# Many precedence and associativity levels have several operators in them. Which one you choose has a subtle impact on the precedence of the outcome. For example, there are three operators that
-# have multiplicative precedence: *, /, and %. Hint shading creates the following properties:
+# Sometimes you want to write a series of unary operators (or modifiers, or some such). To do this, use a splitter as the first non-erased character of the operator: * + ^ < >. For example, you
+# can emulate the Caterwaul sequence library syntax: foo *~!bar[bif] -seq, which parses out to (seq (* foo (~ (! (bar ([ bif)))))). The mnemonic for these is that they are all rendered as
+# intersecting straight lines. Splitters do not apply to themselves; for instance, ** is preserved, not converted into (* (* ...)).
 
-# | precedence(.) > precedence(*+) > precedence(/+) > precedence(%+) > precedence(+)
-#   precedence(*) = precedence(/+) = precedence(%)
+# Micro-ops are separate from identifiers that precede and follow them. For instance, foo.bar is parsed as (. foo bar). However, you can suffix a micro-op with more operator characters: foo.+bar
+# -> (.+ foo bar). Micro-ops have unmodifiable precedence, arity, and associativity. Note that you can use micro-ops inside other operators; in this context they no longer have micro-op
+# behavior: foo /.bif bar -> (.bif foo bar).
 
-# The ordering here is somewhat arbitrary, but it is based on QWERTY keyboard ergonomics. In general, anything you can type without the shift key will have 'default' precedence. Anything else is
-# shaded. In general, characters progress from right to left on a QWERTY keyboard: * is to the right of %, so it has higher precedence when used as a shaded hint.
+# The special operator $, when used as a prefix, is used to decrease the precedence of something and make it right-associative. When used alone, it is rewritten as an applicative node (#). $ in
+# a prefix position is always erased. (Elsewhere it is preserved.) For example:
 
-# Precedence and associativity table.
-# The following is a list of all fundamental and shaded operator characters supported by Mulholland. Shading offsets are denoted by < (for lower precedence) and > (for higher precedence).
+# | f $ g y       -> (# f (# g y))
+#   f $ g $ h x   -> (# f (# g (# h x)))
+#   f $ g x $$ y  -> (# (f (# g x)) y)
 
-# | .             left            micro-operator, but can be used as a hint.
-#   ` ~(>)        right
-#   adjoinment    left            no hinting possible, since this operator's existence is inferred. This operator is represented by the symbol #.
-#   !             unary right
-#   / *(>) %(<)   left
-#   \ :(>)        right
-#   - +(>)        left
-#   < >(>)        right
-#   &             left
-#   $             right
-#   | ^(>)        left
-#   = ?(>)        right
-#   ,             left
-#   ;             left
+# | f $% g + x    -> (% f (+ g x))
+#   f $% g < x    -> (< (% f g) x)
+#   f $$% g < x   -> (% f (< g x))
+#   f $$% g = x   -> (= (f % g) x)
+#   f $$$% g = x  -> (% f (= g x))
+#   f $% g /= x   -> (% f (= g x))        <- this is probably a better way to do it
+
+# If the first unerased character is ?, the operator becomes ternary. This means that it opens a group and captures stuff until you close it. The ?: operator (and only this operator) closes any
+# ternary group. For example, foo ? bar ?: bif folds into (? foo bar bif). Ternary operators can have their precedence adjusted like other operators; for instance:
+
+# | foo + bar /? bif ?: baz       -> (+ foo (? bar bif baz))
+
+# All remaining operator characters, ! ` ~ &, are interpreted normally. For instance, foo &/x bar -> (&/x foo bar).
+
+# Destructured form.
+# Operators are destructured by an operator parser. The result is a 3-tuple that contains flags, precedence, and the symbol ID, respectively. Identifiers and other values can be run through this
+# parser as well; they are mapped to [0, 0, id]. Flags are a bitmask of the following form:
+
+# | 1   right-associative
+#   2   unary
+#   8   some form of group:
+#     0 ternary
+#     1 paren
+#     2 bracket
+#     3 brace
+#     4 closer, not opener
+#   16  closed ternary
+
+# The structure of openers and closers has the convenient property that A ^ B === 4 iff A and B are complementary. All ternary operators right-associate.
+
+          operator_lexer          = /^(\$*)([-\/\\|=]?)(.+)$/.qf,
+          operator_splitter       = /^[+*^<>]/.qf,
+          operator_split_lexer    = /\W|[\w\d\x7f-\uffff]+/,
+          precedence_table        = '\\. # [`~!] [/*%] [-+] [\\\\:] [<>] & [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
+          right_associative       = /^[`~!\\\\:=?]/.qf,
+          unary                   = /^[~!A-Za-z0-9]/.qf,
+          is_value                = /^['"_@A-Za-z0-9\x7f-\uffff]/.qf,
+          base_precedence(t)      = precedence_table |[x.test(t) && xi + 1] |seq,
+          is_closer(t)            = t === '?:' ? 12 : ')]}' /~indexOf/ t + 13,
+          is_opener(t)            = /^\?/.test(t) ? 8 : '([{' /~indexOf/ t + 9,
+
+          destructure(t)          = t /!is_value ? {f: 0, p: 0, id: t /!intern} : t /!destructure_operator,
+          destructure_operator(t) = {f: base /!is_opener || base /!is_closer || right_associative(base) | unary(base) << 1, p: adjustment + base /!base_precedence, id: canonical /!intern}
+                            -where [pieces     = operator_lexer(t),      base      = pieces[2] || pieces[3],
+                                    adjustment = pieces[1].length << 2,  canonical = pieces[2] === pieces[3] ? pieces[2] + pieces[3] : pieces[3]],
 
 # Shunting yard implementation.
 # Most of the implementation here is the classical shunting yard algorithm. The only real point of divergence is that it maintains a flag that indicates whether a value should be interpreted as
-# an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Operators cannot take on prefix forms; if they
-# did, the syntax would be ambiguous. For instance, 'x + + y' could be interpreted as (+ x (+ y)) or (# x (+ (+ y))).
+# an operand or whether a join should be inserted. For example, in the expression 'f.x y', an implicit join is inserted to form (# (. f x) y). Ternary operators are handled in two pieces. The
+# left-hand side is evaluated normally, but the opener remains on the operator stack. The closer then causes everything back to the opener to be grouped into a ternary node, and the opener
+# remains on the stack. At this point there are two spare values on the value-stack and the opener on the operator stack. Finally, something will cause the operator stack to be forced; when a
+# ternary is forced, it collects three values instead of two.
 
-          base_operators         = '\\. [`~] # ! [/*%] [\\\\:] [-+] [<>] & \\$ [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
-          right_associative      = /^[$\\:!<>`~=?(\[{]/.qf,
-          shading                = '~ 1 * 1 : 1 + 1 > 1 ^ 1 ? 1 % -1'.qh %v*[-x] -seq,
+          parse(ts)               = ts *destructure *!observe -seq -re- apply_all()
+                            -where [expect_value        = true,
+                                    values              = [],
+                                    operators           = [],
+                                    top()               = operators[operators.length - 1],
 
-          precedence(t)          = /\w/.test(t) && t.charAt(t.length - 1) /!shaded_precedence || t.charAt(0) /!unshaded_precedence,
-          unshaded_precedence(c) = base_operators |[x.test(c) && xi + 1 << 2] |seq,    shaded_precedence(c) = c /!unshaded_precedence + shading[c] /or[0],
-          operator_semantic(t)   = /\w/.test(t) ? t.replace(/\W$/, '') : t,            node(op, x2, x1)     = new syntax(op, [x1, x2]),
+                                    join                = destructure('#'),
 
-          is_unary(op)           = /\w/.test(op) ? /[!]$/.test(op) : /^[!]/.test(op),  opens_a_group(t)     = /^[(\[{]/.test(t),
-          is_value(t)            = /^['"_@A-Za-z0-9\x7f-\uffff]/.test(t),              closes_a_group(t)    = /^[)\]}]/.test(t),
+                                    apply_unary()       = values /~push/ new syntax(operators.pop().id, [x])       -where [x = values.pop()],
+                                    apply_binary()      = values /~push/ new syntax(operators.pop().id, [y, x])    -where [x = values.pop(), y = values.pop()],
+                                    apply_ternary()     = values /~push/ new syntax(operators.pop().id, [z, y, x]) -where [x = values.pop(), y = values.pop(), z = values.pop()],
+                                    apply(v = top().f)  = v === 8 ? apply_ternary() : v & 2 ? apply_unary() : apply_binary(),
+                                    apply_until(f)      = null *~![operators.length && !f(top())][apply()] -seq,
 
-          parse(ts)              = ts *!route -seq -re- pop_everything()
-                           -where [expect_value = true,  output = [],  operator_stack = [],  op() = operator_stack[operator_stack.length - 1],
+                                    apply_operator(t)   = apply_until(t.f & 1 ? "_.p >= t.p".qf : "_.p > t.p".qf),
 
-                                   defer(op)    = operator_stack /~push/ op,
-                                   use(op)      = is_unary(op) ? output /~push/ new syntax(op /!operator_semantic /!intern, [output.pop()])
-                                                               : output /~push/ node(op /!operator_semantic /!intern, output.pop(), output.pop()),
+                                    maybe_join()        = observe_binary(join) /when [expect_value === (expect_value = false)],
 
-                                   pop()        = use(operator_stack.pop()),
-                                   pop_until(f) = null *~![operator_stack.length && !f(op())][pop()] /seq,
+                                    observe(t)          = t.f ? observe_operator(t) : observe_value(t),
+                                    observe_value(t)    = maybe_join() -then- values /~push/ t.id,
+                                    observe_operator(t) = t.f & 8 ? t.f & 4 ? observe_closer(t) : observe_opener(t) : t.f & 2 ? observe_vop(t) : observe_op(t),
+                                    observe_opener(t)   = t.f === 8 ? observe_op(t) : observe_vop(t),
+                                    observe_closer(t)   = t.f === 12 ? close_ternary(t) : apply_until(opener) -then [expect_value = false],
 
-                                   route(t)     = t /!is_unary ? operator('#') /when [expect_value !== (expect_value = true)]  -re- operator_stack /~push/ t :
-                                                  t /!is_value ? operator('#') /when [expect_value === (expect_value = false)] -re- output /~push/ new syntax(t /!intern)
-                                                               : expect_value = !!decide(t),
+                                    observe_vop(t)      = maybe_join() -then- observe_op(t),
+                                    observe_op(t)       = apply_operator(t) -then- operators /~push/ t -then [expect_value = true],
 
-                                   operator(o)  = pop_until(right_associative(o) ? "precedence(_) >= precedence(o)".qf : "precedence(_) > precedence(o)".qf) -re- operator_stack /~push/ o,
-                                   decide(o)    = o /!closes_a_group ? (pop_until(opens_a_group), op() === '(' ? !operator_stack.pop()
-                                                                                                               : !output.push(new syntax(operator_stack.pop() /!intern, [output.pop()]))) :
-                                                  o /!opens_a_group  ? (operator('#') /when [expect_value !== (expect_value = true)], operator_stack /~push/ o) : operator(o),
+                                    close_ternary(t)    = apply_until(opens_ternary) -then [expect_value = true, top().f |= 16],
 
-                                   pop_everything() = pop_until("operator_stack.length === 0".qf) -re- output[0]]]});
+                                    opens_ternary(t)    = f === 8,
+                                    opener(t, f = t.f)  = f & 8 && !(f & 4),
+
+                                    apply_all()         = apply_until("false".qf) -then- values[0]]]});
 
 # Generated by SDoc 

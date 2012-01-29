@@ -12,7 +12,7 @@
 #   2. (/@b (_f) (_x))            <-> ([] (_f) (_x))
 #   3. (/@p! (_x))                <-> (( (_x))
 #   4. (_op (_x) (/@: (_y) (_z))) <-> (_op (_x) (_y) (_z))        <- binary/ternary conversion
-#   5. ($_stuff)                  <-> (@$_stuff)                  <- conversion of $ in an operator position
+#   5. (@$_stuff)                 <-> ($_stuff)                   <- conversion of $ in an operator position
 #   6. ("/_string/_mods"r)        <-> (/_string/_mods)
 
 # It should be noted that this library doesn't make Caterwaul interfacing easy; it makes it possible. The standard library builds better abstractions on top of this.
@@ -30,7 +30,7 @@ caterwaul.module('mulholland.jsi', 'js_all', function ($) {
 
          as_js()  = this.resolved_data() === '#'                           ? new $.syntax('()', this[0].as_js(), this[1].resolved_data() === '@' ? $.empty : this[1].as_js()) :
                     this.resolved_data() === '/@b'                         ? new $.syntax('[]', this[0].as_js(), this[1].resolved_data() === '@' ? $.empty : this[1].as_js()) :
-                    this.resolved_data() === '/@p'                         ? new $.syntax('(',  this[0].as_js()) :
+                    this.resolved_data() === '/@p!'                        ? new $.syntax('(',  this[0].as_js()) :
                     this.length === 2 && this[1].resolved_data() === '/@:' ? new $.syntax(this.resolved_data() /!mh_decode, [this[0].as_js(), this[1][0].as_js(), this[1][1].as_js()]) :
                     this.length === 0                                      ? new $.syntax(this.resolved_data() /!mh_decode_literal) :
                                                                              new $.syntax(this.resolved_data() /!mh_decode, +this %~![x.resolved_data() !== '@' && x.as_js()] -seq),
