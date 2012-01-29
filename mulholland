@@ -1760,7 +1760,7 @@ instance, you might want to know the precedence and associativity of a given ope
 
   -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
           syntax    = $.mulholland.syntax(parser),
-          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex],
+          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, sdoc = sdoc],
 
 Lexer and token types.
 Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
@@ -1776,7 +1776,7 @@ level, Mulholland supports these types of tokens:
 It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 treats any Unicode character as the beginning of an identifier.
 
-          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n\n'),
+          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
           lexer   = /(#.*|(?:[_@\w\d\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
@@ -1791,10 +1791,10 @@ it; so generally speaking you don't have to worry about it.
 
 Operator precedence and associativity.
 Mulholland relies heavily on operators not only for semantic hints, but also to determine tree structure. To make it efficient to deal with these cases, Mulholland gives you a strange and
-irregular syntax to get stuff done quickly. Like many aspects of the language, it is highly motivated by QWERTY ergonomics.
+irregular syntax to get stuff done quickly. Like many aspects of the language, it is highly motivated by QWERTY keyboard ergonomics.
 
 Operator structure.
-The following characters are erased and used as precedence/associativity hint (listed by descending precedence): / - \ | =. A mnemonic is that they are all comprised entirely of
+The following characters are erased and used as precedence/associativity hint (listed by descending precedence): / - \ = |. A mnemonic is that they are all comprised entirely of
 nonintersecting straight lines. For example, foo /bar/ bif /baz folds into (baz (bar/ foo bif)). On the other hand, foo / bar does what you'd expect: (/ foo bar). There are some situations
 where these rules don't apply. For example, any repeated character is not erased: // is rendered as //, not erased into /. The rationale for this is that there would be no point to modifying
 an operator with itself. This stops applying when you have longer operators: //- becomes /-.
@@ -1821,28 +1821,7 @@ a prefix position is always erased. (Elsewhere it is preserved.) For example:
   f $$$% g = x  -> (% f (= g x))
   f $% g /= x   -> (% f (= g x))        <- this is probably a better way to do it
 
-If the first unerased character is ?, the operator becomes ternary. This means that it opens a group and captures stuff until you close it. The ?: operator (and only this operator) closes any
-ternary group. For example, foo ? bar ?: bif folds into (? foo bar bif). Ternary operators can have their precedence adjusted like other operators; for instance:
-
-| foo + bar /? bif ?: baz       -> (+ foo (? bar bif baz))
-
 All remaining operator characters, ! ` ~ &, are interpreted normally. For instance, foo &/x bar -> (&/x foo bar).
-
-Destructured form.
-Operators are destructured by an operator parser. The result is a 3-tuple that contains flags, precedence, and the symbol ID, respectively. Identifiers and other values can be run through this
-parser as well; they are mapped to [0, 0, id]. Flags are a bitmask of the following form:
-
-| 1   right-associative
-  2   unary
-  8   some form of group:
-    0 ternary
-    1 paren
-    2 bracket
-    3 brace
-    4 closer, not opener
-  16  closed ternary
-
-The structure of openers and closers has the convenient property that A ^ B === 4 iff A and B are complementary. All ternary operators right-associate.
 
           operator_lexer          = /^(\$*)([-\/\\|=]?)(.+)$/.qf,
           operator_splitter       = /^[+*^<>]/.qf,
@@ -1881,7 +1860,7 @@ ternary is forced, it collects three values instead of two.
                                     apply(v = top().f)  = v === 24 ? apply_ternary() : v & 2 ? apply_unary() : apply_binary(),
                                     apply_until(f)      = null *~![operators.length && !f(top())][apply()] -seq,
 
-                                    apply_operator(t)   = apply_until(t.f & 1 ? "_.f & 8 || _.p >= t.p".qf : "_.f & 8 || _.p > t.p".qf),
+                                    apply_operator(t)   = apply_until(t.f & 1 ? "_.f & 8 || _.r >= t.p".qf : "_.f & 8 || _.p > t.p".qf),
 
                                     maybe_join()        = observe_op(join) /when [expect_value === (expect_value = false)],
 
@@ -1889,14 +1868,14 @@ ternary is forced, it collects three values instead of two.
                                     observe_value(t)    = maybe_join() -then- values /~push/ new syntax(t.id),
                                     observe_operator(t) = t.f & 8 ? t.f & 4 ? observe_closer(t) : observe_opener(t) : t.f & 2 ? observe_vop(t) : observe_op(t),
                                     observe_opener(t)   = t.f === 8 ? observe_op(t) : observe_vop(t),
-                                    observe_closer(t)   = t.f === 12 ? close_ternary(t) : apply_until(opener) -then [expect_value = false],
+                                    observe_closer(t)   = t.f === 12 ? close_ternary(t) : apply_until(opener) -then [expect_value = false] -then- apply_unary(),
 
                                     observe_vop(t)      = maybe_join() -then- observe_op(t),
                                     observe_op(t)       = apply_operator(t) -then- operators /~push/ t -then [expect_value = true],
 
                                     close_ternary(t)    = apply_until(opens_ternary) -then [expect_value = true, top().f |= 16],
 
-                                    opens_ternary(t)    = f === 8,
+                                    opens_ternary(t)    = t.f === 8,
                                     opener(t, f = t.f)  = f & 8 && !(f & 4),
 
                                     apply_all()         = apply_until("false".qf) -then- values[0]]]});
@@ -2090,7 +2069,8 @@ For example:
                                                                             argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
 
                                     mh_compile(argv) = '#{header}\n#{resulting_tree}\n#{footer}' /!output
-                                               -where [bundled_source = $.syntax.from_array(source_for(argv) *$.syntax.from_string -seq),
+                                               -where [parser         = $.mulholland(),
+                                                       bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
                                                        resulting_tree = $.replicator().toString(),
                                                        header         = '#!/usr/bin/env node',
                                                        footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],

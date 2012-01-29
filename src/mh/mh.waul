@@ -45,7 +45,8 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
                                                                             argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
 
                                     mh_compile(argv) = '#{header}\n#{resulting_tree}\n#{footer}' /!output
-                                               -where [bundled_source = $.syntax.from_array(source_for(argv) *$.syntax.from_string -seq),
+                                               -where [parser         = $.mulholland(),
+                                                       bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
                                                        resulting_tree = $.replicator().toString(),
                                                        header         = '#!/usr/bin/env node',
                                                        footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],

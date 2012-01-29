@@ -18,11 +18,15 @@ return(function( ) {try{return(require( 'fs' ) .readFileSync(f, 'utf8' ) ) }catc
 return process.stdout.write(t+ ';\n' , 'utf8' ) } ,defaults= {cc:output} ;
 return($.merge($.mulholland, (function( ) {var mh_main=function(argv) {;
 return argv.length===0||contains_short(argv, 'i' ) ?mh_repl(argv) :contains_short(argv, 'c' ) ?mh_compile(argv) :mh_offline(argv) } ,mh_compile=function(argv) {;
-return(function( ) {var bundled_source=$.syntax.from_array( (function(xs) {var x,x0,xi,xl,xr;
+return(function( ) {var parser=$.mulholland() ,bundled_source=$.syntax.from_array( (function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( ( ($.syntax.from_string) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
-return xr} ) .call(this,source_for(argv) ) ) ,resulting_tree=$.replicator() .toString() ,header= '#!/usr/bin/env node' ,footer= ( 'caterwaul.mulholland.mh_main(' + (bundled_source) + '.concat(process.argv.slice(2)));' ) ;
+return xr} ) .call(this, (function(xs) {var x,x0,xi,xl,xr;
+for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
+xi<xl;
+ ++xi)x=xs[xi] ,xr.push( ( (parser.sdoc) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ) ;
+return xr} ) .call(this,source_for(argv) ) ) ) ,resulting_tree=$.replicator() .toString() ,header= '#!/usr/bin/env node' ,footer= ( 'caterwaul.mulholland.mh_main(' + (bundled_source) + '.concat(process.argv.slice(2)));' ) ;
 return(output( ( '' + (header) + '\n' + (resulting_tree) + '\n' + (footer) + '' ) ) ) } ) .call(this) } ,mh_offline=function(argv) {;
 return(function( ) {var mh=$.mulholland.mh() ,cc=contains_short(argv, 'r' ) ?function(_) {return $.compile(_.as_js() ,environment) } :function(_) {return output(_.as_js() .toString() ) } ,environment= {c:$,mh:mh,require:require,process:process} ,mhc=function(t) {;
 return mh(t, {cc:cc} ) } ;
