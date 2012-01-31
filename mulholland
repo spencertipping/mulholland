@@ -1789,42 +1789,73 @@ it; so generally speaking you don't have to worry about it.
           intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
           extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
 
-Operator precedence and associativity.
-Mulholland relies heavily on operators not only for semantic hints, but also to determine tree structure. To make it efficient to deal with these cases, Mulholland gives you a strange and
-irregular syntax to get stuff done quickly. Like many aspects of the language, it is highly motivated by QWERTY keyboard ergonomics.
+Asymmetric operator precedence.
+Mulholland goes off the deep end with operator precedence stuff by allowing operators to have asymmetric precedence and associativity. For example, you can say things like 3 +/ 4 / 5, which
+folds into (/ (+/ 3 4) 5) instead of the usual (+/ 3 (/ 4 5)). It's probably easier to think about precedence asymmetry as a generalization of what happens with parentheses. For instance, the
+open parenthesis from the left has very high precedence, but from the right has very low precedence:
 
-Operator structure.
-The following characters are erased and used as precedence/associativity hint (listed by descending precedence): / - \ = |. A mnemonic is that they are all comprised entirely of
-nonintersecting straight lines. For example, foo /bar/ bif /baz folds into (baz (bar/ foo bif)). On the other hand, foo / bar does what you'd expect: (/ foo bar). There are some situations
-where these rules don't apply. For example, any repeated character is not erased: // is rendered as //, not erased into /. The rationale for this is that there would be no point to modifying
-an operator with itself. This stops applying when you have longer operators: //- becomes /-.
+| x * (foo = bar)       <- * waits for close-paren, = folds before close-paren
 
-Sometimes you want to write a series of unary operators (or modifiers, or some such). To do this, use a splitter as the first non-erased character of the operator: * + ^ < >. For example, you
-can emulate the Caterwaul sequence library syntax: foo *~!bar[bif] -seq, which parses out to (seq (* foo (~ (! (bar ([ bif)))))). The mnemonic for these is that they are all rendered as
-intersecting straight lines. Splitters do not apply to themselves; for instance, ** is preserved, not converted into (* (* ...)).
+Here, open-parenthesis is unary because it appears where we expect a value. But the same generalization is possible for binary operators. The precedence modification is defined in terms of
+shunting yard mechanics:
 
-Micro-ops are separate from identifiers that precede and follow them. For instance, foo.bar is parsed as (. foo bar). However, you can suffix a micro-op with more operator characters: foo.+bar
--> (.+ foo bar). Micro-ops have unmodifiable precedence, arity, and associativity. Note that you can use micro-ops inside other operators; in this context they no longer have micro-op
-behavior: foo /.bif bar -> (.bif foo bar).
+| 3 +/ 4 / 5    -> encounter +/, push onto op stack
+                -> encounter /, force +/ because its right-precedence is equal and / left-associates
 
-The special operator $, when used as a prefix, is used to decrease the precedence of something and make it right-associative. When used alone, it is rewritten as an applicative node (#). $ in
-a prefix position is always erased. (Elsewhere it is preserved.) For example:
+Determining operator behavior.
+In addition to having an unusual way of dealing with operators, Mulholland gives you the ability to alter their precedence and associativity from each side without changing their semantic
+characteristics. These are, at a high level, the rules it follows:
 
-| f $ g y       -> (# f (# g y))
-  f $ g $ h x   -> (# f (# g (# h x)))
-  f $ g x $$ y  -> (# (f (# g x)) y)
+| 1. Operators that begin with an operator character bind values to their left; those that end with an operator bind values to their right. Most operators are binary, as they do both.
+  2. The following characters on the beginning or end of an operator modify its directional precedence/associativity (from high to low precedence): / - \ = |.
+  3. Operators that begin with $ have both directional precedences decreased by the same amount. This character is erased and can occur multiple times.
+  4. Left-associative unary operators whose first non-erased character is + or * are split into multiple left-unary operators with the same precedence/associativity.
 
-| f $% g + x    -> (% f (+ g x))
-  f $% g < x    -> (< (% f g) x)
-  f $$% g < x   -> (% f (< g x))
-  f $$% g = x   -> (= (f % g) x)
-  f $$$% g = x  -> (% f (= g x))
-  f $% g /= x   -> (% f (= g x))        <- this is probably a better way to do it
+Erasure.
+When you write an operator, some of the characters exist only to change its left/right precedence/associativity. These characters are useful only to provide tree structure and shouldn't be
+included in the parsed output. For example:
 
-All remaining operator characters, ! ` ~ &, are interpreted normally. For instance, foo &/x bar -> (&/x foo bar).
+| 3 $+ 4 + 5    -> (+ 3 (+ 4 5))                        x //- y / z  -> (//- x (/ y z))
+  x //.- y / z  -> (// x (/ y z))                       x -// y / z  -> (/ (// x y) z)
+  x --/ y / z   -> (/ (--/ x y) z)                      x /*%!!      -> (/ (* (% (! (! x)))))
+  x / y /*++!   -> (/ (* (+ (+ (! (/ x y))))))          x /~         -> (~ x)
+  x / y /*++ z  -> (/*++ (/ x y) z)
+
+Mulholland uses several heuristics to determine whether a potential hint can be erased:
+
+| 1. If a hint appears on the left-side of an operator and is followed by a character of different precedence or associativity, it is erased.
+  2. If a hint appears on the right-side of an operator and is prefixed with a dot, it and the dot are erased.
+  3. All prefix $ characters are always erased. If the operator consisted entirely of $, it becomes a join (#).
+
+Hints are used even if they aren't erased. For example:
+
+| /--   no erasure; left precedence is /, right precedence is -
+  //-   partial erasure; left precedence is /, right precedence is -
+  ///   partial erasure; left and right precedence are both /
+  ***   no erasure; left and right precedence are both *, which is the same as /
+  ***.- partial erasure; left precedence is *, right precedence is -
+  /+    partial erasure; left precedence is /, right precedence is +, which is the same as -
+
+Precedence groups.
+Mulholland uses a fairly normal precedence layout. From high to low precedence, these are the classes of operators it supports and their associativity:
+
+| . #           left
+  ! ~           unary (associativity depends on context)
+  / *           left
+  % `           right
+  + -           left
+  \ :           right
+  < >           left
+  = /           right
+  &             left
+  | ^           right
+  ,             left
+  ;             right
+
+The $ character shifts an operator two levels down in this stack. This is really important; it means that no associativity collisions will be created.
 
           operator_lexer          = /^(\$*)([-\/\\|=]?)(.+)$/.qf,
-          operator_splitter       = /^[+*^<>]/.qf,
+          operator_splitter       = /^[+*]/.qf,
           operator_split_lexer    = /\W|[\w\d\x7f-\uffff]+/,
           precedence_table        = '\\. # [`~!] [/*%] [-+] [\\\\:] [<>] & [|^] [=?] , ; [(\[{]'.qw *[new RegExp('^#{x}')] -seq,
           right_associative       = /^[`~!\\\\:=?]/.qf,
