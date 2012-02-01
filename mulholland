@@ -1864,10 +1864,10 @@ created. (Imagine the problem: x $+ y + z or some such, where $+ has the same pr
 
           parse_token(t)            = is_value(t) ? {l: 0, r: 0, u: 0, v: t /!is_value, id: t /!intern} : parse_operator(t),
 
-          parse_operator(t)         = '([{'.indexOf(t) !== -1 ? {l: 0,       r: 1 << 30 | 1, id: t /!intern, v: false, u: true} :
-                                      ')]}'.indexOf(t) !== -1 ? {l: 1 << 30, r: 0,           id: t /!intern, v: false, u: true} : parse_regular_operator(t),
+          parse_operator(t)         = '([{'.indexOf(t) !== -1 ? {l: 0,           r: 1 << 30 | 1, id: t /!intern, v: false, u: true, i: false} :
+                                      ')]}'.indexOf(t) !== -1 ? {l: 1 << 30 | 1, r: 0,           id: t /!intern, v: false, u: true, i: true}  : parse_regular_operator(t),
 
-          parse_regular_operator(t) = {l: left, r: right, id: canonical /!intern, v: false, u: right === adjust}
+          parse_regular_operator(t) = {l: left, r: right, id: canonical /!intern, v: false, u: right === adjust, i: false}
                               -where [pieces    = operator_lexer(t),
                                       adjust    = pieces[1].length << 1,
                                       canonical = pieces[3] || '#',
@@ -1881,7 +1881,7 @@ created. (Imagine the problem: x $+ y + z or some such, where $+ has the same pr
                                       top()         = operators[operators.length - 1],
                                       precedence(n) = apply() -then- precedence(n) -when [operators.length && (n & 1 ? top().r < n : top().r <= n)],
                                       observe(t)    = t.v ? observe('#') /when [ev === (ev = false)] -then- values /~push/ new syntax(t.id)
-                                                          : precedence(t.l) -then- operators /~push/ t -then [ev |= !t.u],
+                                                          : precedence(t.l) -then- operators /~push/ t /unless [t.i] -then [ev |= !t.u],
 
                                       apply()       = top().u ? values /~push/ new syntax(operators.pop().id, [values.pop()])
                                                               : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = values.pop(), y = values.pop()],
