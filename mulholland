@@ -1867,6 +1867,7 @@ The first stage involves "parsing" each token into a structure that describes it
   4. v  truthy if the token is a value
   5. u  truthy if the token represents a unary operator
   6. i  truthy if the token represents an invisible operator
+  7. n  the operator's nuking quantity (for right-associative operators)
 
 The values in these structures govern the parser's behavior. For instance, when we encounter an operator, we force the operator stack until the right-facing precedence of the stack top lines
 up with the left-facing precedence of the operator we've just seen. This is a fairly standard feature of shunting-yard operator precedence parsers, though generalized a bit to deal with
@@ -1874,27 +1875,36 @@ precedence asymmetry.
 
 Some singularities of this particular implementation include its inference of joins and its modeling of brackets as normal unary operators with asymmetric precedence. Joins are inferred when
 the parser does not expect to see a value but encounters one anyway. For instance, if you parse 'foo + bar bif', a join is inferred between 'bar' and 'bif' because after 'bar' the parser
-expected to encounter an operator, not a value.
+expected to encounter an operator, not a value. A join is also generated when you have a unary operator where a binary operator is expected. This causes the parser to do the right thing for
+expressions such as 'foo(bar)': a join is inferred after 'foo' and before '(bar)'.
+
+Invisible tokens are a bit of a hack. These make it possible to represent things like closing parentheses, which have no representation in the final syntax tree but do have an impact on the
+operator stack. A closer needs to force every operator until the nearest opener, force that opener, then disappear. This is unusual behavior for an operator because it doesn't have
+well-defined associativity. A left-associative operator would force all openers, a right-associative operator would force none. This behavior is generalized using the nuking quantity.
+
+Unary operators have some strange precedence rules. All unary operators are prefix and right-associative, and they cannot split anything to their left. For example, in 'foo + ! bif', no
+precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
+right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
 
           precedence_table          = '\\. # [~!] [/*] [%`] [+-] [\\\\:] [<>] [&?] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
           base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*?)(\.[-\/\\|=])?$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
 
-          parse_token(t)            = is_value(t) ? {l: 0, r: 0, u: 0, v: true, id: t /!intern, u: false, i: false} : parse_operator(t),
+          parse_token(t)            = is_value(t) ? {l: 0, r: 0, u: 0, id: t /!intern, v: true, u: false, i: false} : parse_operator(t),
 
-          parse_operator(t)         = '([{'.indexOf(t) !== -1 ? {l: 1,       r: 1 << 30, id: t /!intern, v: false, u: true, i: false} :
-                                      ')]}'.indexOf(t) !== -1 ? {l: 1 << 30, r: 1,       id: t /!intern, v: false, u: true, i: true}  : parse_regular_operator(t),
+          parse_operator(t)         = '([{'.indexOf(t) !== -1 ? {l: 1,       r: 1 << 30, id: t /!intern, v: false, u: true, i: false, n: 0} :
+                                      ')]}'.indexOf(t) !== -1 ? {l: 1 << 30, r: 1,       id: t /!intern, v: false, u: true, i: true,  n: 1} : parse_regular_operator(t),
 
-          parse_regular_operator(t) = {l: real_left, r: real_right, id: canonical /!intern, v: false, u: unary, i: false}
+          parse_regular_operator(t) = {l: real_left, r: real_right, id: canonical /!intern, v: false, u: unary, i: false, n: 0}
                               -where [pieces     = operator_lexer(t),
                                       adjust     = pieces[1].length << 2,
                                       canonical  = pieces[3] || pieces[2] || '#',
-                                      left       = adjust + pieces[2]                            /!base_precedence /or [canonical /!base_precedence],
+                                      left       = adjust + pieces[2]                            /!base_precedence /or [canonical                              /!base_precedence],
                                       right      = adjust + pieces[4] /and [pieces[4].charAt(1)] /!base_precedence /or [canonical.charAt(canonical.length - 1) /!base_precedence],
                                       unary      = right === adjust || right === adjust + 4,
 
-                                      real_left  = unary ? 4 : left,
+                                      real_left  = unary ?    1 : left,
                                       real_right = unary ? left : right],
 
           join                      = '#' /!parse_regular_operator,
@@ -1906,7 +1916,7 @@ expected to encounter an operator, not a value.
 
                                       top()         = operators[operators.length - 1],
                                       precedence(n) = apply() -then- precedence(n) -when [operators.length && (n & 1 ? top().r <= n : top().r < n)],
-                                      operator(t)   = precedence(t.l) -then- operators /~push/ t /unless [t.i] -then [ev = true],
+                                      operator(t)   = precedence(t.l) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
                                       observe(t)    = t.v         ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
                                                     : t.u && !t.i ? observe(join) /unless.ev                    -then- operator(t)
