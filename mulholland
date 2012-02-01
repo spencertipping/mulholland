@@ -1777,7 +1777,7 @@ It also supports SDoc-style paragraph comments. These are removed just like line
 treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[_@\w\d\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/,
+          lexer   = /(#.*|(?:[_@\w\d\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\rA-Za-z@]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.

@@ -7,7 +7,7 @@ return(function(it) {return(it.join( ' ' ) ) } ) .call(this, ( (function(xs) {va
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0;
 xi<xl;
  ++xi)x=xs[xi] , ( /^\s*[A-Z|]/ .test(x) ) ||xr.push(x) ;
-return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /(#.*|(?:[_@\w\d\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\r\d\w@]*)/ ,lex=function(s) {;
+return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /(#.*|(?:[_@\w\d\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[^ \n\t\r.:,;()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]|[.:,;][^ \n\t\rA-Za-z@]*)/ ,lex=function(s) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0;
 xi<xl;
