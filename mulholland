@@ -1862,7 +1862,7 @@ created. (Imagine the problem: x $+ y + z or some such, where $+ has the same pr
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.+?)(\.[-\/\\|=])?$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
 
-          parse_token(t)            = is_value(t) ? {l: 0, r: 0, u: 0, v: t /!is_value, id: t /!intern} : parse_operator(t),
+          parse_token(t)            = is_value(t) ? {l: 0, r: 0, u: 0, v: t /!is_value, id: t /!intern, u: false, i: false} : parse_operator(t),
 
           parse_operator(t)         = '([{'.indexOf(t) !== -1 ? {l: 0,           r: 1 << 30 | 1, id: t /!intern, v: false, u: true, i: false} :
                                       ')]}'.indexOf(t) !== -1 ? {l: 1 << 30 | 1, r: 0,           id: t /!intern, v: false, u: true, i: true}  : parse_regular_operator(t),
