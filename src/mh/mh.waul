@@ -12,7 +12,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
 # | 1. Global rewrite definition: foo = bar
 #   2. Local anonymous rewrite: foo // (bar = bif)
-#   3. Rewriting into a pure (!) Javascript expression: foo =@js parse('hello world' + match._x.structure @)
+#   3. Javascript evaluation: =@js @ /[.= mh.parse "foo _x" =,.\ @ /(./ match -function.- @ /{ return match._x
 
 # Semantics.
 # Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
