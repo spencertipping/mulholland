@@ -114,7 +114,8 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 #   ;             left
 
 # The $ character shifts an operator four levels down in this stack. This is really important; combined with the associativity alternation, it means that no associativity collisions will be
-# created. (Imagine the problem: x $+ y + z or some such, where $+ has the same precedence as a right-associative operator.)
+# created. (Imagine the problem: x $+ y + z or some such, where $+ has the same precedence as a right-associative operator.) The only exception to this is that $ right-associates, and this does
+# create collisions. In this case, the collision is with + and -.
 
 # Parser internals.
 # The first stage involves "parsing" each token into a structure that describes its characteristics. These characteristics are:
@@ -142,7 +143,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # NOTE! Parentheses don't do what you think. They fall roughly in the middle of the precedence table and are used as first-class operators. It's most constructive to think of parentheses and/or
 # brackets as being operators of their own, just like < and >.
 
-          precedence_table          = '\\. # [~!] [/*] [%`] [+-] [\\\\:] [<>] [&?] [(\\[{] [}\\])] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
+          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] [(\\[{] [}\\])] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
           base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*?)(\.[-!\/\\|=])?(\d*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
@@ -168,8 +169,10 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
                                       operators     = [],
                                       ev            = true,
 
+                                      right(t)      = !(t.l & 1) || t.id === join.id && t.l > join.l,
+
                                       top()         = operators[operators.length - 1],
-                                      precedence(t) = apply() -then- precedence(t) -when [operators.length && ((t.l & 1 ? top().r <= t.l : top().r < t.l) || t.n-- > 0)],
+                                      precedence(t) = apply() -then- precedence(t) -when [operators.length && ((t /!right ? top().r < t.l : top().r <= t.l) || t.n-- > 0)],
                                       operator(t)   = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
                                       observe(t)    = t.v         ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)

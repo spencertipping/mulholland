@@ -651,7 +651,7 @@ dangerous('bootstrapping mh', sub {
 
 __
 meta::function('repl', <<'__');
-my @modules = qw|i i/tree i/parse i/rewrite i/js mh/mh|;
+my @modules = qw|i i/tree i/parse i/rewrite i/jsi mh/mh|;
 my %filenames = map {$_ => temporary_name() . '.waul.sdoc'} @modules;
 file::write($filenames{$_}, retrieve("sdoc::waul::$_")) for @modules;
 
@@ -1704,11 +1704,11 @@ are transcribed directly, with the exception of things that start with $ (these 
 
 There are some conversion rules used to help Mulholland and Caterwaul interoperate. They are:
 
-| 1. (# (_f) (( (_x)))         <-> (() (_f) (_x))
-  2. (# (_f) ([ (_x)))         <-> ([] (_f) (_x))
-  3. (( (_x))                  <-> (( (_x))
-  4. (_op (_x) (:: (_y) (_z))) <-> (_op (_x) (_y) (_z))        <- binary/ternary conversion
-  5. (@$_stuff)                <-> ($_stuff)                   <- conversion of $ in an operator position
+| 1. (# (_f) (_x))             <-> (() (_f) (_x))
+  2. ([] (_f) (_x))            <-> ([] (_f) (_x))
+  3. (( @ (_x))                <-> (( _x)                       <- similar for quasi-unary [ and {
+  4. (_op (_x) (:: (_y) (_z))) <-> (_op (_x) (_y) (_z))         <- binary/ternary conversion
+  5. (@$_stuff)                <-> ($_stuff)                    <- conversion of $ in an operator position
   6. ("/_string/_mods"r)       <-> (/_string/_mods)
 
 It should be noted that this library doesn't make Caterwaul interfacing easy; it makes it possible. The standard library builds better abstractions on top of this.
@@ -1717,16 +1717,14 @@ caterwaul.module('mulholland.jsi', 'js_all', function ($) {
   $ /~syntax_extend/ {as_mh: as_mh},
   $.mulholland.syntax_common.as_js = as_js,
 
-  where [as_mh(p) = this.data === '()'     ? new p.syntax('#' /!p.intern, [this[0].as_mh(p), new p.syntax('(' /!p.intern, [this[1].as_mh(p)])]) :
-                    this.data === '[]'     ? new p.syntax('#' /!p.intern, [this[0].as_mh(p), new p.syntax('[' /!p.intern, [this[1].as_mh(p)])]) :
+  where [as_mh(p) = this.data === '()'     ? new p.syntax('#' /!p.intern, [this[0].as_mh(p), this[1].as_mh(p)]) :
                     this.data.length === 0 ? new p.syntax('@' /!p.intern) :
                     this.length === 0      ? new p.syntax(this.data /!mh_encode_literal /!p.intern) :
                     this.length === 3      ? new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), new p.syntax('/@:' /!p.intern, [this[1].as_mh(p), this[2].as_mh(p)])]) :
                                              new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), this[1].as_mh(p)]),
 
-         as_js()  = this.resolved_data() === '#' ? this[1].resolved_data() === '(' ? new $.syntax('()', this[0].as_js(), this[1][0].resolved_data() === '@' ? $.empty : this[1][0].as_js()) :
-                                                   this[1].resolved_data() === '[' ? new $.syntax('[]', this[0].as_js(), this[1][0].resolved_data() === '@' ? $.empty : this[1][0].as_js()) :
-                                                                                     raise [new Error('mulholland as_js: unknown join RHS: #{this[1]}')] :
+         as_js()  = this.resolved_data() === '@'                          ? $.empty :
+                    this.resolved_data() === '#'                          ? new $.syntax('()', this[0].as_js(), this[1].as_js()) :
                     this.length === 2 && this[1].resolved_data() === '::' ? new $.syntax(this.resolved_data() /!mh_decode, [this[0].as_js(), this[1][0].as_js(), this[1][1].as_js()]) :
                     this.length === 0                                     ? new $.syntax(this.resolved_data() /!mh_decode_literal) :
                                                                             new $.syntax(this.resolved_data() /!mh_decode, +this %~![x.resolved_data() !== '@' && x.as_js()] -seq),
@@ -1855,7 +1853,8 @@ Mulholland uses a fairly normal precedence layout. From high to low precedence, 
   ;             left
 
 The $ character shifts an operator four levels down in this stack. This is really important; combined with the associativity alternation, it means that no associativity collisions will be
-created. (Imagine the problem: x $+ y + z or some such, where $+ has the same precedence as a right-associative operator.)
+created. (Imagine the problem: x $+ y + z or some such, where $+ has the same precedence as a right-associative operator.) The only exception to this is that $ right-associates, and this does
+create collisions. In this case, the collision is with + and -.
 
 Parser internals.
 The first stage involves "parsing" each token into a structure that describes its characteristics. These characteristics are:
@@ -1883,7 +1882,7 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
 NOTE! Parentheses don't do what you think. They fall roughly in the middle of the precedence table and are used as first-class operators. It's most constructive to think of parentheses and/or
 brackets as being operators of their own, just like < and >.
 
-          precedence_table          = '\\. # [~!] [/*] [%`] [+-] [\\\\:] [<>] [&?] [(\\[{] [}\\])] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
+          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] [(\\[{] [}\\])] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
           base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*?)(\.[-!\/\\|=])?(\d*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
@@ -1909,8 +1908,10 @@ brackets as being operators of their own, just like < and >.
                                       operators     = [],
                                       ev            = true,
 
+                                      right(t)      = !(t.l & 1) || t.id === join.id && t.l > join.l,
+
                                       top()         = operators[operators.length - 1],
-                                      precedence(t) = apply() -then- precedence(t) -when [operators.length && ((t.l & 1 ? top().r <= t.l : top().r < t.l) || t.n-- > 0)],
+                                      precedence(t) = apply() -then- precedence(t) -when [operators.length && ((t /!right ? top().r < t.l : top().r <= t.l) || t.n-- > 0)],
                                       operator(t)   = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
                                       observe(t)    = t.v         ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
