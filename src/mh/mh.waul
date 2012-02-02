@@ -59,8 +59,9 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
                                     mh_repl(argv)    = source_for(argv) *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
                                                -where [mh                       = $.mulholland.mh(),
-                                                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e)
-                                                                                  -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
+                                                       unparenthesize(s)        = s.charAt(0) === '(' && s.charAt(s.length - 1) === ')' ? s.substr(1, s.length - 2) : s,
+                                                       evaluator(s, _1, _2, cc) = mh(s /!unparenthesize, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e)
+                                                                             -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
                                     context()        = capture [parse         = $.mulholland(),
                                                                 split(s)      = this /~parse/ s /~flatten_all/ ';',
