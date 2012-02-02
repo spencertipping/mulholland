@@ -71,11 +71,14 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
                                     mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
                                                                              -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
                                                                                                                       e.resolved_data() === '='    ? e /!define :
+                                                                                                                      e.resolved_data() === '@js'  ? e /!js_evaluate :
                                                                                                                       e.resolved_data() === '=@js' ? e /!js_define :
                                                                                                                       e.resolved_data() === '//'   ? e /!rewrite /!evaluate : e /!cc,
 
+                                                                                     empty               = new c.parse.syntax('@' /!c.parse.intern),
                                                                                      cc(x)               = (options -or- defaults) /~cc/ x,
                                                                                      rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
+                                                                                     js_evaluate(t)      = t[0].as_js() /-$.compile/ c.environment() -then- empty /!cc,
                                                                                      js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
                                                                                      define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
 

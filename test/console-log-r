@@ -1,0 +1,3 @@
+#!./test-mh -r
+# vim: set syntax=mh :
+console.log 'hello world'
