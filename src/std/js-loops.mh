@@ -1,8 +1,0 @@
-Javascript looping construct generators | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-This module provides various forms of low-level Javascript loops with varying degrees of abstraction. These are all modeled as side-effects; other modules provide higher-level looping
-constructs that you can use to manipulate values directly.
-
-module @js-loops (_x /for-n _v _n = /@p! @js (/var! (_v = 0); _v < _n; !++ _v) /for {@js _x})

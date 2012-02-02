@@ -3,4 +3,3 @@ Mulholland: a practical Havoc implementation that operates on top of Caterwaul.
 mulholland      the self-modifying Perl object containing Waul source
 mh-object       a self-modifying Perl object that contains mh:: attributes
 mh              a command-line REPL and Mulholland compiler
-src/stdlib      an instance of mh-object that contains the standard library

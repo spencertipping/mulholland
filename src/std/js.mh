@@ -1,7 +1,0 @@
-Javascript standard library | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-This module ties together all of the other Javascript rewrites.
-
-module @js (using @js-core; using @js-loops)
