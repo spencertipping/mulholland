@@ -1774,7 +1774,7 @@ It also supports SDoc-style paragraph comments. These are removed just like line
 treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;]*|[^ \n\t\r.:,;][^ \n\t\r]*|[.:,;][^ \n\t\rA-Za-z@_]*)/,
+          lexer   = /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[.:,;][^ \n\t\rA-Za-z@_()\[\]{}]|[^ \n\t\r()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]*)/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -1812,24 +1812,23 @@ When you write an operator, some of the characters exist only to change its left
 included in the parsed output. For example:
 
 | 3 $+ 4 + 5    -> (+ 3 (+ 4 5))                        x //- y / z  -> (//- x (/ y z))
-  x //.- y / z  -> (// x (/ y z))                       x -// y / z  -> (/ (// x y) z)
+  x //- y / z   -> (// x (/ y z))                       x -// y / z  -> (/ (// x y) z)
   x --/ y / z   -> (/ (--/ x y) z)                      x /*%!!      -> (/*%!! x)
   x / y /*++!   -> (/*++! (/ x y))                      x /~         -> (~ x)
   x / y /*++ z  -> (/*++ (/ x y) z)
 
 Mulholland uses several heuristics to determine whether a potential hint can be erased:
 
-| 1. If a hint appears on the left-side of an operator and is followed by a character of different precedence or associativity, it is erased.
-  2. If a hint appears on the right-side of an operator and is prefixed with a dot, it and the dot are erased.
-  3. All prefix $ characters are always erased. If the operator consisted entirely of $, it becomes a join (#).
+| 1. If a hint appears on the left-side of an operator, it is erased.
+  2. All prefix $ characters are always erased. If the operator consisted entirely of $, it becomes a join (#).
 
 Hints are used even if they aren't erased. For example:
 
-| /--   no erasure; left precedence is /, right precedence is -
+| /--   partial erasure; left precedence is /, right precedence is -
   //-   partial erasure; left precedence is /, right precedence is -
   ///   partial erasure; left and right precedence are both /
   ***   no erasure; left and right precedence are both *, which is the same as /
-  ***.- partial erasure; left precedence is *, right precedence is -
+  ***-  no erasure; left precedence is *, right precedence is -
   /+    partial erasure; left precedence is /, right precedence is +, which is the same as -
 
 Precedence groups.
@@ -1844,8 +1843,6 @@ Mulholland uses a fairly normal precedence layout. From high to low precedence, 
   \ :           right
   < >           left
   & ?           right
-  ) ] }         left
-  ( [ {         right
   ^             left
   =             right
   |             left
@@ -1864,7 +1861,8 @@ The first stage involves "parsing" each token into a structure that describes it
   3. id the interned symbol ID of the canonical form of the token (after operator hint erasure; values are preserved verbatim)
   4. v  truthy if the token is a value
   5. u  truthy if the token represents a unary operator
-  7. n  the operator's nuking quantity (for right-associative operators)
+  6. o  truthy if the token opens a group
+  7. c  truthy if the token closes a group
 
 The values in these structures govern the parser's behavior. For instance, when we encounter an operator, we force the operator stack until the right-facing precedence of the stack top lines
 up with the left-facing precedence of the operator we've just seen. This is a fairly standard feature of shunting-yard operator precedence parsers, though generalized a bit to deal with
@@ -1879,24 +1877,25 @@ Unary operators have some strange precedence rules. All unary operators are pref
 precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
 right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
 
-NOTE! Parentheses don't do what you think. They fall roughly in the middle of the precedence table and are used as first-class operators. It's most constructive to think of parentheses and/or
-brackets as being operators of their own, just like < and >.
-
-          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] [(\\[{] [}\\])] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
+          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
           base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
-          operator_lexer            = /^(\$*)([-\/\\|=]?)(.*?)(\.[-!\/\\|=])?(\d*)$/.qf,
+          operator_lexer            = /^(\$*)([-\/\\|=]?)(.*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
 
-          parse_token(t)            = is_value(t) ? {l: 0, r: 0, u: 0, id: t /!intern, v: true, u: false, i: false} : parse_operator(t),
+          is_opener(t)              = '([{'.indexOf(t) + 1,
+          is_closer(t)              = ')]}'.indexOf(t) + 1,
 
-          parse_operator(t)         = {l: real_left, r: real_right, id: canonical /!intern, v: false, u: unary, n: +nuke || 0}
+          parse_token(t)            = is_value(t)  ? {l: 0, r: 0,       id: t /!intern, v: true}          : parse_operator(t),
+          parse_operator(t)         = is_opener(t) ? {l: 0, r: 1 << 30, id: t /!intern, o: true, u: true} :
+                                      is_closer(t) ? {l: 0, r: 0,       id: t /!intern, c: true}          : parse_regular_operator(t),
+
+          parse_regular_operator(t) = {l: real_left, r: real_right, id: canonical /!intern, u: unary}
                               -where [pieces     = operator_lexer(t),
                                       adjust     = pieces[1].length << 2,
                                       canonical  = pieces[3] || pieces[2] || '#',
-                                      left       = adjust + pieces[2]                            /!base_precedence /or [canonical                              /!base_precedence],
-                                      right      = adjust + pieces[4] /and [pieces[4].charAt(1)] /!base_precedence /or [canonical.charAt(canonical.length - 1) /!base_precedence],
+                                      left       = adjust + pieces[2] /!base_precedence /or [canonical /!base_precedence],
+                                      right      = adjust + canonical.charAt(canonical.length - 1) /!base_precedence || left,
                                       unary      = right === adjust || right === adjust + 4,
-                                      nuke       = pieces[5],
 
                                       real_left  = unary ?    1 : left,
                                       real_right = unary ? left : right],
@@ -1904,23 +1903,26 @@ brackets as being operators of their own, just like < and >.
           join                      = '#' /!parse_operator,
 
           parse(ts)                 = ts *parse_token *!observe -seq -re- apply_all()
-                              -where [values        = [],
-                                      operators     = [],
-                                      ev            = true,
+                              -where [values         = [],
+                                      operators      = [],
+                                      ev             = true,
 
-                                      right(t)      = !(t.l & 1) || t.id === join.id && t.l > join.l,
+                                      right(t)       = !(t.l & 1) || t.id === join.id && t.l > join.l,
 
-                                      top()         = operators[operators.length - 1],
-                                      precedence(t) = apply() -then- precedence(t) -when [operators.length && ((t /!right ? top().r < t.l : top().r <= t.l) || t.n-- > 0)],
-                                      operator(t)   = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
+                                      top()          = operators[operators.length - 1],
+                                      precedence(t)  = apply() -then- precedence(t) -when [operators.length && ((t /!right ? top().r < t.l : top().r <= t.l) || t.n-- > 0)],
+                                      operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
-                                      observe(t)    = t.v         ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
-                                                    : t.u && !t.i ? observe(join) /unless.ev                    -then- operator(t)
-                                                                  : operator(t),
+                                      observe(t)     = t.v         ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
+                                                     : t.o         ? observe(join) /unless.ev -then [ev = true]  -then- operators /~push/ t
+                                                     : t.c         ? apply_closer()           -then [ev = false] -then- apply()
+                                                     : t.u && !t.i ? observe(join) /unless.ev                    -then- operator(t)
+                                                                   : operator(t),
 
-                                      apply()       = top().u ? values /~push/ new syntax(operators.pop().id, [values.pop()])
-                                                              : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = values.pop(), y = values.pop()],
-                                      apply_all()   = operators.length ? apply() -then- apply_all() : values[values.length - 1]]]});
+                                      apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [values.pop()])
+                                                               : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = values.pop(), y = values.pop()],
+                                      apply_closer() = apply() -then- apply_closer() -unless [!operators.length || top().o],
+                                      apply_all()    = operators.length ? apply() -then- apply_all() : values[values.length - 1]]]});
 
 __
 meta::sdoc('waul::i/rewrite', <<'__');
@@ -2078,7 +2080,7 @@ Like waul, mh specifies a minimal toplevel execution context. This is used to de
 
 | 1. Global rewrite definition: foo = bar
   2. Local anonymous rewrite: foo // (bar = bif)
-  3. Javascript evaluation: =@js @ /[.= mh.parse "foo _x" =,.\ @ /(./ match -function.- @ /{ return match._x
+  3. Javascript evaluation: =@js @ /[= mh.parse "foo _x" =,.\ @ /(./ match -function.- @ /{ return match._x
 
 Semantics.
 Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
