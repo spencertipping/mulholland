@@ -1758,23 +1758,24 @@ instance, you might want to know the precedence and associativity of a given ope
 
   -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
           syntax    = $.mulholland.syntax(parser),
-          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, sdoc = sdoc],
+          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, sdoc = sdoc, parse_token = parse_token],
 
 Lexer and token types.
 Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
 level, Mulholland supports these types of tokens:
 
-| 1. Identifiers, which have the form /[_@A-Za-z0-9\x7f-\uffff][^ \n\t\r.:,;]*/
-  2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;]*/
+| 1. Identifiers, which have the form /[_@A-Za-z0-9\x7f-\uffff][^ \n\t\r.:,;()\[\]{}]*/
+  2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
   4. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
-  5. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z@_]*/
+  5. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z@_()\[\]{}]*/
+  6. Grouping operators, which are of one of ( ) [ ] { }.
 
 It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[_@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^ \n\t\r.:,;()\[\]{}]*|[.:,;][^ \n\t\rA-Za-z@_()\[\]{}]|[^ \n\t\r()\[\]{}][^ \n\t\r()\[\]{}]*|[()\[\]{}]*)/,
+          lexer   = /(#.*|(?:[@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -1881,6 +1882,7 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
           base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
+          is_unary(t)               = precedence_table[2].test(t) || !base_precedence(t),
 
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
@@ -1894,8 +1896,8 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
                                       adjust     = pieces[1].length << 2,
                                       canonical  = pieces[3] || pieces[2] || '#',
                                       left       = adjust + pieces[2] /!base_precedence /or [canonical /!base_precedence],
-                                      right      = adjust + canonical.charAt(canonical.length - 1) /!base_precedence || left,
-                                      unary      = right === adjust || right === adjust + 4,
+                                      right      = canonical.charAt(canonical.length - 1) /!base_precedence -re [it ? it + adjust : left],
+                                      unary      = canonical /!is_unary,
 
                                       real_left  = unary ?    1 : left,
                                       real_right = unary ? left : right],
