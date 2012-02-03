@@ -11,8 +11,8 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you the following primitive operations:
 
 # | 1. Global rewrite definition: foo = bar
-#   2. Local anonymous rewrite: foo // (bar = bif)
-#   3. Javascript evaluation: =@js @ /[= mh.parse "foo _x" =,.\ @ /(./ match -function.- @ /{ return match._x
+#   2. Local anonymous rewrite: foo /- (bar = bif)
+#   3. Javascript evaluation: (todo: add example for this)
 
 # Semantics.
 # Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
@@ -73,16 +73,16 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
                                                                                                                       e.resolved_data() === '='    ? e /!define :
                                                                                                                       e.resolved_data() === '@js'  ? e /!js_evaluate :
                                                                                                                       e.resolved_data() === '=@js' ? e /!js_define :
-                                                                                                                      e.resolved_data() === '//'   ? e /!rewrite /!evaluate : e /!cc,
+                                                                                                                      e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!cc,
 
                                                                                      empty               = new c.parse.syntax('@' /!c.parse.intern),
                                                                                      cc(x)               = (options -or- defaults) /~cc/ x,
                                                                                      rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
-                                                                                     js_evaluate(t)      = t[0].as_js() /-$.compile/ c.environment() -then- empty /!cc,
+                                                                                     js_evaluate(t)      = t[0].as_js() /-$.compile/ c.environment() /or [empty] /!cc,
                                                                                      js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
                                                                                      define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
 
-                                                                                     replacer(js)        = '(function (match) {return match && (_body)})'.qs.replace({_body: js}),
+                                                                                     replacer(js)        = '(function (match) {return match && (_body)})'.qs /~replace/ {_body: js},
                                                                                      js_evaluator(e)     = [e[0], js_marker(e[1])],
                                                                                      js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().toString()}>' /!c.parse.intern)
                                                                                                       -se [it.replace = t.as_js() /!replacer /-$.compile/ c.environment()]]]

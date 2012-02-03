@@ -1769,13 +1769,13 @@ level, Mulholland supports these types of tokens:
   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
   4. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
   5. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z@_()\[\]{}]*/
-  6. Grouping operators, which are of one of ( ) [ ] { }.
+  6. Grouping operators, which are of one of ( ) [ ] { }. Of these, parentheses are erased.
 
 It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 treats any Unicode character as the beginning of an identifier.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/,
+          lexer   = /(#.*|(?:[@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -1864,18 +1864,19 @@ The first stage involves "parsing" each token into a structure that describes it
   5. u  truthy if the token represents a unary operator
   6. o  truthy if the token opens a group
   7. c  truthy if the token closes a group
+  8. i  truthy if the token is invisible; that is, it should not be consed into an operator node (this is used to implement parenthesis erasure)
 
 The values in these structures govern the parser's behavior. For instance, when we encounter an operator, we force the operator stack until the right-facing precedence of the stack top lines
 up with the left-facing precedence of the operator we've just seen. This is a fairly standard feature of shunting-yard operator precedence parsers, though generalized a bit to deal with
 precedence asymmetry.
 
-Some singularities of this particular implementation include its inference of joins and its modeling of brackets as normal unary operators with asymmetric precedence. Joins are inferred when
-the parser does not expect to see a value but encounters one anyway. For instance, if you parse 'foo + bar bif', a join is inferred between 'bar' and 'bif' because after 'bar' the parser
-expected to encounter an operator, not a value. A join is also generated when you have a unary operator where a binary operator is expected. This causes the parser to do the right thing for
-expressions such as 'foo(bar)': a join is inferred after 'foo' and before '(bar)'.
+Some singularities of this particular implementation include its inference of joins and its modeling of operators with asymmetric precedence. Joins are inferred when the parser does not expect
+to see a value but encounters one anyway. For instance, if you parse 'foo + bar bif', a join is inferred between 'bar' and 'bif' because after 'bar' the parser expected to encounter an
+operator, not a value. A join is also generated when you have a unary operator where a binary operator is expected. This causes the parser to do the right thing for expressions such as
+'foo(bar)': a join is inferred after 'foo' and before '(bar)'.
 
-Unary operators have some strange precedence rules. All unary operators are prefix and right-associative, and they cannot split anything to their left. For example, in 'foo + ! bif', no
-precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
+Unary operators have some strange precedence rules. All unary operators are prefix and therefore right-associative, and they cannot split anything to their left. For example, in 'foo + ! bif',
+no precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
 right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
 
           precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
@@ -1887,9 +1888,9 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
 
-          parse_token(t)            = is_value(t)  ? {l: 0, r: 0,       id: t /!intern, v: true}          : parse_operator(t),
-          parse_operator(t)         = is_opener(t) ? {l: 0, r: 1 << 30, id: t /!intern, o: true, u: true} :
-                                      is_closer(t) ? {l: 0, r: 0,       id: t /!intern, c: true}          : parse_regular_operator(t),
+          parse_token(t)            = is_value(t)  ? {l: 0, r: 0,       id: t /!intern, v: true}                        : parse_operator(t),
+          parse_operator(t)         = is_opener(t) ? {l: 0, r: 1 << 30, id: t /!intern, o: true, u: true, i: t === '('} :
+                                      is_closer(t) ? {l: 0, r: 0,       id: t /!intern, c: true}                        : parse_regular_operator(t),
 
           parse_regular_operator(t) = {l: real_left, r: real_right, id: canonical /!intern, u: unary}
                               -where [pieces     = operator_lexer(t),
@@ -1915,11 +1916,11 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
                                       precedence(t)  = apply() -then- precedence(t) -when [operators.length && ((t /!right ? top().r < t.l : top().r <= t.l) || t.n-- > 0)],
                                       operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
-                                      observe(t)     = t.v         ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
-                                                     : t.o         ? observe(join) /unless.ev -then [ev = true]  -then- operators /~push/ t
-                                                     : t.c         ? apply_closer()           -then [ev = false] -then- apply()
-                                                     : t.u && !t.i ? observe(join) /unless.ev                    -then- operator(t)
-                                                                   : operator(t),
+                                      observe(t)     = t.v ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
+                                                     : t.o ? observe(join) /unless.ev -then [ev = true]  -then- operators /~push/ t
+                                                     : t.c ? apply_closer()           -then [ev = false] -then [top().i ? operators.pop() : apply()]
+                                                     : t.u ? observe(join) /unless.ev                    -then- operator(t)
+                                                           : operator(t),
 
                                       apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [values.pop()])
                                                                : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = values.pop(), y = values.pop()],
@@ -2081,8 +2082,8 @@ Mulholland module format.
 Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you the following primitive operations:
 
 | 1. Global rewrite definition: foo = bar
-  2. Local anonymous rewrite: foo // (bar = bif)
-  3. Javascript evaluation: =@js @ /[= mh.parse "foo _x" =,.\ @ /(./ match -function.- @ /{ return match._x
+  2. Local anonymous rewrite: foo /- (bar = bif)
+  3. Javascript evaluation: (todo: add example for this)
 
 Semantics.
 Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
@@ -2143,16 +2144,16 @@ For example:
                                                                                                                       e.resolved_data() === '='    ? e /!define :
                                                                                                                       e.resolved_data() === '@js'  ? e /!js_evaluate :
                                                                                                                       e.resolved_data() === '=@js' ? e /!js_define :
-                                                                                                                      e.resolved_data() === '//'   ? e /!rewrite /!evaluate : e /!cc,
+                                                                                                                      e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!cc,
 
                                                                                      empty               = new c.parse.syntax('@' /!c.parse.intern),
                                                                                      cc(x)               = (options -or- defaults) /~cc/ x,
                                                                                      rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
-                                                                                     js_evaluate(t)      = t[0].as_js() /-$.compile/ c.environment() -then- empty /!cc,
+                                                                                     js_evaluate(t)      = t[0].as_js() /-$.compile/ c.environment() /or [empty] /!cc,
                                                                                      js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
                                                                                      define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
 
-                                                                                     replacer(js)        = '(function (match) {return match && (_body)})'.qs.replace({_body: js}),
+                                                                                     replacer(js)        = '(function (match) {return match && (_body)})'.qs /~replace/ {_body: js},
                                                                                      js_evaluator(e)     = [e[0], js_marker(e[1])],
                                                                                      js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().toString()}>' /!c.parse.intern)
                                                                                                       -se [it.replace = t.as_js() /!replacer /-$.compile/ c.environment()]]]

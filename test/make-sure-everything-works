@@ -2,12 +2,12 @@
 ./build-test-mh
 
 fail() {
-  echo -e "\033[1;31m failed\033[0;0m"
+  echo -e "\033[40G\033[1;31m failed\033[0;0m"
   exit 1
 }
 
 ok() {
-  echo -e "\033[1;32m ok\033[0;0m"
+  echo -e "\033[40G\033[1;32m ok\033[0;0m"
 }
 
 for file in *; do

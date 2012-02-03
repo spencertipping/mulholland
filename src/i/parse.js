@@ -7,7 +7,7 @@ return(function(it) {return(it.join( ' ' ) ) } ) .call(this, ( (function(xs) {va
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0;
 xi<xl;
  ++xi)x=xs[xi] , ( /^\s*[A-Z|]/ .test(x) ) ||xr.push(x) ;
-return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /(#.*|(?:[@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/ ,lex=function(s) {;
+return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /(#.*|(?:[@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/ ,lex=function(s) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length,x0;
 xi<xl;
@@ -28,7 +28,7 @@ return precedence_table[2] .test(t) || !base_precedence(t) } ,is_opener=function
 return'([{' .indexOf(t) +1} ,is_closer=function(t) {;
 return')]}' .indexOf(t) +1} ,parse_token=function(t) {;
 return is_value(t) ? {l:0,r:0,id:intern(t) ,v:true} :parse_operator(t) } ,parse_operator=function(t) {;
-return is_opener(t) ? {l:0,r:1<<30,id:intern(t) ,o:true,u:true} :is_closer(t) ? {l:0,r:0,id:intern(t) ,c:true} :parse_regular_operator(t) } ,parse_regular_operator=function(t) {;
+return is_opener(t) ? {l:0,r:1<<30,id:intern(t) ,o:true,u:true,i:t=== '(' } :is_closer(t) ? {l:0,r:0,id:intern(t) ,c:true} :parse_regular_operator(t) } ,parse_regular_operator=function(t) {;
 return(function( ) {var pieces=operator_lexer(t) ,adjust=pieces[1] .length<<2,canonical=pieces[3] ||pieces[2] || '#' ,left=adjust+ ( (base_precedence(pieces[2] ) ) || (base_precedence(canonical) ) ) ,right= (function(it) {return(it?it+adjust:left) } ) .call(this, (base_precedence(canonical.charAt(canonical.length-1) ) ) ) ,unary=is_unary(canonical) ,real_left=unary?1:left,real_right=unary?left:right;
 return( {l:real_left,r:real_right,id:intern(canonical) ,u:unary} ) } ) .call(this) } ,join=parse_operator( '#' ) ,parse=function(ts) {;
 return(function( ) {var values= [ ] ,operators= [ ] ,ev=true,right=function(t) {;
@@ -36,7 +36,7 @@ return! (t.l&1) ||t.id===join.id&&t.l>join.l} ,top=function() {;
 return operators[operators.length-1] } ,precedence=function(t) {;
 return( (operators.length&& ( (right(t) ?top() .r<t.l:top() .r<=t.l) ||t.n-- >0) ) && ( ( (apply() ) , (precedence(t) ) ) ) ) } ,operator=function(t) {;
 return( (precedence(t) ) , ( ( ! (t.i) && ( ( ( (operators) .push(t) ) , (ev=true) ) ) ) ) ) } ,observe=function(t) {;
-return t.v? ( ( ( ( ( ! (ev) && (observe(join) ) ) ) , (ev=false) ) ) , ( (values) .push(new syntax(t.id) ) ) ) :t.o? ( ( ( ( ( ! (ev) && (observe(join) ) ) ) , (ev=true) ) ) , ( (operators) .push(t) ) ) :t.c? ( ( ( (apply_closer() ) , (ev=false) ) ) , (apply() ) ) :t.u&& !t.i? ( ( ( ! (ev) && (observe(join) ) ) ) , (operator(t) ) ) :operator(t) } ,apply=function() {;
+return t.v? ( ( ( ( ( ! (ev) && (observe(join) ) ) ) , (ev=false) ) ) , ( (values) .push(new syntax(t.id) ) ) ) :t.o? ( ( ( ( ( ! (ev) && (observe(join) ) ) ) , (ev=true) ) ) , ( (operators) .push(t) ) ) :t.c? ( ( ( (apply_closer() ) , (ev=false) ) ) , (top() .i?operators.pop() :apply() ) ) :t.u? ( ( ( ! (ev) && (observe(join) ) ) ) , (operator(t) ) ) :operator(t) } ,apply=function() {;
 return top() .u? (values) .push(new syntax(operators.pop() .id, [values.pop() ] ) ) : (function( ) {var x=values.pop() ,y=values.pop() ;
 return( (values) .push(new syntax(operators.pop() .id, [y,x] ) ) ) } ) .call(this) } ,apply_closer=function() {;
 return( ! ( !operators.length||top() .o) && ( ( (apply() ) , (apply_closer() ) ) ) ) } ,apply_all=function() {;
