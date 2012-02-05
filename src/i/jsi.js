@@ -8,5 +8,5 @@ return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) } ,mh_encode_li
 return/\/./ .test(s) ? '"' +s.replace( /"/g , '\\"' ) + '"r' :s.replace( /^\$/ , '@$' ) } ,mh_encode=function(s) {;
 return/^[()\[\]{}\.,;:]/ .test(s) ?s: '/' +s} ,mh_decode_literal=function(s) {;
 return/^".*"r$/ .test(s) ? '/' +s.replace( /\\"/g , '"' ) .replace( /"r$/ , '' ) :s.replace( /^@\$/ , '$' ) } ,mh_decode=function(s) {;
-return s.replace( /^\// , '' ) } ;
+return s.replace( /^\/(.)/ , '$1' ) } ;
 return( ($) .syntax_extend( {as_mh:as_mh} ) ,$.mulholland.syntax_common.as_js=as_js) } ) .call(this) } ) ;

@@ -80,8 +80,8 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
 # Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
     match(t, m)          = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
-                           (!this.is_wildcard() || this.match_meta_level() >= t.meta_level()) &&
-                           (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t, when [this.is_wildcard()], this / t /~children_match/ m && m),
+                           !this.is_wildcard() -or- (this.match_meta_level() >= t.meta_level() &&
+                                                     (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t)) && this / t /~children_match/ m && m,
 
     replace(m)           = m && (m[this.resolved_data()] || this /~map/ "_.replace(m)".qf),
 

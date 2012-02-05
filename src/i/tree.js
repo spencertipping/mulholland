@@ -36,7 +36,7 @@ for(var x0= (0) ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,x0= (x0+x.complexity() ) ;
 return x0} ) .call(this,this) ) } ,match:function(t,m) {;
-return(this) .can_match(t) && (this) .level_matches(t) && (m|| (m= {_:t} ) ) && ( !this.is_wildcard() ||this.match_meta_level() >=t.meta_level() ) && ( ( (this.is_wildcard() ) && (m[this.without_arity() ] ? (m[this.without_arity() ] ) .match(t) :m[this.without_arity() ] =t) ) , (this) .children_match(t,m) &&m) } ,replace:function(m) {;
+return(this) .can_match(t) && (this) .level_matches(t) && (m|| (m= {_:t} ) ) && ( ( !this.is_wildcard() ) || ( (this.match_meta_level() >=t.meta_level() && (m[this.without_arity() ] ? (m[this.without_arity() ] ) .match(t) :m[this.without_arity() ] =t) ) ) ) && (this) .children_match(t,m) &&m} ,replace:function(m) {;
 return m&& (m[this.resolved_data() ] || (this) .map(function(_) {return _.replace(m) } ) ) } ,can_match:function(t) {;
 return(this.bloom() ) .subset(t.bloom() ) &&this.complexity() <=t.complexity() } ,level_matches:function(t) {;
 return this.is_wildcard() ?this.match_arity() ===null||t.length===this.match_arity() && ( !t.is_wildcard() ||t.match_arity() ===this.match_arity() ) :this.data===t.data&&this.length===t.length} ,children_match:function(t,m) {;
