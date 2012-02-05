@@ -4,4 +4,22 @@ mulholland      the self-modifying Perl object containing Waul source
 mh-object       a self-modifying Perl object that contains mh:: attributes
 mh              a command-line REPL and Mulholland compiler
 
+Perhaps more usefully:
+
+mulholland contains the core Mulholland language implementation as uncompiled
+Waul source. It contains function::render, which generates the stuff in src/
+and the 'mh' program. It also pre-bootstraps 'mh' during the render process to
+make sure that 'mh' can successfully clone itself (and presumably bake in other
+stuff).
+
+mh-object is designed for you to inherit from. It contains a copy of the vim
+highlighter (auto-installable via function::vim) and knows how to store mh::
+attributes. It also importantly contains function::repl, which launches a REPL
+using 'mh' (it assumes 'mh' is somewhere in your $PATH).
+
+mh is the fully precompiled output of 'mulholland render'. It is a
+self-replicating online/offline compiler and REPL. Its documented source code
+is in src/mh/mh.waul; this file describes the command-line options that it
+understands and provides frustratingly little useful information otherwise.
+
 MIT licensed as usual, but nobody in their right mind would want to use this.
