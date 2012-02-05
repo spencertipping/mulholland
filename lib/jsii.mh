@@ -3,4 +3,31 @@ Licensed under the terms of the MIT source code license
 
 Introduction.
 This file provides a jsi-based interpreter for Mulholland. The idea is to provide some basic semantics and allow interfacing to tree objects at compile-time. This is useful when you want to
-use rewrites to do more complex kinds of computation than just matching and replacing.
+use rewrites to do more complex kinds of computation than just matching and replacing. To facilitate this, this library emulates a subset of Javascript in terms of tree rewrites.
+
+All rewriting rules used in this library are parameterized by the prefix operator @jsii. This prevents anything here from being spuriously evaluated in the course of normal rewriting, and it
+allows you to control the order of evaluation at a fairly low level. For example:
+
+| =@jsii _cond      ? _t : _f = =@jsii-cond /@jsii-boolean _cond ? _t : _f;
+  =@jsii-cond true  ? _t : _f = /@jsii _t;
+  =@jsii-cond false ? _t : _f = /@jsii _f;
+
+Here, evaluation is constrained to whichever conditional branch is needed; the other remains unevaluated. This is very important as it lets you model recursion and other self-referential
+processes.
+
+Low-level data representation.
+Numbers and strings are represented verbatim; Javascript's + operator is replaced by two in jsii. + coerces its arguments to numbers while ++ coerces its arguments to strings. All numbers are
+ultimately represented as nullary tree nodes, which means that they are (1) boxed, (2) have Bloom filters, and (3) are therefore insanely expensive to work with (for numbers, anyway). So don't
+write number-crunching code in jsii ;)
+
+Arrays are represented by [] nodes, which Mulholland's parser produces when you encase stuff in [] groups. Elements are comma-separated. Because commas right-associate, working with the
+beginning of an array is O(1) while working with the end is O(n). Therefore, you should treat arrays in jsii like you would treat lists in Lisp. Objects are represented by {} nodes consisting
+of : pairs encased in ,. The representation here is similar to an alist in Lisp, and the same performance caveats apply.
+
+Functions are not represented by jsii. The reason is that you can get most of the functionality of functions by just setting up rewrite rules, and this will probably be faster than trying to
+provide function emulation, parameter binding, etc. In particular, you can create closures by using currying, since function application left-associates:
+
+| /@jsii adder _x _n = -@jsii _x + _n;
+
+Any 'adder _x' term will remain in its unevaluated state; once it is applied to its second argument, however, the rewrite rule will take effect. (Well, it will once the @jsii marker is
+present.)

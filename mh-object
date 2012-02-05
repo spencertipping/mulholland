@@ -1240,8 +1240,8 @@ syn match  mh_wildcard           /_[^[:space:].:,;()\[\]{}]\+/ contains=mh_arity
 syn match  mh_arity_restriction  /@\d/ contained
 syn match  mh_marker             /@[^[:cntrl:][:space:].:,;()\[\]{}]*/
 syn match  mh_op                 /[^[:space:][:cntrl:]_@[:alnum:].:,;()\[\]{}][^[:space:][:cntrl:].:,;()\[\]{}]*/
-syn match  mh_single_string      /'\([^'\\\n]\|\\.\)*'[^\s.:,;()\[\]{}]*/
-syn match  mh_double_string      /"\([^"\\\n]\|\\.\)*"[^\s.:,;()\[\]{}]*/
+syn match  mh_single_string      /'\([^'\\\n]\|\\.\)*'[^[:space:][:cntrl:].:,;()\[\]{}]*/
+syn match  mh_double_string      /"\([^"\\\n]\|\\.\)*"[^[:space:][:cntrl:].:,;()\[\]{}]*/
 
 syn match  mh_group              /[()\[\]{}]/
 syn match  mh_punctuation        /[,;.:]/

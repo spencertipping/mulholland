@@ -2146,17 +2146,19 @@ For example:
                                                                                                                       e.resolved_data() === '=@js' ? e /!js_define :
                                                                                                                       e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!cc,
 
+                                                                                     js_macroexpand      = $('js_all'),
+
                                                                                      empty               = new c.parse.syntax('@' /!c.parse.intern),
                                                                                      cc(x)               = (options -or- defaults) /~cc/ x,
                                                                                      rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
-                                                                                     js_evaluate(t)      = t[0].as_js() /-$.compile/ c.environment() /or [empty] /!cc,
+                                                                                     js_evaluate(t)      = t[0].as_js() /!js_macroexpand /-$.compile/ c.environment() /or [empty] /!cc,
                                                                                      js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
                                                                                      define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
 
                                                                                      replacer(js)        = '(function (match) {return match && (_body)})'.qs /~replace/ {_body: js},
                                                                                      js_evaluator(e)     = [e[0], js_marker(e[1])],
                                                                                      js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().toString()}>' /!c.parse.intern)
-                                                                                                      -se [it.replace = t.as_js() /!replacer /-$.compile/ c.environment()]]]
+                                                                                                      -se [it.replace = t.as_js() /!replacer /!js_macroexpand /-$.compile/ c.environment()]]]
 
                             -where [source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
                                     contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
