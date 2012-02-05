@@ -1,3 +1,5 @@
 Dependencies for Mulholland.
-Right now this just includes Caterwaul and the standard extension. These are
-used by the Mulholland compiler/interpreter.
+Right now this just includes Caterwaul, the standard extension, and the
+Caterwaul Bloom filter library. These are used by and baked into the Mulholland
+compiler/interpreter (mh). From then on, mh can clone itself independently of
+these dependencies.
