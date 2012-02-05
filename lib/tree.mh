@@ -1,0 +1,12 @@
+Mulholland syntax tree reflection | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Mulholland's pattern matching API is good for high-level declarative specification, but it has properties that make it less versatile than is often useful. For example, there isn't a way to
+get a wildcard to bind to an operator. If you want to do this, you'll need to use tree reflection to construct operator trees up-front. This library gives you a reasonable way to do that.
+
+_x.@data   ==@js -new parse.syntax $ match._x.data;
+_x.@length ==@js -new parse.syntax $ parse.intern $ match._x.length;
+
+_x@0.@cons1 _y    ==@js -new parse.syntax (match._x.data, [match._y]);
+_x@0.@cons2 _y _z ==@js -new parse.syntax (match._x.data, [match._y, match._z])
