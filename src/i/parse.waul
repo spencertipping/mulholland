@@ -19,7 +19,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 
   -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
           syntax    = $.mulholland.syntax(parser),
-          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, sdoc = sdoc, parse_token = parse_token],
+          statics() = capture [syntax = syntax, intern = intern, extern = extern, transient_intern = transient_intern, lex = lex, sdoc = sdoc, parse_token = parse_token],
 
 # Lexer and token types.
 # Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
@@ -46,7 +46,9 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # it; so generally speaking you don't have to worry about it.
 
           intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
-          extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
+          extern(n) = n.constructor === Number && Object.prototype.hasOwnProperty.call(table, n) ? table[n] : n,
+
+          transient_intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : s.toString(),
 
 # Asymmetric operator precedence.
 # Mulholland goes off the deep end with operator precedence stuff by allowing operators to have asymmetric precedence and associativity. For example, you can say things like 3 +/ 4 / 5, which
@@ -108,6 +110,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 #   ^             left
 #   =             right
 #   |             left
+#   ...
 #   ,             right
 #   ;             left
 
@@ -140,8 +143,8 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # no precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
 # right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
 
-          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
-          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
+          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\|'.qw *[new RegExp('^#{x}')] -seq,
+          base_precedence(t)        = t === ',' ? 0x40000000 : t === ';' ? 0x40000001 : precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
           is_unary(t)               = precedence_table[2].test(t) || !base_precedence(t),

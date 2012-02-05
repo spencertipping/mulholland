@@ -1758,7 +1758,7 @@ instance, you might want to know the precedence and associativity of a given ope
 
   -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
           syntax    = $.mulholland.syntax(parser),
-          statics() = capture [syntax = syntax, intern = intern, extern = extern, lex = lex, sdoc = sdoc, parse_token = parse_token],
+          statics() = capture [syntax = syntax, intern = intern, extern = extern, transient_intern = transient_intern, lex = lex, sdoc = sdoc, parse_token = parse_token],
 
 Lexer and token types.
 Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
@@ -1785,7 +1785,9 @@ are backed by symbol tables, at least until you render them into regular Caterwa
 it; so generally speaking you don't have to worry about it.
 
           intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
-          extern(n) = Object.prototype.hasOwnProperty.call(table, n)   ? table[n]   : n,
+          extern(n) = n.constructor === Number && Object.prototype.hasOwnProperty.call(table, n) ? table[n] : n,
+
+          transient_intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : s.toString(),
 
 Asymmetric operator precedence.
 Mulholland goes off the deep end with operator precedence stuff by allowing operators to have asymmetric precedence and associativity. For example, you can say things like 3 +/ 4 / 5, which
@@ -1847,6 +1849,7 @@ Mulholland uses a fairly normal precedence layout. From high to low precedence, 
   ^             left
   =             right
   |             left
+  ...
   ,             right
   ;             left
 
@@ -1879,8 +1882,8 @@ Unary operators have some strange precedence rules. All unary operators are pref
 no precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
 right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
 
-          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\| , ;'.qw *[new RegExp('^#{x}')] -seq,
-          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
+          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\|'.qw *[new RegExp('^#{x}')] -seq,
+          base_precedence(t)        = t === ',' ? 0x40000000 : t === ';' ? 0x40000001 : precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
           is_unary(t)               = precedence_table[2].test(t) || !base_precedence(t),
@@ -1993,10 +1996,21 @@ indexes into the symbol table.
 
   $.mulholland.syntax_common = {},
 
-  $.mulholland.syntax(parser, result.prototype / $.mulholland.syntax_common /-$.merge/ methods(parser))
+  $.mulholland.syntax(parser, result.prototype / $.mulholland.syntax_common /-$.merge/ methods(parser),
+                              result                                        /-$.merge/ statics(parser))
                      (data, xs) = (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this),
 
-  where [methods(parser) = capture [
+  where [
+
+  statics(parser) = wcapture [
+
+    constants      = {},
+    constant(s)    = Object.prototype.hasOwnProperty.call(constants, s) ? constants[s] : constants[s] = new this(s),
+
+    create_bloom() = $.bloom(["_ * 5471".qf, "_ * 8707".qf], 8),
+    empty_bloom    = create_bloom()],
+
+  methods(parser) = capture [
 
     resolved_data() = parser.extern(this.data),
     structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
@@ -2036,9 +2050,16 @@ Bloom filters.
 Trees are annotated with Bloom filters that indicate which constants they contain. This optimizes rewriting by quickly eliminating subtrees that don't contain constants that are present in a
 pattern. For example, if your pattern is _x + foo, then its filter contains the constants '+' and 'foo'; target trees that don't contain these constants can't match the pattern.
 
-    create_bloom() = $.bloom(["_ * 5471".qf, "_ * 8707".qf], 8),
+    create_bloom() = this.constructor.create_bloom(),
     self_bloom()   = this.is_wildcard() ? this.create_bloom() : this.create_bloom() /~add/ this.data,
     bloom()        = this._bloom || this /[this._bloom = this.self_bloom()][x0 /~merge/ x.bloom()] -seq,
+
+Bloom filters can be erased in some cases. This means that the node obtains an empty Bloom filter, so no constants it possesses are accounted for. This is actually really useful for some
+things, most notably working with things like numbers (which shouldn't be hashed in many cases). You could theoretically use this to lie about the set of constants in a tree, but this approach
+is unreliable because Bloom filters have false positives and your lie might therefore be ignored. The primary use case I see for Bloom erasure is to quickly allocate a constant node whose
+value is known to be irrelevant to the rewriting process.
+
+    erase_bloom()  = (this._bloom = this.constructor.empty_bloom, this),
 
 Complexity computation.
 This is a fairly straightforward way to reject low-level leaf nodes in recursive match cases. Each tree has a total 'complexity', which is a measure of the number of descendants it has. A

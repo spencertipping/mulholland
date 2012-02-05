@@ -1236,20 +1236,20 @@ meta::vim_highlighter('mh', <<'__');
 syn case match
 syn sync minlines=5
 
-syn match  mh_wildcard           /_[^[:space:].:,;()\[\]{}]\+/ contains=mh_arity_restriction
+syn match  mh_wildcard           /\<_[^[:space:].:,;()\[\]{}]\+/ contains=mh_arity_restriction
 syn match  mh_arity_restriction  /@\d/ contained
 syn match  mh_marker             /@[^[:cntrl:][:space:].:,;()\[\]{}]*/
-syn match  mh_op                 /[^[:space:][:cntrl:]_@[:alnum:].:,;()\[\]{}][^[:space:][:cntrl:].:,;()\[\]{}]*/
+syn match  mh_op                 /[^[:space:][:cntrl:]_@[:alnum:].:,;()\[\]{}][^[:space:][:cntrl:].:,;()\[\]{}]*/ contains=mh_marker
 syn match  mh_single_string      /'\([^'\\\n]\|\\.\)*'[^[:space:][:cntrl:].:,;()\[\]{}]*/
 syn match  mh_double_string      /"\([^"\\\n]\|\\.\)*"[^[:space:][:cntrl:].:,;()\[\]{}]*/
 
 syn match  mh_group              /[()\[\]{}]/
 syn match  mh_punctuation        /[,;.:]/
 
-syn region mh_qop                matchgroup=mh_q start=+\$\+\|\$*[-/\\|=]+ end=+$\|\s\|\.[-/\\|=]\d*+
+syn region mh_qop                matchgroup=mh_q start=+\$\+\|\$*[-/\\|=]+ end=+$\|\s\|\.[-/\\|=]\d*+ contains=mh_marker
 
 syn region mh_line_comment       start=/#/ end=/$/
-syn region mh_sdoc_comment       start=/\(^$\n^\|\%^\)\s*[A-Z\|]/ end=/^\s*$\|\%$/ contains=mh_sdoc_coerce,mh_sdoc_numbered_list,mh_sdoc_heading keepend
+syn region mh_sdoc_comment       start=/\(^$\n^\|\%^\)\s*[A-Z|]/ end=/^\s*$\|\%$/ contains=mh_sdoc_coerce,mh_sdoc_numbered_list,mh_sdoc_heading keepend
 syn region mh_sdoc_numbered_list start=/^\s*|\s*\d\{1,2\}\.\s\{1,2\}[A-Za-z]/me=e-1 end=/^$\|\%$/ contains=mh_sdoc_numbered_item transparent
 syn match  mh_sdoc_numbered_item /^\s*|\?\s*\d\{1,2\}\.\s\{1,2\}/    contained
 syn match  mh_sdoc_heading       /\(^$\n^\|\%^\)\s*[A-Z].\{,60\}\.$/ contained

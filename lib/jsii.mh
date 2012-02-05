@@ -17,17 +17,46 @@ processes.
 
 Low-level data representation.
 Numbers and strings are represented verbatim; Javascript's + operator is replaced by two in jsii. + coerces its arguments to numbers while ++ coerces its arguments to strings. All numbers are
-ultimately represented as nullary tree nodes, which means that they are (1) boxed, (2) have Bloom filters, and (3) are therefore insanely expensive to work with (for numbers, anyway). So don't
-write number-crunching code in jsii ;)
+ultimately represented as nullary tree nodes, which means that they are boxed and therefore much more expensive to allocate than regular Javascript numbers are. They are also Bloom-filter
+erased, which saves about 40 bytes of allocation (though this doesn't make them cheap).
 
 Arrays are represented by [] nodes, which Mulholland's parser produces when you encase stuff in [] groups. Elements are comma-separated. Because commas right-associate, working with the
 beginning of an array is O(1) while working with the end is O(n). Therefore, you should treat arrays in jsii like you would treat lists in Lisp. Objects are represented by {} nodes consisting
 of : pairs encased in ,. The representation here is similar to an alist in Lisp, and the same performance caveats apply.
 
 Functions are not represented by jsii. The reason is that you can get most of the functionality of functions by just setting up rewrite rules, and this will probably be faster than trying to
-provide function emulation, parameter binding, etc. In particular, you can create closures by using currying, since function application left-associates:
+provide function emulation, parameter binding, etc. In particular, you can create closures by using currying since function application left-associates:
 
-| /@jsii adder _x _n = -@jsii _x + _n;
+| /@jsii adder _x _n = \@jsii _x + _n;
 
 Any 'adder _x' term will remain in its unevaluated state; once it is applied to its second argument, however, the rewrite rule will take effect. (Well, it will once the @jsii marker is
 present.)
+
+@jsii-t->n _x = Number $ _x.resolved_data @;
+@jsii-n->t _x = (-new parse.syntax $ parse.transient_intern $ _x).erase_bloom @;
+@jsii-c->t _x = parse.syntax.constant _x;
+
+\@jsii _x@0 = _x;
+
+\@jsii _x@0 + _y@0  ==@js @jsii-n->t $$ @jsii-t->n match._x + @jsii-t->n match._y;
+\@jsii _x@0 - _y@0  ==@js @jsii-n->t $$ @jsii-t->n match._x - @jsii-t->n match._y;
+\@jsii _x@0 * _y@0  ==@js @jsii-n->t $$ @jsii-t->n match._x * @jsii-t->n match._y;
+\@jsii _x@0 / _y@0  ==@js @jsii-n->t $$ @jsii-t->n match._x / @jsii-t->n match._y;
+
+\@jsii _x@0 ++ _y@0 ==@js (-new parse.syntax $ parse.transient_intern $ match._x.resolved_data @ + match._y.resolved_data @).erase_bloom @;
+
+$\@jsii _x@0 <  _y@0 $==@js (@jsii-c->t $$ match._x.resolved_data @ <  match._y.resolved_data @ ? 'true' : 'false');
+$\@jsii _x@0 <= _y@0 $==@js (@jsii-c->t $$ match._x.resolved_data @ <= match._y.resolved_data @ ? 'true' : 'false');
+$\@jsii _x   >  _y   $= \@jsii _y <  _x;
+$\@jsii _x   >= _y   $= \@jsii _y <= _x;
+
+/@jsii [_x@0].length    = 1;
+/@jsii [_x, _xs].length = \@jsii 1 + /@jsii [_xs].length;
+/@jsii [@].length       = 0
+
+High-level operators.
+The high-level operators supported by jsii diverge significantly from Javascript, especially for array operations. Most Javascript array operations are rephrased in terms of Caterwaul's seq
+library because the seq library is the freaking bomb (and because it's faster this way). There's also some attempt made to optimize where possible; for instance, sequence comprehensions
+operate on Javascript native arrays and are then re-rendered as syntax nodes at the last moment, rather than being re-consed into syntax trees in intermediate stages.
+
+
