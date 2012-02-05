@@ -1,4 +1,5 @@
 Mulholland: a practical Havoc implementation that operates on top of Caterwaul.
+MIT licensed as usual, but nobody in their right mind would want to use this.
 
 mulholland      the self-modifying Perl object containing Waul source
 mh-object       a self-modifying Perl object that contains mh:: attributes
@@ -22,4 +23,13 @@ self-replicating online/offline compiler and REPL. Its documented source code
 is in src/mh/mh.waul; this file describes the command-line options that it
 understands and provides frustratingly little useful information otherwise.
 
-MIT licensed as usual, but nobody in their right mind would want to use this.
+Jargon:
+
+jsi     a low-level Mulholland->Javascript interface that is used to assign
+        execution semantics to trees written in Mulholland. Documented in
+        src/i/jsi.waul.
+
+jsii    an implementation of a Javascript-like language in terms of Mulholland
+        tree rewrites combined with some jsi magic to make it faster. Unlike
+        jsi, this is implemented in Mulholland, not Caterwaul. Documented in
+        lib/jsii.mh.
