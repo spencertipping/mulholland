@@ -9,4 +9,7 @@ _x.@data   ==@js -new parse.syntax $ match._x.data;
 _x.@length ==@js -new parse.syntax $ parse.intern $ match._x.length;
 
 _x@0.@cons1 _y    ==@js -new parse.syntax (match._x.data, [match._y]);
-_x@0.@cons2 _y _z ==@js -new parse.syntax (match._x.data, [match._y, match._z])
+_x@0.@cons2 _y _z ==@js -new parse.syntax (match._x.data, [match._y, match._z]);
+
+_x@0.@unquote ==@js -new parse.syntax $ parse.intern $ (match._x.resolved_data @).replace ("/^'/"r, '');
+_x@0.@quote   ==@js -new parse.syntax $ parse.intern $ "'" /+ match._x.resolved_data @

@@ -45,10 +45,15 @@ present.)
 
 \@jsii _x@0 ++ _y@0 ==@js (-new parse.syntax $ parse.transient_intern $ match._x.resolved_data @ + match._y.resolved_data @).erase_bloom @;
 
-$\@jsii _x@0 <  _y@0 $==@js (@jsii-c->t $$ match._x.resolved_data @ <  match._y.resolved_data @ ? 'true' : 'false');
-$\@jsii _x@0 <= _y@0 $==@js (@jsii-c->t $$ match._x.resolved_data @ <= match._y.resolved_data @ ? 'true' : 'false');
-$\@jsii _x   >  _y   $= \@jsii _y <  _x;
-$\@jsii _x   >= _y   $= \@jsii _y <= _x;
+/@jsii /! true  = false;
+/@jsii /! false = true;
+
+\@jsii (_x@0 <  _y@0) ==@js @jsii-c->t ! ! (match._x.resolved_data @  <   match._y.resolved_data @);
+\@jsii (_x@0 <= _y@0) ==@js @jsii-c->t ! ! (match._x.resolved_data @  <=  match._y.resolved_data @);
+\@jsii (_x  -== _y)   ==@js @jsii-c->t ! ! (match._x.resolved_data @ -=== match._y.resolved_data @);
+\@jsii (_x   >  _y)   = \@jsii _y <  _x;
+\@jsii (_x   >= _y)   = \@jsii _y <= _x;
+\@jsii (_x  -=! _y)   = \@jsii -! -@jsii _x /== _y;
 
 /@jsii [_x@0].length    = 1;
 /@jsii [_x, _xs].length = \@jsii 1 + /@jsii [_xs].length;
