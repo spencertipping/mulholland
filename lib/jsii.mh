@@ -1,0 +1,6 @@
+Javascript interface interpreter | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This file provides a jsi-based interpreter for Mulholland. The idea is to provide some basic semantics and allow interfacing to tree objects at compile-time. This is useful when you want to
+use rewrites to do more complex kinds of computation than just matching and replacing.
