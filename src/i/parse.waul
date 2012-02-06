@@ -145,7 +145,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
 
           precedence_table          = '\\. \\s # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\|'.qw *[new RegExp('^#{x}')] -seq,
-          base_precedence(t)        = t === ',' ? 0x40000000 : t === ';' ? 0x40000001 : precedence_table |[x.test(t) && xi + 2] |seq,
+          base_precedence(t)        = t === ',' ? 0x10000000 : t === ';' ? 0x10000001 : precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
           is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),

@@ -41,60 +41,93 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 #   $ mh foo.mh           # compile foo.mh to Javascript and print result to stdout
 #   $ mh -r foo.mh        # compile foo.mh to Javascript and execute it immediately
 
-  $.mulholland /-$.merge/ wcapture [mh_main(argv)    = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl :
-                                                                            argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
+  $.mulholland /-$.merge/ wcapture [
 
-                                    mh_compile(argv) = '#{header}\n#{resulting_tree}\n#{footer}' /!output
-                                               -where [parser         = $.mulholland(),
-                                                       bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
-                                                       resulting_tree = $.replicator().toString(),
-                                                       header         = '#!/usr/bin/env node',
-                                                       footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
+    mh_main(argv)    = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl :
+                                            argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
 
-                                    mh_offline(argv) = source_for(argv) *!mhc -seq
-                                               -where [mh          = $.mulholland.mh(),
-                                                       cc          = argv /-contains_short/ 'r' ? "_.as_js() /-$.compile/ environment".qf : "_.as_js().toString() /!output".qf,
-                                                       environment = {c: $, mh: mh, require: require, process: process},
-                                                       mhc(t)      = mh(t, {cc: cc})],
+# Replicating compiler behavior.
+# This compiles a new 'mh' by asking Caterwaul to replicate itself. It also bundles in any source you give it after reading the corresponding files. This allows you to bake libraries into a 'mh'
+# compiler for later use and simplifies the process of using 'mh' as a shebang-line interpreter. For example:
 
-                                    mh_repl(argv)    = source_for(argv) *!mh -seq -se- require('repl').start('mh> ', undefined, evaluator)
-                                               -where [mh                       = $.mulholland.mh(),
-                                                       unparenthesize(s)        = s.charAt(0) === '(' && s.charAt(s.length - 1) === ')' ? s.substr(1, s.length - 2) : s,
-                                                       evaluator(s, _1, _2, cc) = mh(s /!unparenthesize, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e)
-                                                                             -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
+# | $ mh -c foo.mh > foo-mh
+#   $ chmod u+x foo-mh
+#   $ cat > runnable.mh <<eof
+#   #!./foo-mh -r
+#   ...
+#   eof
+#   $
 
-                                    context()        = capture [parse         = $.mulholland(),
-                                                                split(s)      = this /~parse/ s /~flatten_all/ ';',
-                                                                environment() = {c: $, context: this, parse: this.parse},
-                                                                toplevel      = [] /!$.mulholland.rewriter],
+    mh_compile(argv) = '#{header}\n#{resulting_tree}\n#{footer}' /!output
+               -where [parser         = $.mulholland(),
+                       bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
+                       resulting_tree = $.replicator().toString(),
+                       header         = '#!/usr/bin/env node',
+                       footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
 
-                                    mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
-                                                                             -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
-                                                                                                                      e.resolved_data() === '='    ? e /!define :
-                                                                                                                      e.resolved_data() === '@js'  ? e /!js_evaluate :
-                                                                                                                      e.resolved_data() === '=@js' ? e /!js_define :
-                                                                                                                      e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!cc,
+# Offline compiler behavior.
+# Look for expressions that are not equations and emit them to stdout after converting them to Javascript. Javascript conversion is done through Mulholland's jsi layer, but after any
+# Mulholland-based rewrite rules have been applied. If -r is specified, expressions are compiled and executed immediately by Caterwaul instead of being emitted to stdout.
 
-                                                                                     js_macroexpand      = $('js_all'),
+    mh_offline(argv) = source_for(argv) *!mhc -seq
+               -where [mh          = $.mulholland.mh(),
+                       cc          = argv /-contains_short/ 'r' ? "_.as_js() /-$.compile/ environment".qf : "_.as_js().toString() /!output".qf,
+                       ccs         = {cc: cc} /-$.merge/ (argv /-contains_short/ 'v' && verbose_ccs()),
+                       environment = {c: $, mh: mh, require: require, process: process},
+                       mhc(t)      = mh(t, ccs)],
 
-                                                                                     empty               = new c.parse.syntax('@' /!c.parse.intern),
-                                                                                     cc(x)               = (options -or- defaults) /~cc/ x,
-                                                                                     rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
-                                                                                     js_evaluate(t)      = t[0].as_js() /!js_macroexpand /-$.compile/ c.environment() /or [empty] /!cc,
-                                                                                     js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
-                                                                                     define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
+# REPL behavior.
+# Read and evaluate any files specified on the command line, then enter a REPL that emits results to stdout. Node's REPL module is used to do this. Because of its CPS API, I make sure to call
+# the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
-                                                                                     replacer(js)        = '(function (match) {return match && (_body)})'.qs /~replace/ {_body: js},
-                                                                                     js_evaluator(e)     = [e[0], js_marker(e[1])],
-                                                                                     js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().toString()}>' /!c.parse.intern)
-                                                                                                      -se [it.replace = t.as_js() /!replacer /!js_macroexpand /-$.compile/ c.environment()]]]
+    mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -se- require('repl').start('mh> ', undefined, evaluator)
+               -where [mh                       = $.mulholland.mh(),
+                       ccs                      = argv /-contains_short/ 'v' && verbose_ccs(),
+                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e) -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
-                            -where [source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
-                                    contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+# Toplevel mh context.
+# The toplevel contains a parser, a toplevel split() function to pull individual statements from a stream, a compilation environment (for jsi-based evaluation), and a rewriter. The rewriter
+# instance is itself immutable, but internally it gets replaced with each new definition. (This is one reason that definitions are expensive.)
 
-                                    read_file(f)            = require('fs').readFileSync(f, 'utf8') -rescue- f,
-                                    output(t)               = process.stdout.write(t + ';\n', 'utf8'),
+    context()        = capture [parse         = $.mulholland(),                            split(s) = this /~parse/ s /~flatten_all/ ';',
+                                environment() = {c: $, context: this, parse: this.parse},  toplevel = [] /!$.mulholland.rewriter],
 
-                                    defaults                = {cc: output}]});
+    verbose_ccs()    = capture [define_cc(eq)    = 'defining    #{eq[0]} = #{eq[1]}' /!console.log,
+                                js_define_cc(eq) = 'js-defining #{eq[0]} = #{eq[1]}' /!console.log],
+
+# Mulholland evaluation function.
+# This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here, and 
+
+    mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
+      -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
+                                               e.resolved_data() === '='    ? e /!define :
+                                               e.resolved_data() === '@js'  ? e /!js_evaluate :
+                                               e.resolved_data() === '=@js' ? e /!js_define :
+                                               e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!options.cc,
+
+              options             = {} / defaults /-$.merge/ options,
+              js_macroexpand      = $('js_all'),
+
+              empty               = new c.parse.syntax('@' /!c.parse.intern),
+              rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
+              js_evaluate(t)      = t[0].as_js() /!js_macroexpand /-$.compile/ c.environment() /or [empty] /!options.cc,
+              js_define(equation) = equation /!options.js_define_cc -then [c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator]],
+              define(equation)    = equation /!options.define_cc    -then [c.toplevel = c.toplevel /~extend/ [equation]],
+
+              replacer(js)        = '(function (match) {return match && (_body)})'.qs /~replace/ {_body: js},
+              js_evaluator(e)     = [e[0], js_marker(e[1])],
+              js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().toString()}>' /!c.parse.intern)
+                               -se [it.replace = t.as_js() /!replacer /!js_macroexpand /-$.compile/ c.environment()]]]
+
+# Low-level bindings.
+# These functions contain the mechanics of Mulholland's interface with the real world. They're not exposed in $.mulholland primarily because they aren't really relevant to what Mulholland does.
+
+  -where [source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
+          contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+
+          read_file(f)            = require('fs').readFileSync(f, 'utf8') -rescue- f,
+          output(t)               = process.stdout.write(t + ';\n', 'utf8'),
+
+          defaults                = {cc: output, define_cc: "null".qf, js_define_cc: "null".qf}]});
 
 # Generated by SDoc 

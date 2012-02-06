@@ -20,7 +20,7 @@ for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( (new RegExp( ( '^' + (x) + '' ) ) ) ) ;
 return xr} ) .call(this, [ '\\.' , '\\s' , '#' , '[~!]' , '[/*]' , '[%`]' , '[-+]' , '[\\\\:]' , '[<>]' , '[&?]' , '\\^' , '=' , '\\|' ] ) ,base_precedence=function(t) {;
-return t=== ',' ?0x40000000:t=== ';' ?0x40000001: (function(xs) {var x,x0,xi,xl,xr;
+return t=== ',' ?0x10000000:t=== ';' ?0x10000001: (function(xs) {var x,x0,xi,xl,xr;
 for(var x=xs[0] ,xi=0,xl=xs.length,x1;
 xi<xl;
  ++xi) {x=xs[xi] ;
