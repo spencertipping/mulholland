@@ -19,13 +19,13 @@ return Object.prototype.hasOwnProperty.call(table_i,s) ?table_i[s] :s.toString()
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,xr.push( (new RegExp( ( '^' + (x) + '' ) ) ) ) ;
-return xr} ) .call(this, [ '\\.' , '#' , '[~!]' , '[/*]' , '[%`]' , '[-+]' , '[\\\\:]' , '[<>]' , '[&?]' , '\\^' , '=' , '\\|' ] ) ,base_precedence=function(t) {;
+return xr} ) .call(this, [ '\\.' , '\\s' , '#' , '[~!]' , '[/*]' , '[%`]' , '[-+]' , '[\\\\:]' , '[<>]' , '[&?]' , '\\^' , '=' , '\\|' ] ) ,base_precedence=function(t) {;
 return t=== ',' ?0x40000000:t=== ';' ?0x40000001: (function(xs) {var x,x0,xi,xl,xr;
 for(var x=xs[0] ,xi=0,xl=xs.length,x1;
 xi<xl;
  ++xi) {x=xs[xi] ;
 if(x1= (x.test(t) &&xi+2) )return x1}return false} ) .call(this,precedence_table) } ,operator_lexer=function(_) {return/^(\$*)([-\/\\|=]?)(.*)$/ .exec(_) } ,is_value=function(_) {return/^["'A-Za-z0-9@_\xff-\uffff]/ .exec(_) } ,is_unary=function(t) {;
-return precedence_table[2] .test(t) || !base_precedence(t) } ,is_opener=function(t) {;
+return precedence_table[3] .test(t) || !base_precedence(t) } ,is_opener=function(t) {;
 return'([{' .indexOf(t) +1} ,is_closer=function(t) {;
 return')]}' .indexOf(t) +1} ,parse_token=function(t) {;
 return is_value(t) ? {l:0,r:0,id:intern(t) ,v:true} :parse_operator(t) } ,parse_operator=function(t) {;
@@ -33,9 +33,9 @@ return is_opener(t) ? {l:0,r:1<<30,id:intern(t) ,o:true,u:true,i:t=== '(' } :is_
 return(function( ) {var pieces=operator_lexer(t) ,adjust=pieces[1] .length<<2,canonical=pieces[3] ||pieces[2] || '#' ,left=adjust+ ( (base_precedence(pieces[2] ) ) || (base_precedence(canonical) ) ) ,right= (function(it) {return(it?it+adjust:left) } ) .call(this, (base_precedence(canonical.charAt(canonical.length-1) ) ) ) ,unary=is_unary(canonical) ,real_left=unary?1:left,real_right=unary?left:right;
 return( {l:real_left,r:real_right,id:intern(canonical) ,u:unary} ) } ) .call(this) } ,join=parse_operator( '#' ) ,parse=function(ts) {;
 return(function( ) {var values= [ ] ,operators= [ ] ,ev=true,right=function(t) {;
-return! (t.l&1) ||t.id===join.id&&t.l>join.l} ,top=function() {;
+return t.l&1||t.id===join.id&&t.l>join.l} ,top=function() {;
 return operators[operators.length-1] } ,precedence=function(t) {;
-return( (operators.length&& ( (right(t) ?top() .r<t.l:top() .r<=t.l) ||t.n-- >0) ) && ( ( (apply() ) , (precedence(t) ) ) ) ) } ,operator=function(t) {;
+return( (operators.length&& (right(t) ?top() .r<t.l:top() .r<=t.l) ) && ( ( (apply() ) , (precedence(t) ) ) ) ) } ,operator=function(t) {;
 return( (precedence(t) ) , ( ( ! (t.i) && ( ( ( (operators) .push(t) ) , (ev=true) ) ) ) ) ) } ,observe=function(t) {;
 return t.v? ( ( ( ( ( ! (ev) && (observe(join) ) ) ) , (ev=false) ) ) , ( (values) .push(new syntax(t.id) ) ) ) :t.o? ( ( ( ( ( ! (ev) && (observe(join) ) ) ) , (ev=true) ) ) , ( (operators) .push(t) ) ) :t.c? ( ( ( (apply_closer() ) , (ev=false) ) ) , (top() .i?operators.pop() :apply() ) ) :t.u? ( ( ( ! (ev) && (observe(join) ) ) ) , (operator(t) ) ) :operator(t) } ,apply=function() {;
 return top() .u? (values) .push(new syntax(operators.pop() .id, [values.pop() ] ) ) : (function( ) {var x=values.pop() ,y=values.pop() ;

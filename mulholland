@@ -1837,7 +1837,8 @@ Hints are used even if they aren't erased. For example:
 Precedence groups.
 Mulholland uses a fairly normal precedence layout. From high to low precedence, these are the classes of operators it supports and their associativity:
 
-| .             right
+| .             left
+  (none)        right
   #             left
   ! ~           right (unary)
   / *           left
@@ -1882,11 +1883,11 @@ Unary operators have some strange precedence rules. All unary operators are pref
 no precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
 right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
 
-          precedence_table          = '\\. # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\|'.qw *[new RegExp('^#{x}')] -seq,
+          precedence_table          = '\\. \\s # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\|'.qw *[new RegExp('^#{x}')] -seq,
           base_precedence(t)        = t === ',' ? 0x40000000 : t === ';' ? 0x40000001 : precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)([-\/\\|=]?)(.*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
-          is_unary(t)               = precedence_table[2].test(t) || !base_precedence(t),
+          is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),
 
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
@@ -1913,10 +1914,10 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
                                       operators      = [],
                                       ev             = true,
 
-                                      right(t)       = !(t.l & 1) || t.id === join.id && t.l > join.l,
+                                      right(t)       = t.l & 1 || t.id === join.id && t.l > join.l,
 
                                       top()          = operators[operators.length - 1],
-                                      precedence(t)  = apply() -then- precedence(t) -when [operators.length && ((t /!right ? top().r < t.l : top().r <= t.l) || t.n-- > 0)],
+                                      precedence(t)  = apply() -then- precedence(t) -when [operators.length && (t /!right ? top().r < t.l : top().r <= t.l)],
                                       operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
                                       observe(t)     = t.v ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
