@@ -1909,6 +1909,7 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
                                       real_right = unary ? left : right],
 
           join                      = '#' /!parse_operator,
+          empty_value               = new syntax('@'),
 
           parse(ts)                 = ts *parse_token *!observe -seq -re- apply_all()
                               -where [values         = [],
@@ -1918,6 +1919,7 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
                                       right(t)       = t.l & 1 || t.id === join.id && t.l > join.l,
 
                                       top()          = operators[operators.length - 1],
+                                      value()        = values.pop() || empty_value,
                                       precedence(t)  = apply() -then- precedence(t) -when [operators.length && (t /!right ? top().r < t.l : top().r <= t.l)],
                                       operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
@@ -1927,8 +1929,8 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
                                                      : t.u ? observe(join) /unless.ev                    -then- operator(t)
                                                            : operator(t),
 
-                                      apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [values.pop()])
-                                                               : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = values.pop(), y = values.pop()],
+                                      apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [value()])
+                                                               : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = value(), y = value()],
                                       apply_closer() = apply() -then- apply_closer() -unless [!operators.length || top().o],
                                       apply_all()    = operators.length ? apply() -then- apply_all() : values[values.length - 1]]]});
 

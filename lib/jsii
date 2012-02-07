@@ -321,6 +321,7 @@ run this script with the 'usage' argument.
 
 __
 meta::cache('parent-identification', <<'__');
+../mh-object 1c4e5c01fba8dd73fae05f53c8295b39
 object 99aeabc9ec7fe80b1b39f5e53dc7e49e
 preprocessor 70dae4b46eb4e06798ec6f38d17d4c7b
 vim-highlighters 902333a0bd6ed90ff919fe8477cb4e69
@@ -349,7 +350,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 __
-meta::data('permanent-identity', '1c4e5c01fba8dd73fae05f53c8295b39');
 meta::function('ad', <<'__');
 return @{$transient{path}} = () unless @_;
 push @{$transient{path}}, @_;
@@ -597,6 +597,11 @@ else    {pop @{$transient{path}}}
 
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
+meta::function('render', <<'__');
+file::write("$_.mh", retrieve("mh::$_")) for grep s/^mh:://, sort keys %data;
+compile(qw/mhi::tree mhi::jsii/, 'mh-jsii');
+
+__
 meta::function('repl', <<'__');
 with_exported(map("pp::$_", @_), sub {
   sh("mh -i $_[0]")});
@@ -1161,6 +1166,101 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::mh('jsii', <<'__');
+Javascript interface interpreter | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This file provides a jsi-based interpreter for Mulholland. The idea is to provide some basic semantics and allow interfacing to tree objects at compile-time. This is useful when you want to
+use rewrites to do more complex kinds of computation than just matching and replacing. To facilitate this, this library emulates a subset of Javascript in terms of tree rewrites.
+
+All rewriting rules used in this library are parameterized by the prefix operator @jsii. This prevents anything here from being spuriously evaluated in the course of normal rewriting, and it
+allows you to control the order of evaluation at a fairly low level. For example:
+
+| =@jsii _cond      ? _t : _f = =@jsii-cond /@jsii-boolean _cond ? _t : _f;
+  =@jsii-cond true  ? _t : _f = /@jsii _t;
+  =@jsii-cond false ? _t : _f = /@jsii _f;
+
+Here, evaluation is constrained to whichever conditional branch is needed; the other remains unevaluated. This is very important as it lets you model recursion and other self-referential
+processes.
+
+Low-level data representation.
+Numbers and strings are represented verbatim; Javascript's + operator is replaced by two in jsii. + coerces its arguments to numbers while ++ coerces its arguments to strings. All numbers are
+ultimately represented as nullary tree nodes, which means that they are boxed and therefore much more expensive to allocate than regular Javascript numbers are. They are also Bloom-filter
+erased, which saves about 40 bytes of allocation (though this doesn't make them cheap).
+
+Arrays are represented by [] nodes, which Mulholland's parser produces when you encase stuff in [] groups. Elements are comma-separated. Because commas right-associate, working with the
+beginning of an array is O(1) while working with the end is O(n). Therefore, you should treat arrays in jsii like you would treat lists in Lisp. Objects are represented by {} nodes consisting
+of : pairs encased in ,. The representation here is similar to an alist in Lisp, and the same performance caveats apply.
+
+Functions are not represented by jsii. The reason is that you can get most of the functionality of functions by just setting up rewrite rules, and this will probably be faster than trying to
+provide function emulation, parameter binding, etc. In particular, you can create closures by using currying since function application left-associates:
+
+| /@jsii adder _x _n = \@jsii _x + _n;
+
+Any 'adder _x' term will remain in its unevaluated state; once it is applied to its second argument, however, the rewrite rule will take effect. (Well, it will once the @jsii marker is
+present.)
+
+  @jsii.intrinsics = (/@jsii-t->n _x = Number $ _x.resolved_data @;
+                      /@jsii-n->t _x = (-new parse.syntax $ parse.transient_intern $ _x).erase_bloom @;
+                      /@jsii-c->t _x = parse.syntax.constant _x);
+
+  ( \@jsii _x@0 = _x;
+
+    \@jsii _x@0 + _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x  + /@jsii-t->n match._y;
+    \@jsii _x@0 - _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x  - /@jsii-t->n match._y;
+    \@jsii _x@0 * _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -* /@jsii-t->n match._y;
+    \@jsii _x@0 / _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -/ /@jsii-t->n match._y;
+
+    \@jsii _x@0 ++ _y@0 ==@js (-new parse.syntax $ parse.transient_intern $ match._x.resolved_data @ + match._y.resolved_data @).erase_bloom @;
+
+    \@jsii (_x@0 <  _y@0) ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @  <   match._y.resolved_data @);
+    \@jsii (_x@0 <= _y@0) ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @  <=  match._y.resolved_data @);
+    \@jsii (_x  -== _y)   ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @ -=== match._y.resolved_data @);
+    \@jsii (_x   >  _y)   = \@jsii _y <  _x;
+    \@jsii (_x   >= _y)   = \@jsii _y <= _x;
+    \@jsii (_x  -=! _y)   = \@jsii -u! -@jsii _x /== _y;
+
+    /@jsii [_x@0].length    = 1;
+    /@jsii [_x, _xs].length = \@jsii 1 + /@jsii [_xs].length;
+    /@jsii [@].length       = 0 ) //- @jsii.intrinsics
+
+High-level operators.
+The high-level operators supported by jsii diverge significantly from Javascript, especially for array operations. Most Javascript array operations are rephrased in terms of Caterwaul's seq
+library because the seq library is the freaking bomb (and because it's faster this way). There's also some attempt made to optimize where possible; for instance, sequence comprehensions
+operate on Javascript native arrays and are then re-rendered as syntax nodes at the last moment, rather than being re-consed into syntax trees in intermediate stages.
+
+
+
+__
+meta::mh('tree', <<'__');
+Mulholland syntax tree reflection | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Mulholland's pattern matching API is good for high-level declarative specification, but it has properties that make it less versatile than is often useful. For example, there isn't a way to
+get a wildcard to bind to an operator. If you want to do this, you'll need to use tree reflection to construct operator trees up-front. This library gives you a reasonable way to do that.
+
+_x.@data   ==@js -new parse.syntax $ match._x.data;
+_x.@length ==@js -new parse.syntax $ parse.intern $ match._x.length;
+
+_x@0.@cons1 _y    ==@js -new parse.syntax (match._x.data, [match._y]);
+_x@0.@cons2 _y _z ==@js -new parse.syntax (match._x.data, [match._y, match._z]);
+
+_x@0.@unquote ==@js -new parse.syntax $ parse.intern $ (match._x.resolved_data @).replace ("/^'/"r, '');
+_x@0.@quote   ==@js -new parse.syntax $ parse.intern $ "'" /+ match._x.resolved_data @
+
+__
+meta::parent('../mh-object', <<'__');
+function::compile         51bbd6c69566343dae446e33570d911e
+function::repl            889cfc8294d68fca8641db03f8996b8a
+meta::type::mh            0b10222b800b45a0e3cb98e8d7607645
+parent::preprocessor      3b4cea3c3d232d9cca0496a72968df65
+parent::vim-highlighters  77c9231e0b6ba6e7aa6ed74193c02d2c
+retriever::mhi            72bbfd7e2a90f61e7500e38f4f700e79
+vim_highlighter::mh       2f4f5a7980c60f9479b3fb0a8666cc52
+
+__
 meta::parent('object', <<'__');
 bootstrap::html                         f44dd03cb0c904b3a5f69fbda5f018d0
 bootstrap::initialization               1cf74e7209f32722a79b6e49e3907fd3
