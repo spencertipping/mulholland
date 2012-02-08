@@ -62,7 +62,8 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
                -where [parser         = $.mulholland(),
                        bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
                        resulting_tree = $.replicator().toString(),
-                       header         = '#!/usr/bin/env node',
+                       license        = '// Mulholland compiler (or derivative) | Spencer Tipping\n// Licensed under the terms of the MIT source code license',
+                       header         = '#!/usr/bin/env node\n#{license}',
                        footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
 
 # Offline compiler behavior.
