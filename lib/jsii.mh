@@ -33,21 +33,25 @@ Any 'adder _x' term will remain in its unevaluated state; once it is applied to 
 present.)
 
   @jsii.intrinsics = (/@jsii-t->n _x = Number $ _x.resolved_data @;
-                      /@jsii-n->t _x = (-new parse.syntax $ parse.transient_intern $ _x).erase_bloom @;
+                      /@jsii-n->t _x = /new parse.syntax $ parse.transient_intern _x -. erase_bloom @;
                       /@jsii-c->t _x = parse.syntax.constant _x);
 
   ( \@jsii _x@0 = _x;
 
+    # Numerical processing
     \@jsii _x@0 + _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x  + /@jsii-t->n match._y;
     \@jsii _x@0 - _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x  - /@jsii-t->n match._y;
     \@jsii _x@0 * _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -* /@jsii-t->n match._y;
     \@jsii _x@0 / _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -/ /@jsii-t->n match._y;
+    \@jsii _x@0 % _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -% /@jsii-t->n match._y;
 
+    # String processing
     \@jsii _x@0 ++ _y@0 ==@js =@jsii-n->t match._x.resolved_data @ + match._y.resolved_data @;
+    \@jsii _x@0.length  ==@js =@jsii-n->t match._x.resolved_data @ -. length;
 
-    \@jsii (_x@0 <  _y@0) ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @  <   match._y.resolved_data @);
-    \@jsii (_x@0 <= _y@0) ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @  <=  match._y.resolved_data @);
-    \@jsii (_x  -== _y)   ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @ -=== match._y.resolved_data @);
+    \@jsii (_x@0 <  _y@0) ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /<   match._y.resolved_data @;
+    \@jsii (_x@0 <= _y@0) ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /<=  match._y.resolved_data @;
+    \@jsii (_x  -== _y)   ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /=== match._y.resolved_data @;
     \@jsii (_x   >  _y)   = \@jsii _y <  _x;
     \@jsii (_x   >= _y)   = \@jsii _y <= _x;
     \@jsii (_x  -=! _y)   = \@jsii -u! -@jsii _x /== _y) //- @jsii.intrinsics;

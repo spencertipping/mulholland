@@ -73,7 +73,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
     mh_offline(argv) = source_for(argv) *!mhc -seq
                -where [mh          = $.mulholland.mh(),
-                       cc          = argv /-contains_short/ 'r' ? "_.as_js() /-$.compile/ environment".qf : "_.as_js().toString() /!output".qf,
+                       cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
                        ccs         = {cc: cc} /-$.merge/ (argv /-contains_short/ 'v' && verbose_ccs()),
                        environment = {c: $, mh: mh, require: require, process: process},
                        mhc(t)      = mh(t, ccs)],
@@ -82,10 +82,11 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # Read and evaluate any files specified on the command line, then enter a REPL that emits results to stdout. Node's REPL module is used to do this. Because of its CPS API, I make sure to call
 # the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
-    mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -se- require('repl').start('mh> ', undefined, evaluator)
+    mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -then- require('repl').start('mh> ', undefined, evaluator)
                -where [mh                       = $.mulholland.mh(),
                        ccs                      = argv /-contains_short/ 'v' && verbose_ccs(),
-                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e) -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
+                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
+                                           -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
 # Toplevel mh context.
 # The toplevel contains a parser, a toplevel split() function to pull individual statements from a stream, a compilation environment (for jsi-based evaluation), and a rewriter. The rewriter

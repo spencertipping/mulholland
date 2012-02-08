@@ -524,6 +524,15 @@ around_hook('load-state', @_, sub {
   verify()});
 
 __
+meta::function('loc', <<'__');
+sub loc_single {(split ' ', qx|jsl $_[0]|)[1]}
+
+with_exported(grep(s/^sdoc::waul::/waul::/, sort keys %data), sub {
+  terminal::info("total LOC: " . loc_single $_[0]);
+  with_exported($_, sub {
+    terminal::info("$_: " . loc_single $_[0])}) for grep s/^sdoc::waul::/waul::/, sort keys %data});
+
+__
 meta::function('lock', 'hook(\'lock\', chmod_self(sub {$_[0] & 0555}));');
 meta::function('ls', <<'__');
 my ($options, @criteria) = separate_options(@_);
@@ -2112,7 +2121,9 @@ Like waul, mh specifies a minimal toplevel execution context. This is used to de
 
 | 1. Global rewrite definition: foo = bar
   2. Local anonymous rewrite: foo /- (bar = bif)
-  3. Javascript evaluation: (todo: add example for this)
+  3. Javascript evaluation: =@js parse 'hello world'
+  4. Javascript equation definition: _x + _y ==@js -new parse.syntax $ match._x.resolved_data @ /+ match._y.resolved_data @
+  5. Composition of side-effects: foo = bar; bif = baz
 
 Semantics.
 Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
@@ -2173,7 +2184,7 @@ Mulholland-based rewrite rules have been applied. If -r is specified, expression
 
     mh_offline(argv) = source_for(argv) *!mhc -seq
                -where [mh          = $.mulholland.mh(),
-                       cc          = argv /-contains_short/ 'r' ? "_.as_js() /-$.compile/ environment".qf : "_.as_js().toString() /!output".qf,
+                       cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
                        ccs         = {cc: cc} /-$.merge/ (argv /-contains_short/ 'v' && verbose_ccs()),
                        environment = {c: $, mh: mh, require: require, process: process},
                        mhc(t)      = mh(t, ccs)],
@@ -2182,10 +2193,11 @@ REPL behavior.
 Read and evaluate any files specified on the command line, then enter a REPL that emits results to stdout. Node's REPL module is used to do this. Because of its CPS API, I make sure to call
 the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
-    mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -se- require('repl').start('mh> ', undefined, evaluator)
+    mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -then- require('repl').start('mh> ', undefined, evaluator)
                -where [mh                       = $.mulholland.mh(),
                        ccs                      = argv /-contains_short/ 'v' && verbose_ccs(),
-                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.toString())".qf}) -rescue- cc(e) -se- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
+                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
+                                           -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
 Toplevel mh context.
 The toplevel contains a parser, a toplevel split() function to pull individual statements from a stream, a compilation environment (for jsi-based evaluation), and a rewriter. The rewriter
@@ -2198,7 +2210,7 @@ instance is itself immutable, but internally it gets replaced with each new defi
                                 js_define_cc(eq) = 'js-defining #{eq[0]} = #{eq[1]}' /!console.log],
 
 Mulholland evaluation function.
-This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here, and 
+This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here.
 
     mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
       -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
