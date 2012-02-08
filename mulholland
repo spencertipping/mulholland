@@ -2163,7 +2163,8 @@ compiler for later use and simplifies the process of using 'mh' as a shebang-lin
                        bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
                        resulting_tree = $.replicator().toString(),
                        license        = '// Mulholland compiler (or derivative) | Spencer Tipping\n// Licensed under the terms of the MIT source code license',
-                       header         = '#!/usr/bin/env node\n#{license}',
+                       reference_url  = '// http://github.com/spencertipping/mulholland',
+                       header         = '#!/usr/bin/env node\n#{license}\n#{reference_url}\n',
                        footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
 
 Offline compiler behavior.
