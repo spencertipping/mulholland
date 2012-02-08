@@ -617,7 +617,7 @@ __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
 file::write("$_.mh", retrieve("mh::$_")) for grep s/^mh:://, sort keys %data;
-compile('mhi::index', 'mh-jsii');
+compile('pp::sdoc::index', 'mh-jsii');
 
 __
 meta::function('repl', <<'__');
