@@ -43,22 +43,21 @@ present.)
     \@jsii _x@0 * _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -* /@jsii-t->n match._y;
     \@jsii _x@0 / _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -/ /@jsii-t->n match._y;
 
-    \@jsii _x@0 ++ _y@0 ==@js (-new parse.syntax $ parse.transient_intern $ match._x.resolved_data @ + match._y.resolved_data @).erase_bloom @;
+    \@jsii _x@0 ++ _y@0 ==@js =@jsii-n->t match._x.resolved_data @ + match._y.resolved_data @;
 
     \@jsii (_x@0 <  _y@0) ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @  <   match._y.resolved_data @);
     \@jsii (_x@0 <= _y@0) ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @  <=  match._y.resolved_data @);
     \@jsii (_x  -== _y)   ==@js /@jsii-c->t /u! /u! (match._x.resolved_data @ -=== match._y.resolved_data @);
     \@jsii (_x   >  _y)   = \@jsii _y <  _x;
     \@jsii (_x   >= _y)   = \@jsii _y <= _x;
-    \@jsii (_x  -=! _y)   = \@jsii -u! -@jsii _x /== _y;
-
-    /@jsii [_x@0].length    = 1;
-    /@jsii [_x, _xs].length = \@jsii 1 + /@jsii [_xs].length;
-    /@jsii [@].length       = 0 ) //- @jsii.intrinsics
+    \@jsii (_x  -=! _y)   = \@jsii -u! -@jsii _x /== _y) //- @jsii.intrinsics;
 
 High-level operators.
 The high-level operators supported by jsii diverge significantly from Javascript, especially for array operations. Most Javascript array operations are rephrased in terms of Caterwaul's seq
 library because the seq library is the freaking bomb (and because it's faster this way). There's also some attempt made to optimize where possible; for instance, sequence comprehensions
 operate on Javascript native arrays and are then re-rendered as syntax nodes at the last moment, rather than being re-consed into syntax trees in intermediate stages.
 
+  ( \@jsii [_xs][_i]    ==@js match._xs.flatten_all ',' -. [/u+ match._i.resolved_data @];
+    \@jsii [_xs].length ==@js -@jsii-n->t match._xs.flatten_all ',' /. length;
 
+    \@jsii [_xs] /<< _y = [_xs, /@jsii _y]) //- @jsii.intrinsics
