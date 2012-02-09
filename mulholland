@@ -2212,14 +2212,14 @@ instance is itself immutable, but internally it gets replaced with each new defi
 Mulholland evaluation function.
 This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here.
 
-    mh(c = result.context = context())(s, options) = c.split(s) *!evaluate -seq
+    mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
       -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
                                                e.resolved_data() === '='    ? e /!define :
                                                e.resolved_data() === '@js'  ? e /!js_evaluate :
                                                e.resolved_data() === '=@js' ? e /!js_define :
                                                e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!options.cc,
 
-              options             = {} / defaults /-$.merge/ options,
+              options             = {} / defaults /-$.merge/ specified_options,
               js_macroexpand      = $('js_all'),
 
               empty               = new c.parse.syntax('@' /!c.parse.intern),

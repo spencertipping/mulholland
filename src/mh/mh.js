@@ -49,13 +49,13 @@ return{c:$,context:this,parse:this.parse} } ,toplevel:$.mulholland.rewriter( [ ]
 return{define_cc:function(eq) {;
 return console.log( ( 'defining    ' + (eq[0] ) + ' = ' + (eq[1] ) + '' ) ) } ,js_define_cc:function(eq) {;
 return console.log( ( 'js-defining ' + (eq[0] ) + ' = ' + (eq[1] ) + '' ) ) } } } ,mh=function() {;
-var result=function(s,options) {;
+var result=function(s,specified_options) {;
 return(function( ) {var evaluate=function(t) {var e=c.toplevel(t) ;
 return e.resolved_data() === ';' ? (function(xs) {var x,x0,xi,xl,xr;
 for(var xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] , ( (evaluate) .call( {x0:x0,xi:xi,xl:xl,xs:xs,xr:xr} ,x) ) ;
-return xs} ) .call(this,e.flatten_all( ';' ) ) :e.resolved_data() === '=' ?define(e) :e.resolved_data() === '@js' ?js_evaluate(e) :e.resolved_data() === '=@js' ?js_define(e) :e.resolved_data() === '/-' ?evaluate(rewrite(e) ) :options.cc(e) } ,options=$.merge( { } ,defaults,options) ,js_macroexpand=$( 'js_all' ) ,empty=new c.parse.syntax(c.parse.intern( '@' ) ) ,rewrite=function(t) {;
+return xs} ) .call(this,e.flatten_all( ';' ) ) :e.resolved_data() === '=' ?define(e) :e.resolved_data() === '@js' ?js_evaluate(e) :e.resolved_data() === '=@js' ?js_define(e) :e.resolved_data() === '/-' ?evaluate(rewrite(e) ) :options.cc(e) } ,options=$.merge( { } ,defaults,specified_options) ,js_macroexpand=$( 'js_all' ) ,empty=new c.parse.syntax(c.parse.intern( '@' ) ) ,rewrite=function(t) {;
 return c.toplevel.extend(t[1] .flatten_all( ';' ) ) (t[0] ) } ,js_evaluate=function(t) {;
 return options.cc( ( ($.compile(js_macroexpand(t[0] .as_js() .guarded() ) ,c.environment() ) ) || (empty) ) ) } ,js_define=function(equation) {;
 return( (options.js_define_cc(equation) ) , (c.toplevel= (c.toplevel) .extend( [js_evaluator(equation) ] ) ) ) } ,define=function(equation) {;
