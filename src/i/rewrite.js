@@ -1,7 +1,7 @@
 caterwaul.module( 'mulholland.rewrite' ,function($) {$.mulholland.rewriter=function(rules) {;
 return(function( ) {var current=Array.prototype.slice.call( (rules) ) ,change=null,pattern_complexity=function() {;
 return(function(xs) {var x,x0,xi,xl,xr;
-for(var x0= (Infinity) ,xi=0,xl=xs.length;
+for(var x0= (0x10000000) ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,x0= (Math.min(x0,x[0] .complexity() ) ) ;
 return x0} ) .call(this,current) } ,rewrite_once=function(t) {;

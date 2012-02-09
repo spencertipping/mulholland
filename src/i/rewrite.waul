@@ -7,16 +7,25 @@
 
 caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
 
-# Compile-time rewriting.
-# All rewriting rules are localized to a given expression tree in the source; there is no such thing as a toplevel rewrite. You can introduce anonymous rewriting rules as well as using shared
-# ones. This is done by using the anonymous-rewriting operator /@. So, for example:
+# Mathematical properties of rewriting.
+# Equations that you write are implicitly normalizing symmetric equivalence relations. This has a few consequences. First, terms are normalized towards the right-hand side of the equations
+# transitively; so, for instance, if you write 'foo = bar' and then write 'foo', the result will bar 'bar' because 'bar' is considered to be the most normalized form in its equivalence class.
+# The rewriter determines this by transitive closure, and circular rewrites with no normal form will cause a stack overflow error. (This is why it is coded recursively, despite the fact that it
+# could be written as a loop instead.)
 
-# | foo + bar /@- foo =/ baz ,+ bar =/ bif
-#   foo + bar /@- [foo = bar, bar = bif]           <- same thing, but with explicit grouping
+# Equations are symmetric because their left-hand terms can be normalized prior to rewriting. For example, you can see this behavior in mh:
 
-# Compile-time rewrite sections can be nested for abstraction. In this case they apply outside-in. For example:
+# | > foo = bar + bif
+#   > foo = 5
+#   > bar + bif
+#   5
+#   >
 
-# | foo + bar /@- [foo = bif + baz, _x + bar = _x /@- [bif = bok]]
+# This happens because the equation 'foo = 5' is rewritten prior to its definition; it is internally represented as its more normalized form, 'bar + bif = 5'. However, because bar + bif is a
+# pattern, this is actually a denormalizing rewrite (since it requires a corresponding normalization operation for the term that matches it). For this reason, the equation 'foo = bar + bif' is
+# semantically symmetric in its role as an equivalence relation.
+
+# Note that if we then said 'foo = 6', Mulholland would conclude that 5 = 6. At this point, 'bar + bif', 'foo', and 5 would all normalize into 6.
 
 # Rewriting optimizations.
 # Most of the time Mulholland spends compiling things is taken up by the rewriting process, so a number of optimizations are implemented to make this fast. First, each rule is closed under
@@ -31,7 +40,7 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
                                                      -where [current                                           = +rules -seq,
                                                              change                                            = null,
 
-                                                             pattern_complexity()                              = current /[Infinity][x0 /-Math.min/ x[0].complexity()] -seq,
+                                                             pattern_complexity()                              = current /[0x10000000][x0 /-Math.min/ x[0].complexity()] -seq,
                                                              rewrite_once(t)                                   = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change = change || it],
 
                                                              deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
