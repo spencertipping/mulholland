@@ -1731,7 +1731,7 @@ caterwaul.module('mulholland.jsi', 'js_all', function ($) {
                     this.data === '[]'     ? new p.syntax('.' /!p.intern, [this[0].as_mh(p), new p.syntax('[' /!p.intern, [this[1].as_mh(p)])]) :
                     this.data.length === 0 ? new p.syntax('@' /!p.intern) :
                     this.length === 0      ? new p.syntax(this.data /!mh_encode_literal /!p.intern) :
-                    this.length === 3      ? new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), new p.syntax('/@:' /!p.intern, [this[1].as_mh(p), this[2].as_mh(p)])]) :
+                    this.length === 3      ? new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), new p.syntax('::' /!p.intern, [this[1].as_mh(p), this[2].as_mh(p)])]) :
                                              new p.syntax(this.data /!mh_encode         /!p.intern, [this[0].as_mh(p), this[1].as_mh(p)]),
 
          as_js()  = this.resolved_data() === '@'                          ? $.empty :
@@ -1743,11 +1743,11 @@ caterwaul.module('mulholland.jsi', 'js_all', function ($) {
 
          represents_a_slice(t) = t.resolved_data() === '.' && t[1].resolved_data() === '[',
 
-         mh_encode_literal(s)  = /\/./.test(s) ? '"' + s.replace(/"/g, '\\"') + '"r' : s.replace(/^\$/, '@$'),
-         mh_encode(s)          = /^[()\[\]{}\.,;:]/.test(s) ? s : '/' + s,
+         mh_encode_literal(d, s = d.toString())  = /\/./.test(s) ? '"' + s.replace(/"/g, '\\"') + '"r' : s.replace(/^\$/, '@$'),
+         mh_encode(d, s = d.toString())          = /^[()\[\]{}\.,;:]/.test(s) ? s : '/' + s,
 
-         mh_decode_literal(s)  = /^".*"r$/.test(s) ? s.replace(/^"\//, '/').replace(/\\"/g, '"').replace(/"r$/, '') : s.replace(/^@\$/, '$'),
-         mh_decode(s)          = s.replace(/^\/(.)/, '$1')]});
+         mh_decode_literal(d, s = d.toString())  = /^".*"r$/.test(s) ? s.replace(/^"\//, '/').replace(/\\"/g, '"').replace(/"r$/, '') : s.replace(/^@\$/, '$'),
+         mh_decode(d, s = d.toString())          = s.replace(/^\/(.)/, '$1')]});
 
 __
 meta::sdoc('waul::i/parse', <<'__');
