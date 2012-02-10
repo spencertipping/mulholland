@@ -52,8 +52,8 @@ present.)
     \@jsii (_x@0 <  _y@0) ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /<   match._y.resolved_data @;
     \@jsii (_x@0 <= _y@0) ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /<=  match._y.resolved_data @;
     \@jsii (_x  -== _y)   ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /=== match._y.resolved_data @;
-    \@jsii (_x   >  _y)   = \@jsii _y <  _x;
-    \@jsii (_x   >= _y)   = \@jsii _y <= _x;
+    \@jsii (_x   >  _y)   = \@jsii (_y <  _x);
+    \@jsii (_x   >= _y)   = \@jsii (_y <= _x);
     \@jsii (_x  -=! _y)   = \@jsii -u! -@jsii _x /== _y) //- @jsii.intrinsics;
 
 High-level operators.
