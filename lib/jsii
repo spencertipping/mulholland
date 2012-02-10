@@ -1330,7 +1330,9 @@ present.)
 
   @jsii.intrinsics = (/@jsii-t->n _x = Number $ _x.resolved_data @;
                       /@jsii-n->t _x = /new parse.syntax $ parse.transient_intern _x -. erase_bloom @;
-                      /@jsii-c->t _x = parse.syntax.constant _x);
+                      /@jsii-c->t _x = parse.syntax.constant _x;
+
+                      /@jsii-a->t _x = /new parse.syntax (parse.intern '[', [/new parse.syntax (parse.intern ',', _x)]));
 
   ( \@jsii _x@0 = _x;
 
@@ -1360,7 +1362,21 @@ operate on Javascript native arrays and are then re-rendered as syntax nodes at 
   ( \@jsii [_xs][_i]    ==@js match._xs.flatten_all ',' -. [/u+ match._i.resolved_data @];
     \@jsii [_xs].length ==@js -@jsii-n->t match._xs.flatten_all ',' /. length;
 
-    \@jsii [_xs] /<< _y = [_xs, /@jsii _y]) //- @jsii.intrinsics
+    \@jsii [_xs] /<< _y = [_xs, /@jsii _y]) //- @jsii.intrinsics;
+
+  ( \@jsii {_xs}.@keys ==@js /@jsii-a->t seq.[match._xs.flatten_all ',' *[/@jsii-c->t x.[0]]] ) //- @jsii.intrinsics
+
+__
+meta::mh('jsr', <<'__');
+Javascript representation rewrites | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This file provides deep representation conversion for common Javascript constructs. Whether or not this will work for you mostly depends on what you're doing. If you are writing fairly normal
+code that involves a lot of state propagation among statically-defined objects, then you'll probably get a lot of options here.
+
+Representations.
+
 
 __
 meta::mh('tree', <<'__');
@@ -1697,6 +1713,7 @@ my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
 meta::sdoc('index', <<'__');
+- include mhi::jsr
 - include mhi::jsii
 - include mhi::tree
 

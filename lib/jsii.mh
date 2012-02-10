@@ -34,7 +34,9 @@ present.)
 
   @jsii.intrinsics = (/@jsii-t->n _x = Number $ _x.resolved_data @;
                       /@jsii-n->t _x = /new parse.syntax $ parse.transient_intern _x -. erase_bloom @;
-                      /@jsii-c->t _x = parse.syntax.constant _x);
+                      /@jsii-c->t _x = parse.syntax.constant _x;
+
+                      /@jsii-a->t _x = /new parse.syntax (parse.intern '[', [/new parse.syntax (parse.intern ',', _x)]));
 
   ( \@jsii _x@0 = _x;
 
@@ -64,4 +66,6 @@ operate on Javascript native arrays and are then re-rendered as syntax nodes at 
   ( \@jsii [_xs][_i]    ==@js match._xs.flatten_all ',' -. [/u+ match._i.resolved_data @];
     \@jsii [_xs].length ==@js -@jsii-n->t match._xs.flatten_all ',' /. length;
 
-    \@jsii [_xs] /<< _y = [_xs, /@jsii _y]) //- @jsii.intrinsics
+    \@jsii [_xs] /<< _y = [_xs, /@jsii _y]) //- @jsii.intrinsics;
+
+  ( \@jsii {_xs}.@keys ==@js /@jsii-a->t seq.[match._xs.flatten_all ',' *[/@jsii-c->t x.[0]]] ) //- @jsii.intrinsics

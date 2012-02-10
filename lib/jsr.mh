@@ -1,0 +1,9 @@
+Javascript representation rewrites | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This file provides deep representation conversion for common Javascript constructs. Whether or not this will work for you mostly depends on what you're doing. If you are writing fairly normal
+code that involves a lot of state propagation among statically-defined objects, then you'll probably get a lot of options here.
+
+Representations.
+
