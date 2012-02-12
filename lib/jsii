@@ -1311,8 +1311,18 @@ _xs :> _y = function.@cons2 _xs.@commas.@paren {/return _y};
 Return identities.
 In general, 'return' distributes over various kinds of statements and conditionals.
 
+/return /return _x = /return _x;
 /return (_x; _y) = (_x; /return _y);
-/return (_x ? _y :: _z) = if.@cons2 _x.@paren $$ {/return _y} :: -else {/return _z}
+/return (_x ? _y :: _z) = if.@cons2 _x.@paren $$ {/return _y} :: -else {/return _z};
+
+Simplification of linear values.
+These are high-level simplifications that are often useful when dealing with generated values.
+
+(_x _xs :> _y)(_arg, _args) = /return (-var _x /= _arg; (_xs :> _y) _args);
+(_x@0 :> _y) _arg           = /return (-var _x /= _arg; _y);
+
+(_x :> _y).call  (_this,  _args)  = (receiver _x :> _y)(_this, _args);
+(_x :> _y).apply (_this, [_args]) = (receiver _x :> _y)(_this, _args)
 
 __
 meta::mh('tree', <<'__');
