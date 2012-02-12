@@ -1,0 +1,7 @@
+Monad definition | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This file standardizes monad notation by providing an abstraction that you can use to write monads.
+
+/@monad _m (_return_x, _bind_f) = (/return /_m _x = _return_x; /_m _x >>= _f $= _bind_f)
