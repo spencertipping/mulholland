@@ -1,73 +1,18 @@
-Javascript interface interpreter | Spencer Tipping
+Javascript high-level interfacing | Spencer Tipping
 Licensed under the terms of the MIT source code license
 
 Introduction.
-This file provides a jsi-based interpreter for Mulholland. The idea is to provide some basic semantics and allow interfacing to tree objects at compile-time. This is useful when you want to
-use rewrites to do more complex kinds of computation than just matching and replacing. To facilitate this, this library emulates a subset of Javascript in terms of tree rewrites.
+Mulholland's jsi is a low-level interface that's difficult to use. This is a high-level interface that makes it tolerable to write Javascript code in Mulholland (and use syntactic expansions
+in the process). It relies on the tree reflection library.
 
-All rewriting rules used in this library are parameterized by the prefix operator @jsii. This prevents anything here from being spuriously evaluated in the course of normal rewriting, and it
-allows you to control the order of evaluation at a fairly low level. For example:
+_x@0.@commas = _x;
+_xs _x -. @commas = (_xs.@commas, _x);
 
-| =@jsii _cond      ? _t : _f = =@jsii-cond /@jsii-boolean _cond ? _t : _f;
-  =@jsii-cond true  ? _t : _f = /@jsii _t;
-  =@jsii-cond false ? _t : _f = /@jsii _f;
+_x.@paren = '('.@unquote.@cons1 _x;
+_xs :> _y = function.@cons2 _xs.@commas.@paren {/return _y};
 
-Here, evaluation is constrained to whichever conditional branch is needed; the other remains unevaluated. This is very important as it lets you model recursion and other self-referential
-processes.
+Return identities.
+In general, 'return' distributes over various kinds of statements and conditionals.
 
-Low-level data representation.
-Numbers and strings are represented verbatim; Javascript's + operator is replaced by two in jsii. + coerces its arguments to numbers while ++ coerces its arguments to strings. All numbers are
-ultimately represented as nullary tree nodes, which means that they are boxed and therefore much more expensive to allocate than regular Javascript numbers are. They are also Bloom-filter
-erased, which saves about 40 bytes of allocation (though this doesn't make them cheap).
-
-Arrays are represented by [] nodes, which Mulholland's parser produces when you encase stuff in [] groups. Elements are comma-separated. Because commas right-associate, working with the
-beginning of an array is O(1) while working with the end is O(n). Therefore, you should treat arrays in jsii like you would treat lists in Lisp. Objects are represented by {} nodes consisting
-of : pairs encased in ,. The representation here is similar to an alist in Lisp, and the same performance caveats apply.
-
-Functions are not represented by jsii. The reason is that you can get most of the functionality of functions by just setting up rewrite rules, and this will probably be faster than trying to
-provide function emulation, parameter binding, etc. In particular, you can create closures by using currying since function application left-associates:
-
-| /@jsii adder _x _n = \@jsii _x + _n;
-
-Any 'adder _x' term will remain in its unevaluated state; once it is applied to its second argument, however, the rewrite rule will take effect. (Well, it will once the @jsii marker is
-present.)
-
-  @jsii.intrinsics = (/@jsii-t->n _x = Number $ _x.resolved_data @;
-                      /@jsii-n->t _x = /new parse.syntax $ parse.transient_intern _x -. erase_bloom @;
-                      /@jsii-c->t _x = parse.syntax.constant _x;
-
-                      /@jsii-t->a _x = _x.flatten_all ',';
-                      /@jsii-a->t _x = /new parse.syntax (parse.intern '[', [/new parse.syntax (parse.intern ',', _x)]));
-
-  ( \@jsii _x@0 = _x;
-
-    # Numerical processing
-    \@jsii _x@0 + _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x  + /@jsii-t->n match._y;
-    \@jsii _x@0 - _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x  - /@jsii-t->n match._y;
-    \@jsii _x@0 * _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -* /@jsii-t->n match._y;
-    \@jsii _x@0 / _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -/ /@jsii-t->n match._y;
-    \@jsii _x@0 % _y@0 ==@js =@jsii-n->t /@jsii-t->n match._x -% /@jsii-t->n match._y;
-
-    # String processing
-    \@jsii _x@0 ++ _y@0 ==@js =@jsii-n->t match._x.resolved_data @ + match._y.resolved_data @;
-    \@jsii _x@0.length  ==@js =@jsii-n->t match._x.resolved_data @ -. length;
-
-    \@jsii (_x@0 <  _y@0) ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /<   match._y.resolved_data @;
-    \@jsii (_x@0 <= _y@0) ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /<=  match._y.resolved_data @;
-    \@jsii (_x  -== _y)   ==@js =@jsii-c->t -u! -u! match._x.resolved_data @ /=== match._y.resolved_data @;
-    \@jsii (_x   >  _y)   = \@jsii (_y <  _x);
-    \@jsii (_x   >= _y)   = \@jsii (_y <= _x);
-    \@jsii (_x  -=! _y)   = \@jsii -u! -@jsii _x /== _y) //- @jsii.intrinsics;
-
-High-level operators.
-The high-level operators supported by jsii diverge significantly from Javascript, especially for array operations. Most Javascript array operations are rephrased in terms of Caterwaul's seq
-library because the seq library is the freaking bomb (and because it's faster this way). There's also some attempt made to optimize where possible; for instance, sequence comprehensions
-operate on Javascript native arrays and are then re-rendered as syntax nodes at the last moment, rather than being re-consed into syntax trees in intermediate stages.
-
-  ( \@jsii [_xs][_i]    ==@js /@jsii-t->a match._xs -. [/u+ match._i.resolved_data @];
-    \@jsii [_xs].length ==@js -@jsii-n->t /@jsii-t->a match._xs /. length;
-
-    \@jsii [_xs] /<< _y = [_xs, /@jsii _y]) //- @jsii.intrinsics;
-
-  ( \@jsii {_xs}.@keys   ==@js /@jsii-a->t seq.[/@jsii-t->a match._xs *[/@jsii-c->t x.[0]]];
-    \@jsii {_xs}.@values ==@js /@jsii-a->t seq.[/@jsii-t->a match._xs *[/@jsii-c->t x.[1]]] ) //- @jsii.intrinsics
+/return (_x; _y) = (_x; /return _y);
+/return (_x ? _y :: _z) = if.@cons2 _x.@paren $$ {/return _y} :: -else {/return _z}

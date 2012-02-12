@@ -29,10 +29,5 @@ jsi     a low-level Mulholland->Javascript interface that is used to assign
         execution semantics to trees written in Mulholland. Documented in
         src/i/jsi.waul.
 
-jsii    an implementation of a Javascript-like language in terms of Mulholland
-        tree rewrites combined with some jsi magic to make it faster. Unlike
-        jsi, this is implemented in Mulholland, not Caterwaul. Documented in
-        lib/jsii.mh.
-
-jsr     a high-level compiler that understands various ways of representing
-        Javascript functions and data structures.
+jsii    a high-level Mulholland->Javascript interface that augments jsi with
+        rewrite rules that make it more fun to use.

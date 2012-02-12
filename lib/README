@@ -1,7 +1,3 @@
 Mulholland libraries.
 These are designed to modify the global environment in 'mh', primarily to make
 it easier to use Mulholland to write Javascript.
-
-The canonical version of the library source lives in self-modifying Perl files
-that inherit from ../mh-object. One such file is ./jsii. mh-jsii is a version of
-../mh with tree.mh and jsii.mh baked in.
