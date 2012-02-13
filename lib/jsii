@@ -1308,6 +1308,8 @@ _xs _x -. @commas = (_xs.@commas, _x);
 _x.@paren = '('.@unquote.@cons1 _x;
 _xs :> _y = function.@cons2 _xs.@commas.@paren {/return _y};
 
+_x ? _y : _z = '?'.@unquote.@cons3 _x _y _z;
+
 Return identities.
 In general, 'return' distributes over various kinds of statements and conditionals.
 
@@ -1336,8 +1338,9 @@ get a wildcard to bind to an operator. If you want to do this, you'll need to us
 _x.@data   ==@js -new parse.syntax $ match._x.data;
 _x.@length ==@js -new parse.syntax $ parse.intern $ match._x.length;
 
-_x@0.@cons1 _y    ==@js -new parse.syntax (match._x.data, [match._y]);
-_x@0.@cons2 _y _z ==@js -new parse.syntax (match._x.data, [match._y, match._z]);
+_x@0.@cons1 _y       ==@js -new parse.syntax (match._x.data, [match._y]);
+_x@0.@cons2 _y _z    ==@js -new parse.syntax (match._x.data, [match._y, match._z]);
+_x@0.@cons3 _y _z _t ==@js -new parse.syntax (match._x.data, [match._y, match._z, match._t]);
 
 _x@0.@unquote ==@js -new parse.syntax $ parse.intern $ (match._x.resolved_data @).replace ("/^'(.*)'$/"r, '$1');
 _x@0.@quote   ==@js -new parse.syntax $ parse.intern $ "'" /+ match._x.resolved_data @ /+ "'"
