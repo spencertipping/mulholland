@@ -1302,28 +1302,28 @@ Introduction.
 Mulholland's jsi is a low-level interface that's difficult to use. This is a high-level interface that makes it tolerable to write Javascript code in Mulholland (and use syntactic expansions
 in the process). It relies on the tree reflection library.
 
-_x@0.@commas      = _x;
-_xs _x $. @commas = _xs.@commas -, _x;
+@jsii = (_x@0.@commas      = _x;
+         _xs _x $. @commas = _xs.@commas -, _x;
 
-_xs :> _y = function.@cons2 _xs.@commas.@group {/return _y};  !+ _x = 'u+'.@unquote.@cons1 _x;  !~ _x = 'u~'.@unquote.@cons1 _x;
-_x  <: _y = '@='.@unquote.@cons2 _x _y;                       !- _x = 'u-'.@unquote.@cons1 _x;  !! _x = 'u!'.@unquote.@cons1 _x;
+         _xs :> _y = function.@cons2 _xs.@commas.@group {/return _y};  !+ _x = 'u+'.@unquote.@cons1 _x;  !~ _x = 'u~'.@unquote.@cons1 _x;
+         _x  <: _y = '@='.@unquote.@cons2 _x _y;                       !- _x = 'u-'.@unquote.@cons1 _x;  !! _x = 'u!'.@unquote.@cons1 _x;
 
-_x ? _y : _z = '?'.@unquote.@cons3 _x _y _z;
+         _x ? _y : _z = '?'.@unquote.@cons3 _x _y _z;
 
 Return identities.
 return distributes over various kinds of statements and conditionals. This makes it into more of a compile-time evaluation signal than a syntactic construct, though it ends up being a
 syntactic construct in generated Javascript.
 
-/return /return _x  = /return _x;        /return (_x ? _y : _z) = if.@cons3 _x.@group {/return _y} $ /else {/return _z};
-/return (_x; _y)    = (_x; /return _y);  /return (_x, _y)       = (_x; /return _y);
-/return (_x //= _y) = (/var _y; _x);
+         /return /return _x  = /return _x;        /return (_x ? _y : _z) = if.@cons3 _x.@group {/return _y} $ /else {/return _z};
+         /return (_x; _y)    = (_x; /return _y);  /return (_x, _y)       = (_x; /return _y);
+         /return (_x //= _y) = (/var _y; _x);
 
 Simplification of linear values.
 These are high-level simplifications that are often useful when dealing with generated values. Note that they are not sound in the general case; functions can't always be inlined due to scope
 integrity. However, this is a reasonable approximation.
 
-/return (_x _xs :> _y)(_arg, _args) = /return (-var _x /= _arg; (_xs :> _y) _args);  /return (_x :> _y).call  (_this,  _args)  = /return (receiver _x :> _y)(_this, _args);
-/return (_x@0 :> _y) _arg           = /return (-var _x /= _arg; _y);                 /return (_x :> _y).apply (_this, [_args]) = /return (receiver _x :> _y)(_this, _args)
+         /return (_x _xs :> _y)(_arg, _args) = /return (-var _x /= _arg; (_xs :> _y) _args);  /return (_x :> _y).call  (_this,  _args)  = /return (receiver _x :> _y)(_this, _args);
+         /return (_x@0 :> _y) _arg           = /return (-var _x /= _arg; _y);                 /return (_x :> _y).apply (_this, [_args]) = /return (receiver _x :> _y)(_this, _args))
 
 __
 meta::mh('tree', <<'__');
