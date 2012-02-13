@@ -5,24 +5,23 @@ Introduction.
 Mulholland's jsi is a low-level interface that's difficult to use. This is a high-level interface that makes it tolerable to write Javascript code in Mulholland (and use syntactic expansions
 in the process). It relies on the tree reflection library.
 
-_x@0.@commas = _x;
+_x@0.@commas      = _x;
 _xs _x -. @commas = (_xs.@commas, _x);
 
-_x.@paren = '('.@unquote.@cons1 _x;
-_xs :> _y = function.@cons2 _xs.@commas.@paren {/return _y};
+_x.@paren         = '('.@unquote.@cons1 _x;
+_xs :> _y         = function.@cons2 _xs.@commas.@paren {/return _y};
+
+_x ? _y : _z      = '?'.@unquote.@cons3 _x _y _z;
+_x <: _y          = '@='.@unquote.@cons2 _x _y;
 
 Return identities.
 In general, 'return' distributes over various kinds of statements and conditionals.
 
-/return /return _x = /return _x;
-/return (_x; _y) = (_x; /return _y);
-/return (_x ? _y :: _z) = if.@cons2 _x.@paren $$ {/return _y} :: -else {/return _z};
+/return /return _x     = /return _x;        /return (_x ? _y : _z) = if.@cons3 _x.@paren {/return _y} $ /else {/return _z};
+/return (_x; _y)       = (_x; /return _y);  /return (_x, _y)       = (_x; /return _y);
 
 Simplification of linear values.
 These are high-level simplifications that are often useful when dealing with generated values.
 
-(_x _xs :> _y)(_arg, _args) = /return (-var _x /= _arg; (_xs :> _y) _args);
-(_x@0 :> _y) _arg           = /return (-var _x /= _arg; _y);
-
-(_x :> _y).call  (_this,  _args)  = (receiver _x :> _y)(_this, _args);
-(_x :> _y).apply (_this, [_args]) = (receiver _x :> _y)(_this, _args)
+(_x _xs :> _y)(_arg, _args) = /return (-var _x /= _arg; (_xs :> _y) _args);  (_x :> _y).call  (_this,  _args)  = (receiver _x :> _y)(_this, _args);
+(_x@0 :> _y) _arg           = /return (-var _x /= _arg; _y);                 (_x :> _y).apply (_this, [_args]) = (receiver _x :> _y)(_this, _args)
