@@ -1648,7 +1648,7 @@ syn match  mh_double_string      /"\([^"\\\n]\|\\.\)*"[^[:space:][:cntrl:].:,;()
 syn match  mh_group              /[()\[\]{}]/
 syn match  mh_punctuation        /[,;.:]/
 
-syn region mh_qop                matchgroup=mh_q start=+\$\+\|\$*[-/\\|=]+ end=+$\|\s\|\.[-/\\|=]\d*+ contains=mh_marker
+syn region mh_qop                matchgroup=mh_q start=+\$\+[-/\\|=]\?\|\$*[-/\\|=]+ end=+$\|\s\|\.[-/\\|=]\d*+ contains=mh_marker
 
 syn region mh_line_comment       start=/#/ end=/$/
 syn region mh_sdoc_comment       start=/\(^$\n^\|\%^\)\s*[A-Z|]/ end=/^\s*$\|\%$/ contains=mh_sdoc_coerce,mh_sdoc_numbered_list,mh_sdoc_heading keepend

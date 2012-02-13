@@ -6,10 +6,9 @@ Mulholland's jsi is a low-level interface that's difficult to use. This is a hig
 in the process). It relies on the tree reflection library.
 
 _x@0.@commas      = _x;
-_xs _x -. @commas = (_xs.@commas, _x);
+_xs _x -. @commas = _xs.@commas -, _x;
 
-_x.@paren         = '('.@unquote.@cons1 _x;
-_xs :> _y         = function.@cons2 _xs.@commas.@paren {/return _y};
+_xs :> _y         = function.@cons2 _xs.@commas.@group {/return _y};
 
 _x ? _y : _z      = '?'.@unquote.@cons3 _x _y _z;
 _x <: _y          = '@='.@unquote.@cons2 _x _y;
@@ -17,8 +16,8 @@ _x <: _y          = '@='.@unquote.@cons2 _x _y;
 Return identities.
 In general, 'return' distributes over various kinds of statements and conditionals.
 
-/return /return _x     = /return _x;        /return (_x ? _y : _z) = if.@cons3 _x.@paren {/return _y} $ /else {/return _z};
-/return (_x; _y)       = (_x; /return _y);  /return (_x, _y)       = (_x; /return _y);
+/return /return _x     = /return _x;        /return (_x ? _y : _z) = if.@cons3 _x.@group {/return _y} $ /else {/return _z};
+-return _x /; _y       = _x -; /return _y;  /return (_x, _y)       = _x -; /return _y;
 
 Simplification of linear values.
 These are high-level simplifications that are often useful when dealing with generated values.
