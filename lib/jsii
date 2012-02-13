@@ -1313,8 +1313,9 @@ _x <: _y          = '@='.@unquote.@cons2 _x _y;
 Return identities.
 In general, 'return' distributes over various kinds of statements and conditionals.
 
-/return /return _x     = /return _x;        /return (_x ? _y : _z) = if.@cons3 _x.@group {/return _y} $ /else {/return _z};
--return _x /; _y       = _x -; /return _y;  /return (_x, _y)       = _x -; /return _y;
+/return /return _x  = /return _x;        /return (_x ? _y : _z) = if.@cons3 _x.@group {/return _y} $ /else {/return _z};
+-return (_x; _y)    = (_x; /return _y);  /return (_x, _y)       = (_x; /return _y);
+/return (_x //= _y) = (/var _y; _x);
 
 Simplification of linear values.
 These are high-level simplifications that are often useful when dealing with generated values.
