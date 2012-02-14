@@ -1,7 +1,7 @@
 caterwaul.module( 'mulholland.rewrite' ,function($) {$.mulholland.rewriter=function(rules) {;
 return(function( ) {var current=Array.prototype.slice.call( (rules) ) ,change=null,pattern_complexity=function() {;
 return(function(xs) {var x,x0,xi,xl,xr;
-for(var x0= (0x7fffffff) ,xi=0,xl=xs.length;
+for(var x0= (0x10000000) ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,x0= (Math.min(x0,x[0] .complexity() ) ) ;
 return x0} ) .call(this,current) } ,rewrite_once=function(t) {;
@@ -9,12 +9,12 @@ return(function(it) {return(change=change||it) ,it} ) .call(this, ( (function(xs
 for(var xl=xs.length,xi=xl-1,x=xs[xi] ,x1;
 xi>=0;
  --xi) {x=xs[xi] ;
-if(x1= ( (x[1] ) .replace(x[0] .match(t) ) ) )return x1}return false} ) .call(this,current) ) ) } ,rewriter=function() {var c=pattern_complexity() ;
+if(x1= ( (x[1] ) .replace(x[0] .match(t) ) ) )return x1}return false} ) .call(this,current) ) ) } ,deep_rewriter=function() {var c=pattern_complexity() ;
 return function(t) {;
-return t.complexity() >=c? (t) .rmap(rewrite_once) :t} } ,fixed_point=function() {var r=rewriter() ;
+return t.complexity() >=c? (t) .rmap(rewrite_once) :t} } ,fixed_point=function() {var r=deep_rewriter() ;
 var result=function(t) {;
-return(change=null, (function(it) {return(change?result.fix(it) :it) } ) .call(this, (r(t) ) ) ) } ;
- (result.fix=result) ;
+return(change=null, (function(it) {return(change?fix(it) :it) } ) .call(this, (r(t) ) ) ) } ;
+var fix=result;
 return result} ,transitive_limit=function(r) {;
 return[r[0] ,fixed_point() (r[1] ) ] } ,uniq=function(rs) {;
 return(function(rs) {var r,r0,ri,rl,rr;

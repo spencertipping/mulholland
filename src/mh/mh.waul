@@ -74,7 +74,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # Mulholland-based rewrite rules have been applied. If -r is specified, expressions are compiled and executed immediately by Caterwaul instead of being emitted to stdout.
 
     mh_offline(argv) = source_for(argv) *!mhc -seq
-               -where [mh          = mh_for(argv),
+               -where [mh          = $.mulholland.mh(),
                        cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
                        ccs         = {cc: cc} /-$.merge/ (argv /-contains_short/ 'v' && verbose_ccs()),
                        environment = {c: $, mh: mh, require: require, process: process},
@@ -85,7 +85,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
     mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -then- require('repl').start('mh> ', undefined, evaluator)
-               -where [mh                       = mh_for(argv),
+               -where [mh                       = $.mulholland.mh(),
                        ccs                      = argv /-contains_short/ 'v' && verbose_ccs(),
                        evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
                                            -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
@@ -132,9 +132,6 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
           read_file(f)            = require('fs').readFileSync(f, 'utf8') -rescue- f,
           output(t)               = process.stdout.write(t + ';\n', 'utf8'),
-          log(message, t)         = process.stderr.write('[mh.#{message}] #{t.toString()}\n', 'utf8'),
-
-          mh_for(argv)            = $.mulholland.mh() -se [it.context.toplevel.fix(x) = fix(x) -se- log('fix', it), where [fix = it.context.toplevel.fix], when [argv /-contains_short/ 'v']],
 
           defaults                = {cc: output, define_cc: "null".qf, js_define_cc: "null".qf}]});
 
