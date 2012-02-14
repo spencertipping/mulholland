@@ -1982,19 +1982,19 @@ example, this is a case where transitivity would apply:
 
   $.mulholland.rewriter(rules) = rewrite /-$.merge/ capture [rules = current, extend(rs) = $.mulholland.rewriter(current + rs -seq)]
 
-                                                     -where [current                                           = +rules -seq,
-                                                             change                                            = null,
+                                                     -where [current                                             = +rules -seq,
+                                                             change                                              = null,
 
-                                                             pattern_complexity()                              = current /[0x10000000][x0 /-Math.min/ x[0].complexity()] -seq,
-                                                             rewrite_once(t)                                   = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change = change || it],
+                                                             pattern_complexity()                                = current /[0x7fffffff][x0 /-Math.min/ x[0].complexity()] -seq,
+                                                             rewrite_once(t)                                     = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change = change || it],
 
-                                                             deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
-                                                             fixed_point(r = deep_rewriter(), fix = result)(t) = (change = null, r(t) -re [change ? fix(it) : it]),
-                                                             transitive_limit(r)                               = [r[0], fixed_point()(r[1])],
+                                                             rewriter(c = pattern_complexity())(t)               = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
+                                                             fixed_point(r = rewriter(), result.fix = result)(t) = (change = null, r(t) -re [change ? result.fix(it) : it]),
+                                                             transitive_limit(r)                                 = [r[0], fixed_point()(r[1])],
 
-                                                             uniq(rs)                                          = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
-                                                             current                                           = uniq(current + current *transitive_limit -seq),
-                                                             rewrite                                           = fixed_point()]});
+                                                             uniq(rs)                                            = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
+                                                             current                                             = uniq(current + current *transitive_limit -seq),
+                                                             rewrite                                             = fixed_point()]});
 
 __
 meta::sdoc('waul::i/tree', <<'__');
@@ -2182,7 +2182,7 @@ Look for expressions that are not equations and emit them to stdout after conver
 Mulholland-based rewrite rules have been applied. If -r is specified, expressions are compiled and executed immediately by Caterwaul instead of being emitted to stdout.
 
     mh_offline(argv) = source_for(argv) *!mhc -seq
-               -where [mh          = $.mulholland.mh(),
+               -where [mh          = mh_for(argv),
                        cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
                        ccs         = {cc: cc} /-$.merge/ (argv /-contains_short/ 'v' && verbose_ccs()),
                        environment = {c: $, mh: mh, require: require, process: process},
@@ -2193,7 +2193,7 @@ Read and evaluate any files specified on the command line, then enter a REPL tha
 the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
     mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -then- require('repl').start('mh> ', undefined, evaluator)
-               -where [mh                       = $.mulholland.mh(),
+               -where [mh                       = mh_for(argv),
                        ccs                      = argv /-contains_short/ 'v' && verbose_ccs(),
                        evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
                                            -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
@@ -2240,6 +2240,9 @@ These functions contain the mechanics of Mulholland's interface with the real wo
 
           read_file(f)            = require('fs').readFileSync(f, 'utf8') -rescue- f,
           output(t)               = process.stdout.write(t + ';\n', 'utf8'),
+          log(message, t)         = process.stderr.write('[mh.#{message}] #{t.toString()}\n', 'utf8'),
+
+          mh_for(argv)            = $.mulholland.mh() -se [it.context.toplevel.fix(x) = fix(x) -se- log('fix', it), where [fix = it.context.toplevel.fix], when [argv /-contains_short/ 'v']],
 
           defaults                = {cc: output, define_cc: "null".qf, js_define_cc: "null".qf}]});
 
