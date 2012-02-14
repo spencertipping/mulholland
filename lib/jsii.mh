@@ -9,8 +9,8 @@ in the process). It relies on the tree reflection library.
          _xs _x $. @commas = _xs.@commas -, _x;  _x  <: _y = '@='.@unquote.@cons2 _x _y;                       !- _x = 'u-'.@unquote.@cons1 _x;  !! _x = 'u!'.@unquote.@cons1 _x;
 
          _x ? _y : _z = '?'.@unquote.@cons3 _x _y _z;  @jsii.ife    _cond _then _else = if.@cons3 _cond.@group {_then} $ /else {_else};
-                                                       @jsii.if     _cond _then       = if.@cons2 _cond.@group {_then}
-                                                       @jsii.unless _cond _then       = if.@cons2 (!! _cond).@group {_then}
+                                                       @jsii.if     _cond _then       = if.@cons2 _cond.@group {_then};
+                                                       @jsii.unless _cond _then       = if.@cons2 (!! _cond).@group {_then};
 
 Return identities.
 return distributes over various kinds of statements and conditionals. This makes it into more of a compile-time evaluation signal than a syntactic construct, though it ends up being a
