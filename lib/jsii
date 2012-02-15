@@ -1659,8 +1659,8 @@ my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
 meta::sdoc('index', <<'__');
-- include mhi::tree
-- include mhi::jsii
+- pinclude mhi::tree
+- pinclude mh::jsii
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
