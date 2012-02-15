@@ -84,8 +84,10 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # Read and evaluate any files specified on the command line, then enter a REPL that emits results to stdout. Node's REPL module is used to do this. Because of its CPS API, I make sure to call
 # the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
-    mh_repl(argv)    = source_for(argv) *!mh -seq -then- require('repl').start('mh> ', undefined, evaluator)
+    mh_repl(argv)    = source_for(argv) *!mh -seq -then- introduce() -then- require('repl').start('mh> ', undefined, evaluator)
                -where [mh                       = $.mulholland.mh(),
+                       introduce()              = process.stderr.write('Mulholland compiler (repl mode), copyright 2012 Spencer Tipping\n' +
+                                                                       'Licensed under the terms of the MIT source code license\n'),
                        evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
                                            -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
