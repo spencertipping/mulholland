@@ -2184,7 +2184,7 @@ Mulholland-based rewrite rules have been applied. If -r is specified, expression
     mh_offline(argv) = source_for(argv) *!mhc -seq
                -where [mh          = $.mulholland.mh(),
                        cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
-                       ccs         = {cc: cc} /-$.merge/ (argv /-contains_short/ 'v' && verbose_ccs()),
+                       ccs         = {cc: cc},
                        environment = {c: $, mh: mh, require: require, process: process},
                        mhc(t)      = mh(t, ccs)],
 
@@ -2192,9 +2192,8 @@ REPL behavior.
 Read and evaluate any files specified on the command line, then enter a REPL that emits results to stdout. Node's REPL module is used to do this. Because of its CPS API, I make sure to call
 the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
-    mh_repl(argv)    = source_for(argv) *![mh(x, ccs)] -seq -then- require('repl').start('mh> ', undefined, evaluator)
+    mh_repl(argv)    = source_for(argv) *!mh -seq -then- require('repl').start('mh> ', undefined, evaluator)
                -where [mh                       = $.mulholland.mh(),
-                       ccs                      = argv /-contains_short/ 'v' && verbose_ccs(),
                        evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
                                            -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
@@ -2204,9 +2203,6 @@ instance is itself immutable, but internally it gets replaced with each new defi
 
     context()        = capture [parse         = $.mulholland(),                            split(s) = this /~parse/ s /~flatten_all/ ';',
                                 environment() = {c: $, context: this, parse: this.parse},  toplevel = [] /!$.mulholland.rewriter],
-
-    verbose_ccs()    = capture [define_cc(eq)    = 'defining    #{eq[0]} = #{eq[1]}' /!console.log,
-                                js_define_cc(eq) = 'js-defining #{eq[0]} = #{eq[1]}' /!console.log],
 
 Mulholland evaluation function.
 This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here.
@@ -2224,8 +2220,8 @@ This is where Mulholland is biased by practical constraints. Toplevel operations
               empty               = new c.parse.syntax('@' /!c.parse.intern),
               rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
               js_evaluate(t)      = t[0].as_js().guarded() /!js_macroexpand /-$.compile/ c.environment() /or [empty] /!options.cc,
-              js_define(equation) = equation /!options.js_define_cc -then [c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator]],
-              define(equation)    = equation /!options.define_cc    -then [c.toplevel = c.toplevel /~extend/ [equation]],
+              js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
+              define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
 
               replacer(js)        = '(function (match) {return match && (_body)})'.qs /~replace/ {_body: js},
               js_evaluator(e)     = [e[0], js_marker(e[1])],
@@ -2241,7 +2237,7 @@ These functions contain the mechanics of Mulholland's interface with the real wo
           read_file(f)            = require('fs').readFileSync(f, 'utf8') -rescue- f,
           output(t)               = process.stdout.write(t + ';\n', 'utf8'),
 
-          defaults                = {cc: output, define_cc: "null".qf, js_define_cc: "null".qf}]});
+          defaults                = {cc: output}]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
