@@ -9,8 +9,8 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
 
 # Mathematical properties of rewriting.
 # Equations that you write are implicitly normalizing symmetric equivalence relations. This has a few consequences. First, terms are normalized towards the right-hand side of the equations
-# transitively; so, for instance, if you write 'foo = bar' and then write 'foo', the result will bar 'bar' because 'bar' is considered to be the most normalized form in its equivalence class.
-# The rewriter determines this by transitive closure, and circular rewrites with no normal form will cause a stack overflow error. (This is why it is coded recursively, despite the fact that it
+# transitively; so, for instance, if you write 'foo = bar' and then write 'foo', the result will be 'bar' because 'bar' is considered to be the most normalized form in its equivalence class. The
+# rewriter determines this by transitive closure, and circular rewrites with no normal form will cause a stack overflow error. (This is why it is coded recursively, despite the fact that it
 # could be written as a loop instead.)
 
 # Equations are symmetric because their left-hand terms can be normalized prior to rewriting. For example, you can see this behavior in mh:
