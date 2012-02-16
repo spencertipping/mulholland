@@ -13,13 +13,4 @@ in the process). It relies on the tree reflection library.
                                                        @jsii-unless  _cond _then             = if.@cons2 (!! _cond).@group {_then};
                                                        @jsii-iterate _init _cond _each _body = for.@cons2 (_init; _cond; _each).@group {_body};
                                                        @jsii-inspect _var  _obj  _body       = for.@cons2 (-var (in.@cons2 _var _obj)) {_body};
-                                                       @jsii-while   _cond _body             = while.@cons2 _cond.@group {_body};
-
-Return identities.
-return distributes over various kinds of statements and conditionals. This makes it into more of a compile-time evaluation signal than a syntactic construct, though it ends up being a
-syntactic construct in generated Javascript.
-
-         _x <: /return _y    = _x <: _y;
-
-         /return (_x //= _y) = (/var _y; /return _x);  /return (_x ? _y : _z) = @jsii-ife _x (/return _y) (/return _z);  _x  && /return _y  = @jsii-if _x     $ /return _y;
-         /return (_x; _y)    = (_x; /return _y);       /return (_x, _y)       = (_x; /return _y);                        _x -|| /return _y |= @jsii-unless _x $ /return _y)
+                                                       @jsii-while   _cond _body             = while.@cons2 _cond.@group {_body})
