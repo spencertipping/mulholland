@@ -115,7 +115,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
                                                e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!options.cc,
 
               options             = {} / defaults /-$.merge/ specified_options,
-              js_macroexpand      = $('js_all'),
+              js_macroexpand      = $(':all'),
 
               empty               = new c.parse.syntax('@' /!c.parse.intern),
               rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
