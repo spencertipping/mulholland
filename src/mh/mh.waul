@@ -36,12 +36,16 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # | -i  interactive mode: starts a REPL after loading all files
 #   -r  compiles the given source output into Javascript statements and executes it immediately
 #   -c  compiles a new 'mh' file with the given libraries bundled in and emits it to stdout
+#   -j  interprets the given file as Javascript, executing it immediately (useful to load caterwaul extensions)
 
 # For example:
 
-# | $ mh -i foo.mh        # start a REPL after loading foo.mh
-#   $ mh foo.mh           # compile foo.mh to Javascript and print result to stdout
-#   $ mh -r foo.mh        # compile foo.mh to Javascript and execute it immediately
+# | $ mh -i foo.mh                        # start a REPL after loading foo.mh
+#   $ mh foo.mh                           # compile foo.mh to Javascript and print result to stdout
+#   $ mh -r foo.mh                        # compile foo.mh to Javascript and execute it immediately
+#   $ mh -jfoo.js -jbar.js foo.mh         # load foo.js and bar.js side-effectfully, then compile foo.mh into Javascript and print to stdout
+#   $ mh -c foo.mh                        # load foo.mh as a string, then write a new 'mh' instance that preloads it to stdout
+#   $ mh -c -jfoo.js foo.mh               # load foo.js as a Javascript module side-effectfully, then load foo.mh and write a new 'mh' instance that preloads both
 
   $.mulholland /-$.merge/ wcapture [
 
@@ -61,7 +65,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 #   $
 
     mh_compile(argv) = '#{header}\n#{resulting_tree}\n#{footer}' /!output
-               -where [parser         = $.mulholland(),
+               -where [parser         = $.mulholland() -se- evaluate_js_modules(argv),
                        bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
                        resulting_tree = $.replicator().toString(),
                        license        = '// Mulholland compiler (or derivative) | Spencer Tipping\n// Licensed under the terms of the MIT source code license',
@@ -74,7 +78,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # Mulholland-based rewrite rules have been applied. If -r is specified, expressions are compiled and executed immediately by Caterwaul instead of being emitted to stdout.
 
     mh_offline(argv) = source_for(argv) *!mhc -seq
-               -where [mh          = $.mulholland.mh(),
+               -where [mh          = $.mulholland.mh() -se- evaluate_js_modules(argv),
                        cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
                        ccs         = {cc: cc},
                        environment = {c: $, mh: mh, require: require, process: process},
@@ -85,7 +89,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
     mh_repl(argv)    = source_for(argv) *!mh -seq -then- introduce() -then- require('repl').start('mh> ', undefined, evaluator)
-               -where [mh                       = $.mulholland.mh(),
+               -where [mh                       = $.mulholland.mh() -se- evaluate_js_modules(argv),
                        evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
                                            -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
@@ -127,12 +131,15 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # Low-level bindings.
 # These functions contain the mechanics of Mulholland's interface with the real world. They're not exposed in $.mulholland primarily because they aren't really relevant to what Mulholland does.
 
-  -where [source_for(argv)        = argv %![/^-/.test(x)] *read_file -seq,
-          contains_short(argv, o) = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
+  -where [source_for(argv)          = argv %![/^-/.test(x)] *read_file -seq,
+          modules_for(argv)         = argv %~![/^-j/.test(x) && x.substr(2)] *read_file -seq,
+          evaluate_js_modules(argv) = modules_for(argv) *![$()('(function(){#{x}})()', {caterwaul: $, require: require})] -seq,
 
-          read_file(f)            = require('fs').readFileSync(f, 'utf8') -rescue- f,
-          output(t)               = process.stdout.write(t + ';\n', 'utf8'),
+          contains_short(argv, o)   = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
 
-          defaults                = {cc: output}]});
+          read_file(f)              = require('fs').readFileSync(f, 'utf8') -rescue- f,
+          output(t)                 = process.stdout.write(t + ';\n', 'utf8'),
+
+          defaults                  = {cc: output}]});
 
 # Generated by SDoc 
