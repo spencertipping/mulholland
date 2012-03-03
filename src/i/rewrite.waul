@@ -47,7 +47,7 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
                                                              fixed_point(r = deep_rewriter(), fix = result)(t) = (change = null, r(t) -re [change ? fix(it) : it]),
                                                              transitive_limit(r)                               = [r[0], fixed_point()(r[1])],
 
-                                                             uniq(rs)                                          = rs %!~r[rs |[xi > ri && x[0] /~match/ r[0]]] -seq,
+                                                             uniq(rs)                                          = rs %!r[rs |[xi > ri && x[0] /~match/ r[0]], seq] -seq,
                                                              current                                           = uniq(current + current *transitive_limit -seq),
                                                              rewrite                                           = fixed_point()]});
 
