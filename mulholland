@@ -839,11 +839,11 @@ my @markup;
 my $indent        = sub {'  ' x ($_[0] || $section_level)};
 my $unindent      = sub {my $spaces = '  ' x ($section_level - 1); s/^$spaces//gm};
 
-my $code          = sub {&$unindent(); s/^c\n//;                   push @markup, "\n", join("\n", map &$indent(2) . $_, split /\n/, $_), "\n"};
-my $quoted        = sub {&$unindent(); s/^\|(\s?)/ \1/; s/^  //mg; push @markup, "\n", join("\n", map &$indent(2) . $_, split /\n/, $_), "\n"};
+my $code          = sub {&$unindent(); s/^c\n//;                   push @markup, join("\n", map &$indent(2) . $_, split /\n/, $_)};
+my $quoted        = sub {&$unindent(); s/^\|(\s?)/ \1/; s/^  //mg; push @markup, join("\n", map &$indent(2) . $_, split /\n/, $_)};
 
 my $heading       = sub {'#' x $_[0]};
-my $section       = sub {&$unindent(); push @markup, "\n" . &$heading($_[0]) . ' ' . $2};
+my $section       = sub {&$unindent(); push @markup, &$heading($_[0]) . ' ' . $2};
 
 my $title = sub {
   my $indentation = (length($1) >> 1) + 1;
@@ -859,7 +859,7 @@ for (@paragraphs) {
   push @markup, join "\n", map {&$unindent() and $_} split /\n/, $_;
 }
 
-join "\n", @markup;
+join "\n\n", @markup;
 
 __
 meta::function('sdocp', <<'__');
@@ -1527,20 +1527,20 @@ meta::parent('/home/spencertipping/bin/waul-object', <<'__');
 function::minify-yui                                        dd0d6afd6be3108180637436f058a181
 function::waul                                              66b92f55d5db498934b487188a04b16d
 meta::type::waul                                            869b5820cd79178b94c3ccdd47dff9df
-parent::/home/spencertipping/conjectures/perl-objects/js    bc7a27dec21a2794a034ca292453d45f
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  c328e1359e74d8eb1b3520c9d3888b90
-parent::preprocessor                                        ce0627808a7fa6f2692af7437f98a731
+parent::/home/spencertipping/conjectures/perl-objects/js    08631314298573e77850afe27d7d3003
+parent::/home/spencertipping/conjectures/perl-objects/sdoc  0cef7258a2449765557387e954ab76d0
+parent::preprocessor                                        4450ebbe2c9d3a70ada4050fcd567907
 
 __
 meta::parent('/home/spencertipping/conjectures/perl-objects/js', <<'__');
 meta::type::js                           0377fcc438f3af85ec87d4770b8cd307
-parent::/home/spencertipping/bin/object  4d71ae092e2baa681e627f8a8ba8399e
+parent::/home/spencertipping/bin/object  1f1bf492b56b2f0196b2018b11b8c991
 
 __
 meta::parent('/home/spencertipping/conjectures/perl-objects/sdoc', <<'__');
 function::sdoc                           f0cea831720d18449455a8ed79181727
 function::sdoc-html                      b23152b3f5be696e5bae842ec43fc5a4
-function::sdoc-markdown                  95b79c4f54d9f8d77e67b557cd951c7e
+function::sdoc-markdown                  2f219c0399669b223a6d1bf1829218ff
 function::sdocp                          c3d738d982ba87418a298ff58478a85b
 meta::type::sdoc                         22cd7315641d38c9d536344e83c36bed
 meta::type::slibrary                     95474943c4a5f8ff17d3cf66ddb7c386
