@@ -99,7 +99,7 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
     replace(m)             = m && this.replace_children(m[this.resolved_data()], m) -or- this /~map/ "_.replace(m)".qf,
     replace_children(t, m) = t && (this.length ? new this.constructor(t.data, this /~map/ "_.replace(m)".qf) : t),
 
-    can_match(t)           = this.bloom() /~subset/ t.bloom() && this.complexity() <= t.complexity(),
+    can_match(t)           = this.complexity() <= t.complexity() && this.bloom() /~subset/ t.bloom(),
     level_matches(t)       = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
                                                 : this.data === t.data && this.length === t.length,
     children_match(t, m)   = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});

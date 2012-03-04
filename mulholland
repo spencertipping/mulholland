@@ -262,6 +262,7 @@ meta::meta('type::waul', <<'__');
 meta::functor::editable 'waul', inherit => 1, extension => '.waul', default => 'edit';
 
 __
+meta::alias('er', 'edit sdoc::readme');
 meta::alias('ev', 'edit vim_highlighter::mh');
 meta::bootstrap('html', <<'__');
 <html>
@@ -665,9 +666,12 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
+file::write('README.md', retrieve('markdown::readme'));
 file::write("src/$_.waul", retrieve("waul::$_")) for qw|i i/tree i/parse i/rewrite i/jsi mh/mh|;
-terminal::info('waul-compiling source');
-sh("waul src/*.waul src/*/*.waul");
+
+my $files = join ' ', glob 'src/*.waul src/*/*.waul';
+terminal::info("waul-compiling $files");
+sh("waul $files");
 
 file::write('mh', retrieve('pp::js::mh'));
 chmod 0755, 'mh';
@@ -837,10 +841,10 @@ my $section_level = 0;
 my @markup;
 
 my $indent        = sub {'  ' x ($_[0] || $section_level)};
-my $unindent      = sub {my $spaces = '  ' x ($section_level - 1); s/^$spaces//gm};
+my $unindent      = sub {my $spaces = '  ' x ($section_level - 1); s/^$spaces//gm; $_};
 
-my $code          = sub {&$unindent(); s/^c\n//;                   push @markup, join("\n", map &$indent(2) . $_, split /\n/, $_)};
-my $quoted        = sub {&$unindent(); s/^\|(\s?)/ \1/; s/^  //mg; push @markup, join("\n", map &$indent(2) . $_, split /\n/, $_)};
+my $code          = sub {&$unindent(); s/^c\n//;                   push @markup, join("\n", map &$indent(2) . $_, split /\n/)};
+my $quoted        = sub {&$unindent(); s/^\|(\s?)/ \1/; s/^  //mg; push @markup, join("\n", map &$indent(2) . $_, split /\n/)};
 
 my $heading       = sub {'#' x $_[0]};
 my $section       = sub {&$unindent(); push @markup, &$heading($_[0]) . ' ' . $2};
@@ -856,7 +860,7 @@ for (@paragraphs) {
   &$quoted(), next if     /^\h*\|/;
 
   &$title(), s/^.*\n// if /^(\s*)(\S.*)\.\n([^\n]+)/ and length("$1$2") < 60 and length("$1$2") - 10 < length($3);
-  push @markup, join "\n", map {&$unindent() and $_} split /\n/, $_;
+  push @markup, join "\n", map &$unindent(), split /\n/;
 }
 
 join "\n\n", @markup;
@@ -1540,7 +1544,7 @@ __
 meta::parent('/home/spencertipping/conjectures/perl-objects/sdoc', <<'__');
 function::sdoc                           f0cea831720d18449455a8ed79181727
 function::sdoc-html                      b23152b3f5be696e5bae842ec43fc5a4
-function::sdoc-markdown                  2f219c0399669b223a6d1bf1829218ff
+function::sdoc-markdown                  a35a6441dd750466f2d0e636bee2b382
 function::sdocp                          c3d738d982ba87418a298ff58478a85b
 meta::type::sdoc                         22cd7315641d38c9d536344e83c36bed
 meta::type::slibrary                     95474943c4a5f8ff17d3cf66ddb7c386
@@ -1555,7 +1559,7 @@ meta::parent('mh-object', <<'__');
 function::compile                                           51bbd6c69566343dae446e33570d911e
 function::repl                                              889cfc8294d68fca8641db03f8996b8a
 meta::type::mh                                              0b10222b800b45a0e3cb98e8d7607645
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  e4b705e778f5885457320433cea95a2f
+parent::/home/spencertipping/conjectures/perl-objects/sdoc  0cef7258a2449765557387e954ab76d0
 parent::preprocessor                                        4450ebbe2c9d3a70ada4050fcd567907
 parent::vim-highlighters                                    9f43562336f10d621ddefd326a989b1d
 retriever::mhi                                              72bbfd7e2a90f61e7500e38f4f700e79
@@ -1769,6 +1773,60 @@ Licensed under the terms of the MIT source code license
 - include src/mh/mh.js
 
 caterwaul.mulholland.mh_main(process.argv.slice(2));
+
+__
+meta::sdoc('readme', <<'__');
+Mulholland language.
+Mulholland is a practical [Havoc](http://github.com/spencertipping/havoc) implementation written in and using [Caterwaul](http://github.com/spencertipping/caterwaul). More usefully, it is an
+optimizing term rewriter that contains a native rewriting transformation from Mulholland source into Javascript.
+
+MIT licensed as usual.
+
+The core interpreter is implemented in `mulholland`, which is a [self-modifying Perl object](http://github.com/spencertipping/perl-objects) that contains Caterwaul source. It uses the `waul`
+precompiler to convert the Caterwaul source into Javascript, after which it uses a [preprocessor](http://spencertipping.com/perl-objects/preprocessor.html) to concatenate the Javascript
+sources together into the `mh` script. `mh` is executable by [node.js](http://nodejs.org) and can replicate itself in some useful ways, described below.
+
+  Mulholland internals.
+  Mulholland is very similar to caterwaul in a lot of ways, but its syntax is not compatible with Javascript and it compiles to Javascript only incidentally. Its syntax trees are optimized for
+  fast rewriting and destructuring binds; to do this they use a variety of heuristics to quickly reject large subtrees. This differs from caterwaul, which is optimized at a low level for
+  dynamic rewriting but doesn't do any static pattern analysis.
+
+  This project uses two significant optimizations that make it more scalable than caterwaul. First, rewrites are statically inlined. This means that if `foo = bar` and `bar = bif`, mulholland
+  replaces the first rewrite rule with `foo = bif` to skip the intermediate step. This eager rewriting makes it infeasible to define nonterminating rewrite rules, so mulholland as a rewriting
+  language is not Turing-complete.
+
+  The second optimization is that each syntax tree maintains a 256-bit [Bloom filter](http://en.wikipedia.org/wiki/Bloom_filter) index of the constants contained in that tree and any
+  descendants. Because the set of constants in a pattern must be a subset of the constants in any matching tree, a constant-time Bloom filter subset operation can exclude subtrees of arbitrary
+  size with a probability inversely proportional to the subtree's constant set size. False positives translate into extra work, but don't impact the correctness of the result.
+
+  Using `mh`.
+  `mh` is probably most useful as a REPL right now. I'm still figuring out what mulholland as a language needs to be, but you can see the rewriter in action like this:
+
+  | $ ./mh
+    mh> foo = bar
+    1           <- the number of unique rewrite rules
+    mh> bar = bif
+    2
+    mh> foo
+    'bif'
+    mh>
+
+  Pattern variables can be specified using an underscore prefix, just like caterwaul wildcards:
+
+  | mh> f _x = _x + 1
+    mh> f foo
+    'bif+1'
+    mh>
+
+  Replication.
+  `mh` can replicate itself just like `waul`. This is useful for two purposes. First, you can load caterwaul modules using `mh -jmodule.js`. Second, you can preload mulholland source files.
+  The option to replicate is `-c`:
+
+  | $ ./mh -c foo.mh            <- emits on stdout a mh compiler with foo.mh bundled in
+    $ ./mh -c -jmodule.js       <- emits on stdout a mh compiler whose caterwaul instance is configured with module.js
+
+  The `mh` in the root directory is the product of one such replication cycle; this process is governed by `mulholland`, which is a self-modifying Perl object that contains the authoritative
+  copies of mulholland's source in caterwaul.
 
 __
 meta::sdoc('waul::i', <<'__');
@@ -2178,7 +2236,7 @@ Note that match() forms a partial ordering over trees. In particular, it is tran
     replace(m)             = m && this.replace_children(m[this.resolved_data()], m) -or- this /~map/ "_.replace(m)".qf,
     replace_children(t, m) = t && (this.length ? new this.constructor(t.data, this /~map/ "_.replace(m)".qf) : t),
 
-    can_match(t)           = this.bloom() /~subset/ t.bloom() && this.complexity() <= t.complexity(),
+    can_match(t)           = this.complexity() <= t.complexity() && this.bloom() /~subset/ t.bloom(),
     level_matches(t)       = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
                                                 : this.data === t.data && this.length === t.length,
     children_match(t, m)   = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});
