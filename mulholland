@@ -1782,8 +1782,8 @@ optimizing term rewriter that contains a native rewriting transformation from Mu
 
 MIT licensed as usual.
 
-The core interpreter is implemented in `mulholland`, which is a [self-modifying Perl object](http://github.com/spencertipping/perl-objects) that contains Caterwaul source. It uses the `waul`
-precompiler to convert the Caterwaul source into Javascript, after which it uses a [preprocessor](http://spencertipping.com/perl-objects/preprocessor.html) to concatenate the Javascript
+The core interpreter is implemented in `mulholland`, which is a [self-modifying Perl object](http://github.com/spencertipping/perl-objects) that contains caterwaul source. It uses the `waul`
+precompiler to convert the caterwaul source into Javascript, after which it uses a [preprocessor](http://spencertipping.com/perl-objects/preprocessor.html) to concatenate the Javascript
 sources together into the `mh` script. `mh` is executable by [node.js](http://nodejs.org) and can replicate itself in some useful ways, described below.
 
   Mulholland internals.
@@ -1817,6 +1817,16 @@ sources together into the `mh` script. `mh` is executable by [node.js](http://no
     mh> f foo
     'bif+1'
     mh>
+
+  Rewrite rules can generate more rewrite rules:
+
+  | mh> define _name _value = _name = _value
+    mh> define (g _x) (_x * 2)
+    mh> g 10
+    '10*2'
+    mh>
+
+  However, you cannot pattern-match against rewrite rules. That is, no pattern of the form `_x = _y` will ever be matched by input you write.
 
   Replication.
   `mh` can replicate itself just like `waul`. This is useful for two purposes. First, you can load caterwaul modules using `mh -jmodule.js`. Second, you can preload mulholland source files.
