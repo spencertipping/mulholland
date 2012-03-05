@@ -1129,6 +1129,11 @@ Caterwaul doesn't use all of Javascript's intermediate levels of precedence, and
 Precedence modification should still be possible. Ideally, the $ operator (prefix?) would raise, not lower, precedence. Actually, it can do both: prefix $ increases precedence while postfix $
 decreases it. $ in the middle of an operator has no effect.
 
+Asymmetry.
+I like the idea of asymmetric operator precedence but its use cases are less than obvious. In particular, you rarely need asymmetric precedence if you can use arbitrary prefixes to modify the
+precedence of any operator transparently. The only case where it's very useful is when you're shifting an expression consistently to either the left or the right, and symmetric precedence
+would require some form of grouping. I can't think of a case where this necessary, so for now I'm going to assume that all operators have symmetric precedence.
+
 __
 meta::parent('/home/spencertipping/bin/notes', <<'__');
 function::note    c6d52ffe73cd48cd95fdc561c59d9f63

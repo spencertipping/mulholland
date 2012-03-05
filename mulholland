@@ -1944,74 +1944,29 @@ it; so generally speaking you don't have to worry about it.
 
           transient_intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : s.toString(),
 
-Asymmetric operator precedence.
-Mulholland goes off the deep end with operator precedence stuff by allowing operators to have asymmetric precedence and associativity. For example, you can say things like 3 +/ 4 / 5, which
-folds into (/ (+/ 3 4) 5) instead of the usual (+/ 3 (/ 4 5)). It's probably easier to think about precedence asymmetry as a generalization of what happens with parentheses. For instance, the
-open parenthesis from the left has very high precedence, but from the right has very low precedence (in most languages; Mulholland uses them for something totally different):
-
-| x * (foo = bar)       <- * waits for close-paren, = folds before close-paren
-
-Here, open-parenthesis is unary because it appears where we expect a value. But the same generalization is possible for binary operators. The precedence modification is defined in terms of
-shunting yard mechanics:
-
-| 3 +/ 4 / 5    -> encounter +/, push onto op stack
-                -> encounter /, force +/ because its right-precedence is equal and / left-associates
-
-Determining operator behavior.
-In addition to having an unusual way of dealing with operators, Mulholland gives you the ability to alter their precedence and associativity from each side without changing their semantic
-characteristics. These are, at a high level, the rules it follows:
-
-| 1. Operators that begin with an operator character bind values to their left; those that end with an operator bind values to their right. Most operators are binary, as they do both.
-  2. The following characters on the beginning or end of an operator modify its directional precedence/associativity (from high to low precedence): / - \ = |.
-  3. Operators that begin with $ have both directional precedences decreased by the same amount. This character is erased and can occur multiple times.
-
-Erasure.
-When you write an operator, some of the characters exist only to change its left/right precedence/associativity. These characters are useful only to provide tree structure and shouldn't be
-included in the parsed output. For example:
-
-| 3 $+ 4 + 5    -> (+ 3 (+ 4 5))                        x //- y / z  -> (//- x (/ y z))
-  x //- y / z   -> (// x (/ y z))                       x -// y / z  -> (/ (// x y) z)
-  x --/ y / z   -> (/ (--/ x y) z)                      x /*%!!      -> (/*%!! x)
-  x / y /*++!   -> (/*++! (/ x y))                      x /~         -> (~ x)
-  x / y /*++ z  -> (/*++ (/ x y) z)
-
-Mulholland uses several heuristics to determine whether a potential hint can be erased:
-
-| 1. If a hint appears on the left-side of an operator, it is erased.
-  2. All prefix $ characters are always erased. If the operator consisted entirely of $, it becomes a join (#).
-
-Hints are used even if they aren't erased. For example:
-
-| /--   partial erasure; left precedence is /, right precedence is -
-  //-   partial erasure; left precedence is /, right precedence is -
-  ///   partial erasure; left and right precedence are both /
-  ***   no erasure; left and right precedence are both *, which is the same as /
-  ***-  no erasure; left precedence is *, right precedence is -
-  /+    partial erasure; left precedence is /, right precedence is +, which is the same as -
-
 Precedence groups.
-Mulholland uses a fairly normal precedence layout. From high to low precedence, these are the classes of operators it supports and their associativity:
+Mulholland uses a fairly normal precedence layout. From high to low precedence, these are the classes of operators it supports and their associativity (if you memorize the logical layers then
+most other things should be fairly straightforward):
 
-| .             left
-  (none)        right
-  #             left
-  ! ~           right (unary)
-  / *           left
-  % `           right
-  + -           left
-  \ :           right
-  < >           left
-  & ?           right
-  ^             left
-  =             right
-  |             left
-  ...
-  ,             right
-  ;             left
+| Dot access             . 的                   left   2          <- first logical layer
+  Applicative            #                      left   4          <- second logical layer
+    Unary                ! ~ \ ` 个不           right  5
+  Multiplicative         / * % ⋅ ∩              left   6          <- third logical layer
+  Additive/bitwise       + - : & ^ ∪ ≻ ≺        left   8          <- fourth logical layer
+    Disjunction          |                      left   10
+  Relational             < > ≡ ∈ ⊂ ⊆ ⊃ ⊇ 是     left   12         <- fifth logical layer
+    Applicative          $ ⋯                    right  13
+  Logical                and nand xor xnor not  left   14         <- sixth logical layer
+    Logical disjunction  or nor                 left   16
+  Ternary/assignment     = ?                    right  17         <- seventh logical layer
+  Tupling                ,                      left   18
+  Sequence               ;                      left   20
 
-The $ character shifts an operator four levels down in this stack. This is really important; combined with the associativity alternation, it means that no associativity collisions will be
-created. (Imagine the problem: x $+ y + z or some such, where $+ has the same precedence as a right-associative operator.) The only exception to this is that $ right-associates, and this does
-create collisions. In this case, the collision is with + and -.
+This table has some important properties. First, all even precedence levels left-associate and all odd levels right-associate. This prevents the ambiguity that would arise if two operators had
+opposite associativity but equal precedence. Further, this property continues to hold even for operators which are not defined in the table above. This generality allows you to shift an
+operator's precedence and modify its associativity simultaneously.
+
+The parser still supports asymmetric operator precedence even though there is no way to use it. I may reintroduce the feature at some point in the future.
 
 Parser internals.
 The first stage involves "parsing" each token into a structure that describes its characteristics. These characteristics are:
