@@ -7,10 +7,13 @@ get a wildcard to bind to a binary operator. If you want to do this, you'll need
 that.
 
 _x.@group = '('.@unquote.@cons1 _x;
+_x.@new = 'new'.@unquote.@cons1 _x;
 
-_x@0.@unquote ==@js -new parse.syntax $ parse.intern $ (match._x.resolved_data @).replace ("/^'(.*)'$/"r, '$1');
-_x@0.@quote   ==@js -new parse.syntax $ parse.intern $ "'" /+ match._x.resolved_data @ /+ "'";
+_x $ _y = _x _y;
 
-_x@0.@cons1 _y       ==@js -new parse.syntax (match._x.data, [match._y]);
-_x@0.@cons2 _y _z    ==@js -new parse.syntax (match._x.data, [match._y, match._z]);
-_x@0.@cons3 _y _z _t ==@js -new parse.syntax (match._x.data, [match._y, match._z, match._t])
+_x@0.@unquote =@js parse.syntax $ parse.intern $ (match._x.resolved_data @).replace ("/^'(.*)'$/"r, '$1');
+_x@0.@quote   =@js parse.syntax $ parse.intern $ "'" + match._x.resolved_data @ + "'";
+
+_x@0.@cons1 _y       =@js parse.syntax (match._x.data, [match._y]);
+_x@0.@cons2 _y _z    =@js parse.syntax (match._x.data, [match._y, match._z]);
+_x@0.@cons3 _y _z _t =@js parse.syntax (match._x.data, [match._y, match._z, match._t])
