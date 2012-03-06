@@ -1919,7 +1919,7 @@ Lexer and token types.
 Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
 level, Mulholland supports these types of tokens:
 
-| 1. Identifiers, which have the form /[_@A-Za-z0-9\x7f-\uffff][^ \n\t\r.:,;()\[\]{}]*/
+| 1. Identifiers, which have the form /[_@A-Za-z0-9][^ \n\t\r.:,;()\[\]{}]*/
   2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
   4. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
@@ -1948,16 +1948,16 @@ Precedence groups.
 Mulholland uses a fairly normal precedence layout. From high to low precedence, these are the classes of operators it supports and their associativity (if you memorize the logical layers then
 most other things should be fairly straightforward):
 
-| Dot access             . 的                   left   2          <- first logical layer
+| Dot access             .                      left   2          <- first logical layer
   Applicative            #                      left   4          <- second logical layer
     Unary                ! ~ \ ` 个不           right  5
   Multiplicative         / * % ⋅ ∩              left   6          <- third logical layer
   Additive/bitwise       + - : & ^ ∪ ≻ ≺        left   8          <- fourth logical layer
-    Disjunction          |                      left   10
+    Disjunction          | ⋯                    left   10
   Relational             < > ≡ ∈ ⊂ ⊆ ⊃ ⊇ 是     left   12         <- fifth logical layer
-    Applicative          $ ⋯                    right  13
-  Logical                and nand xor xnor not  left   14         <- sixth logical layer
-    Logical disjunction  or nor                 left   16
+    Applicative          $                      right  13
+  Logical                ∧ ¬ ⊕                  left   14         <- sixth logical layer
+    Logical disjunction  ∨                      left   16
   Ternary/assignment     = ?                    right  17         <- seventh logical layer
   Tupling                ,                      left   18
   Sequence               ;                      left   20
@@ -1969,7 +1969,8 @@ operator's precedence and modify its associativity simultaneously.
 The parser still supports asymmetric operator precedence even though there is no way to use it. I may reintroduce the feature at some point in the future.
 
 Handling Unicode.
-Any Unicode characters are, admittedly erroneously, assumed to be parts of operators. (TODO: develop this thought further...)
+Any Unicode characters are, admittedly erroneously, assumed to be parts of operators. This is important: it means that you can use any Unicode character as an adverb on an operator, but it can
+only be a suffix of a noun. (Remember that tokens are categorized based on what they start with.)
 
 Parser internals.
 The first stage involves "parsing" each token into a structure that describes its characteristics. These characteristics are:
@@ -1992,13 +1993,14 @@ to see a value but encounters one anyway. For instance, if you parse 'foo + bar 
 operator, not a value. A join is also generated when you have a unary operator where a binary operator is expected. This causes the parser to do the right thing for expressions such as
 'foo(bar)': a join is inferred after 'foo' and before '(bar)'.
 
-Unary operators have some strange precedence rules. All unary operators are prefix and therefore right-associative, and they cannot split anything to their left. For example, in 'foo + ! bif',
-no precedence of '!' can cause it to bind after the '+'. To deal with this, unary operators all have left-facing precedence 1 (higher than any other operator) and they have variable
-right-precedence. The right-precedence can be used to vary the scope of the binding: 'foo + -! bar / bif' causes the '!' to bind 'bar / bif', not just 'bar' as it normally would.
+Operator modifiers.
+Previous versions of mulholland provided fully general operator modifiers, which allowed you to dynamically change the precedence of any operator without changing the operator itself. For
+example, you could use the / prefix to make an operator multiplicative-precedence: foo + bif /+ bar would be equivalent to foo + (bif + bar). This version does away with this because it's
+fundamentally a little bit misguided. As such, the operator "parse" step is fairly trivial.
 
-          precedence_table          = '\\. \\s # [~!] [/*] [%`] [-+] [\\\\:] [<>] [&?] \\^ = \\|'.qw *[new RegExp('^#{x}')] -seq,
-          base_precedence(t)        = t === ',' ? 0x10000000 : t === ';' ? 0x10000001 : precedence_table |[x.test(t) && xi + 2] |seq,
-          operator_lexer            = /^(\$*)([-\/\\|=]?)(.*)$/.qf,
+          precedence_table          = '\\. $ # [~!\\\\`个不] [/*%⋅∩] $ [-+:&^∪≺≻] $ [|⋯] $ [<>≡∈⊂⊆⊃⊇是] [\\$] [∧¬⊕] $ [∨] [=?] [,] $ [;]'.qw *[new RegExp('^#{x}')] -seq,
+          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
+          operator_lexer            = /^(\$*)(.+?)(\$*)$/.qf,
           is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
           is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),
 
@@ -2009,16 +2011,9 @@ right-precedence. The right-precedence can be used to vary the scope of the bind
           parse_operator(t)         = is_opener(t) ? {l: 0, r: 1 << 30, id: t /!intern, o: true, u: true, i: t === '('} :
                                       is_closer(t) ? {l: 0, r: 0,       id: t /!intern, c: true}                        : parse_regular_operator(t),
 
-          parse_regular_operator(t) = {l: real_left, r: real_right, id: canonical /!intern, u: unary}
-                              -where [pieces     = operator_lexer(t),
-                                      adjust     = pieces[1].length << 2,
-                                      canonical  = pieces[3] || pieces[2] || '#',
-                                      left       = adjust + pieces[2] /!base_precedence /or [canonical /!base_precedence],
-                                      right      = canonical.charAt(canonical.length - 1) /!base_precedence -re [it ? it + adjust : left],
-                                      unary      = canonical /!is_unary,
-
-                                      real_left  = unary ?    1 : left,
-                                      real_right = unary ? left : right],
+          parse_regular_operator(t) = {l: real_left, r: precedence, id: pieces[2] /!intern, u: unary}
+                              -where [pieces     = operator_lexer(t),                                                  unary     = pieces[2] /!is_unary,
+                                      precedence = pieces[2] /!base_precedence + pieces[1].length - pieces[3].length,  real_left = unary ? 1 : precedence],
 
           join                      = '#' /!parse_operator,
           empty_value               = new syntax('@'),
