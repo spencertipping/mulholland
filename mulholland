@@ -1968,6 +1968,9 @@ operator's precedence and modify its associativity simultaneously.
 
 The parser still supports asymmetric operator precedence even though there is no way to use it. I may reintroduce the feature at some point in the future.
 
+Handling Unicode.
+Any Unicode characters are, admittedly erroneously, assumed to be parts of operators. (TODO: develop this thought further...)
+
 Parser internals.
 The first stage involves "parsing" each token into a structure that describes its characteristics. These characteristics are:
 
