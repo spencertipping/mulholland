@@ -7,7 +7,7 @@ return(function(it) {return(it.join( ' ' ) ) } ) .call(this, ( (function(xs) {va
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] , ( /^\s*[A-Z|]/ .test(x) ) ||xr.push(x) ;
-return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /(#.*|(?:[@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/ ,lex=function(s) {;
+return xr} ) .call(this,s.split( /\n(?:\s*\n)+/ ) ) ) ) } ,lexer= /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/ ,lex=function(s) {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var xr=new xs.constructor() ,xi=0,xl=xs.length;
 xi<xl;
@@ -33,7 +33,7 @@ return is_opener(t) ? {l:0,r:1<<30,id:intern(t) ,o:true,u:true,i:t=== '(' } :is_
 return(function( ) {var pieces=operator_lexer(t) ,unary=is_unary(pieces[2] ) ,precedence=base_precedence(pieces[2] ) +pieces[1] .length-pieces[3] .length,real_left=unary?1:precedence;
 return( {l:real_left,r:precedence,id:intern(pieces[2] ) ,u:unary} ) } ) .call(this) } ,join=parse_operator( '#' ) ,empty_value=new syntax( '@' ) ,parse=function(ts) {;
 return(function( ) {var values= [ ] ,operators= [ ] ,ev=true,right=function(t) {;
-return t.l&1||t.id===join.id&&t.l>join.l} ,top=function() {;
+return t.l&1} ,top=function() {;
 return operators[operators.length-1] } ,value=function() {;
 return values.pop() ||empty_value} ,precedence=function(t) {;
 return( (operators.length&& (right(t) ?top() .r<t.l:top() .r<=t.l) ) && ( ( (apply() ) , (precedence(t) ) ) ) ) } ,operator=function(t) {;

@@ -33,10 +33,10 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 #   6. Grouping operators, which are of one of ( ) [ ] { }. Of these, parentheses are erased.
 
 # It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
-# treats any Unicode character as the beginning of an identifier.
+# treats any Unicode character as the beginning of an operator.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[@\w\x7f-\uffff]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/,
+          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 # Symbol interning.
@@ -129,7 +129,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
                                       operators      = [],
                                       ev             = true,
 
-                                      right(t)       = t.l & 1 || t.id === join.id && t.l > join.l,
+                                      right(t)       = t.l & 1,
 
                                       top()          = operators[operators.length - 1],
                                       value()        = values.pop() || empty_value,
