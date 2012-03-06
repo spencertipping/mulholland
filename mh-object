@@ -627,8 +627,9 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('repl', <<'__');
+my $nontrivial = @_;
 with_exported(map("pp::$_", @_), sub {
-  sh("mh -i $_[0]")});
+  sh($nontrivial ? "mh -i $_[0]" : 'mh -i')});
 
 __
 meta::function('rm', <<'__');

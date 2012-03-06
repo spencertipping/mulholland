@@ -683,8 +683,9 @@ dangerous('bootstrapping mh', sub {
 
 __
 meta::function('repl', <<'__');
+my $nontrivial = @_;
 with_exported(map("pp::$_", @_), sub {
-  sh("mh -i $_[0]")});
+  sh($nontrivial ? "mh -i $_[0]" : 'mh -i')});
 
 __
 meta::function('rm', <<'__');
@@ -1532,7 +1533,7 @@ function::minify-yui                                        dd0d6afd6be310818063
 function::waul                                              66b92f55d5db498934b487188a04b16d
 meta::type::waul                                            869b5820cd79178b94c3ccdd47dff9df
 parent::/home/spencertipping/conjectures/perl-objects/js    08631314298573e77850afe27d7d3003
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  0cef7258a2449765557387e954ab76d0
+parent::/home/spencertipping/conjectures/perl-objects/sdoc  5ead79278263770b4bd3f4928f4b28aa
 parent::preprocessor                                        4450ebbe2c9d3a70ada4050fcd567907
 
 __
@@ -1557,7 +1558,7 @@ retriever::sdocp                         330694ea14a23bb04b65c761075cd946
 __
 meta::parent('mh-object', <<'__');
 function::compile                                           51bbd6c69566343dae446e33570d911e
-function::repl                                              889cfc8294d68fca8641db03f8996b8a
+function::repl                                              54eaffe967a927ca20ed3b5975dee8f4
 meta::type::mh                                              0b10222b800b45a0e3cb98e8d7607645
 parent::/home/spencertipping/conjectures/perl-objects/sdoc  0cef7258a2449765557387e954ab76d0
 parent::preprocessor                                        4450ebbe2c9d3a70ada4050fcd567907
