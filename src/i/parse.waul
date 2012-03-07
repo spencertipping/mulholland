@@ -111,9 +111,9 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
 
-          parse_token(t)            = is_operator(t) ? parse_operator(t) : {l: 0, r: 0, id: t /!intern, v: true},
-          parse_operator(t)         = is_opener(t)   ?                     {id: t /!intern, o: true, u: true, i: t === '('} :
-                                      is_closer(t)   ?                     {id: t /!intern, c: true}                        : parse_regular_operator(t),
+          parse_token(t)            = is_operator(t) ? parse_operator(t) : {l: 0,       r: 0,       id: t /!intern, v: true},
+          parse_operator(t)         = is_opener(t)   ?                     {l: 1 << 30, r: 1 << 30, id: t /!intern, o: true, u: true, i: t === '('} :
+                                      is_closer(t)   ?                     {l: 1 << 30, r: 1 << 30, id: t /!intern, c: true}                        : parse_regular_operator(t),
 
           parse_regular_operator(t) = {l: real_left, r: precedence, id: pieces[2] /!intern, u: unary}
                               -where [pieces     = operator_lexer(t),                                                  unary     = pieces[2] /!is_unary,

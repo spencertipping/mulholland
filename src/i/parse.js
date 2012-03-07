@@ -29,7 +29,7 @@ return precedence_table[3] .test(t) || !base_precedence(t) } ,is_operator=functi
 return'([{' .indexOf(t) +1} ,is_closer=function(t) {;
 return')]}' .indexOf(t) +1} ,parse_token=function(t) {;
 return is_operator(t) ?parse_operator(t) : {l:0,r:0,id:intern(t) ,v:true} } ,parse_operator=function(t) {;
-return is_opener(t) ? {id:intern(t) ,o:true,u:true,i:t=== '(' } :is_closer(t) ? {id:intern(t) ,c:true} :parse_regular_operator(t) } ,parse_regular_operator=function(t) {;
+return is_opener(t) ? {l:1<<30,r:1<<30,id:intern(t) ,o:true,u:true,i:t=== '(' } :is_closer(t) ? {l:1<<30,r:1<<30,id:intern(t) ,c:true} :parse_regular_operator(t) } ,parse_regular_operator=function(t) {;
 return(function( ) {var pieces=operator_lexer(t) ,unary=is_unary(pieces[2] ) ,precedence=base_precedence(pieces[2] ) +pieces[1] .length-pieces[3] .length,real_left=unary?1:precedence;
 return( {l:real_left,r:precedence,id:intern(pieces[2] ) ,u:unary} ) } ) .call(this) } ,join=parse_operator( '#' ) ,empty_value=new syntax( '@' ) ,parse=function(ts) {;
 return(function( ) {var values= [ ] ,right=function(t) {;
