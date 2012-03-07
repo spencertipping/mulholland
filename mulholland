@@ -1923,7 +1923,7 @@ level, Mulholland supports these types of tokens:
 | 1. Identifiers, which have the form /[_@A-Za-z0-9][^ \n\t\r.:,;()\[\]{}]*/
   2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
   3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
-  4. Operators, which are of the form /[^ \n\t\r()\[\]{}]+/ and are not identifiers
+  4. Operators, which are of the form /[^ \n\t\r()\[\]{}A-Za-z]+(\w+[^ \n\t\r()\[\]{}]+)*/ (they can contain letters, but those letters must be bounded on both sides by operator chars)
   5. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z@_()\[\]{}]*/
   6. Grouping operators, which are of one of ( ) [ ] { }. Of these, parentheses are erased.
 
@@ -1931,7 +1931,7 @@ It also supports SDoc-style paragraph comments. These are removed just like line
 treats any Unicode character as the beginning of an operator.
 
           sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s()\[\]{}]*|[()\[\]{}])/,
+          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s\w()\[\]{}]*(?:\w+[^\s\w()\[\]{}]+)*|[()\[\]{}])/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -2002,15 +2002,15 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
           precedence_table          = '\\. $ # [~!\\\\`个不] [/*%⋅∩] $ [-+:&^∪≺≻] $ [|⋯] $ [<>≡∈⊂⊆⊃⊇是] [\\$] [∧¬⊕] $ [∨] [=?] [,] $ [;]'.qw *[new RegExp('^#{x}')] -seq,
           base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
           operator_lexer            = /^(\$*)(.+?)(\$*)$/.qf,
-          is_value                  = /^["'A-Za-z0-9@_\xff-\uffff]/.qf,
+          is_operator               = /^\W+(?:\w+[^\s\w()\[\]{}]+)*$/.qf,
           is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),
 
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
 
-          parse_token(t)            = is_value(t)  ? {l: 0, r: 0,       id: t /!intern, v: true}                        : parse_operator(t),
-          parse_operator(t)         = is_opener(t) ? {l: 0, r: 1 << 30, id: t /!intern, o: true, u: true, i: t === '('} :
-                                      is_closer(t) ? {l: 0, r: 0,       id: t /!intern, c: true}                        : parse_regular_operator(t),
+          parse_token(t)            = is_operator(t) ? parse_operator(t) : {l: 0, r: 0,       id: t /!intern, v: true},
+          parse_operator(t)         = is_opener(t)   ?                     {l: 0, r: 1 << 30, id: t /!intern, o: true, u: true, i: t === '('} :
+                                      is_closer(t)   ?                     {l: 0, r: 0,       id: t /!intern, c: true}                        : parse_regular_operator(t),
 
           parse_regular_operator(t) = {l: real_left, r: precedence, id: pieces[2] /!intern, u: unary}
                               -where [pieces     = operator_lexer(t),                                                  unary     = pieces[2] /!is_unary,
@@ -2019,7 +2019,7 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
           join                      = '#' /!parse_operator,
           empty_value               = new syntax('@'),
 
-          parse(ts)                 = ts *parse_token *!observe -seq -re- apply_all()
+          parse(ts)                 = ts *parse_token *!observe -seq -then- apply_all()
                               -where [values         = [],
                                       operators      = [],
                                       ev             = true,
