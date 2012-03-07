@@ -1880,16 +1880,16 @@ caterwaul.module('mulholland.jsi', 'js_all', function ($) {
                     this.length === 0      ? new p.syntax(this.data /!mh_encode_literal /!p.intern) :
                                              new p.syntax(this.data /!mh_encode_literal /!p.intern, [this[0].as_mh(p), this[1].as_mh(p)]),
 
-         as_js()  = this.resolved_data() === '@'                          ? $.empty :
-                    this.resolved_data() === '#'                          ? new $.syntax('()', this[0].as_js(), this[1].as_js()) :
-                    this /!represents_a_slice                             ? new $.syntax('[]', this[0].as_js(), this[1][0].as_js()) :
-                    this.length === 0                                     ? new $.syntax(this.resolved_data() /!mh_decode_literal) :
-                                                                            new $.syntax(this.resolved_data() /!mh_decode_literal, +this %~![x.resolved_data() !== '@' && x.as_js()] -seq),
+         as_js()  = this.resolved_data() === '@' ? $.empty :
+                    this.resolved_data() === '#' ? new $.syntax('()', this[0].as_js(), this[1].as_js()) :
+                    this /!represents_a_slice    ? new $.syntax('[]', this[0].as_js(), this[1][0].as_js()) :
+                    this.length === 0            ? new $.syntax(this.resolved_data() /!mh_decode_literal) :
+                                                   new $.syntax(this.resolved_data() /!mh_decode_literal, +this %~![x.resolved_data() !== '@' && x.as_js()] -seq),
 
          represents_a_slice(t) = t.resolved_data() === '.' && t[1].resolved_data() === '[',
 
-         mh_encode_literal(d, s = d.toString())  = /\/./.test(s) ? '"' + s.replace(/"/g, '\\"') + '"r' : s.replace(/^\$/, '@$'),
-         mh_decode_literal(d, s = d.toString())  = /^".*"r$/.test(s) ? s.replace(/^"\//, '/').replace(/\\"/g, '"').replace(/"r$/, '') : s.replace(/^@(.)/, '$1')]});
+         mh_encode_literal(d, s = d.toString()) = /\/./.test(s) ? '"' + s.replace(/"/g, '\\"') + '"r' : s.replace(/^\$/, '@$'),
+         mh_decode_literal(d, s = d.toString()) = /^".*"r$/.test(s) ? s.replace(/^"\//, '/').replace(/\\"/g, '"').replace(/"r$/, '') : s.replace(/^@(.)/, '$1')]});
 
 __
 meta::sdoc('waul::i/parse', <<'__');
@@ -1930,8 +1930,8 @@ level, Mulholland supports these types of tokens:
 It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 treats any Unicode character as the beginning of an operator.
 
-          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s\w()\[\]{}]*(?:\w+[^\s\w()\[\]{}]+)*|[()\[\]{}])/,
+          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n'),
+          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s\w()\[\]{}]*(?:\w*[^\s\w()\[\]{}]+)*|[()\[\]{}])/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 Symbol interning.
@@ -2000,10 +2000,8 @@ example, you could use the / prefix to make an operator multiplicative-precedenc
 fundamentally a little bit misguided. As such, the operator "parse" step is fairly trivial.
 
           precedence_table          = '\\. $ # [~!\\\\`个不] [/*%⋅∩] $ [-+:&^∪≺≻] $ [|⋯] $ [<>≡∈⊂⊆⊃⊇是] [\\$] [∧¬⊕] $ [∨] [=?] [,] $ [;]'.qw *[new RegExp('^#{x}')] -seq,
-          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
-          operator_lexer            = /^(\$*)(.+?)(\$*)$/.qf,
-          is_operator               = /^\W+(?:\w+[^\s\w()\[\]{}]+)*$/.qf,
-          is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),
+          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,        operator_lexer = /^(\$*)(.+?)(\$*)$/.qf,
+          is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),  is_operator    = /^[^"'\w@_]+(?:\w*[^\s\w()\[\]{}]+)*$/.qf,
 
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
@@ -2020,14 +2018,10 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
           empty_value               = new syntax('@'),
 
           parse(ts)                 = ts *parse_token *!observe -seq -then- apply_all()
-                              -where [values         = [],
-                                      operators      = [],
-                                      ev             = true,
+                              -where [values         = [],    right(t) = t.l & 1,
+                                      operators      = [],    value()  = values.pop() || empty_value,
+                                      ev             = true,  top()    = operators[operators.length - 1],
 
-                                      right(t)       = t.l & 1,
-
-                                      top()          = operators[operators.length - 1],
-                                      value()        = values.pop() || empty_value,
                                       precedence(t)  = apply() -then- precedence(t) -when [operators.length && (t /!right ? top().r < t.l : top().r <= t.l)],
                                       operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
@@ -2039,6 +2033,7 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
 
                                       apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [value()])
                                                                : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = value(), y = value()],
+
                                       apply_closer() = apply() -then- apply_closer() -unless [!operators.length || top().o],
                                       apply_all()    = operators.length ? apply() -then- apply_all() : values[values.length - 1]]]});
 
@@ -2221,8 +2216,8 @@ Like waul, mh specifies a minimal toplevel execution context. This is used to de
 
 | 1. Global rewrite definition: foo = bar
   2. Local anonymous rewrite: foo /- (bar = bif)
-  3. Javascript evaluation: =@js parse 'hello world'
-  4. Javascript equation definition: _x + _y ==@js -new parse.syntax $ match._x.resolved_data @ /+ match._y.resolved_data @
+  3. Javascript evaluation: @- $ parse 'hello world'
+  4. Javascript equation definition: _x@0 ++ _y@0 =@ parse.syntax (match._x.resolved_data @ + match._y.resolved_data @)
   5. Composition of side-effects: foo = bar; bif = baz
 
 Semantics.
@@ -2317,11 +2312,11 @@ This is where Mulholland is biased by practical constraints. Toplevel operations
 
     mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
       -where [evaluate(t, e = c.toplevel(t)) = console.log('evaluating #{t}') -re [
-                                               e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
-                                               e.resolved_data() === '='    ? e /!define :
-                                               e.resolved_data() === '@js'  ? e /!js_evaluate :
-                                               e.resolved_data() === '=@js' ? e /!js_define :
-                                               e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!options.cc],
+                                               e.resolved_data() === ';'  ? e.flatten_all(';') *!evaluate -seq :
+                                               e.resolved_data() === '='  ? e /!define :
+                                               e.resolved_data() === '@-' ? e /!js_evaluate :
+                                               e.resolved_data() === '=@' ? e /!js_define :
+                                               e.resolved_data() === '/-' ? e /!rewrite /!evaluate : e /!options.cc],
 
               options             = {} / defaults /-$.merge/ specified_options,
               js_macroexpand      = $(':all'),

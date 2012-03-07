@@ -12,8 +12,8 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
 # | 1. Global rewrite definition: foo = bar
 #   2. Local anonymous rewrite: foo /- (bar = bif)
-#   3. Javascript evaluation: =@js parse 'hello world'
-#   4. Javascript equation definition: _x + _y ==@js -new parse.syntax $ match._x.resolved_data @ /+ match._y.resolved_data @
+#   3. Javascript evaluation: @- $ parse 'hello world'
+#   4. Javascript equation definition: _x@0 ++ _y@0 =@ parse.syntax (match._x.resolved_data @ + match._y.resolved_data @)
 #   5. Composition of side-effects: foo = bar; bif = baz
 
 # Semantics.
@@ -108,11 +108,11 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
     mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
       -where [evaluate(t, e = c.toplevel(t)) = console.log('evaluating #{t}') -re [
-                                               e.resolved_data() === ';'    ? e.flatten_all(';') *!evaluate -seq :
-                                               e.resolved_data() === '='    ? e /!define :
-                                               e.resolved_data() === '@js'  ? e /!js_evaluate :
-                                               e.resolved_data() === '=@js' ? e /!js_define :
-                                               e.resolved_data() === '/-'   ? e /!rewrite /!evaluate : e /!options.cc],
+                                               e.resolved_data() === ';'  ? e.flatten_all(';') *!evaluate -seq :
+                                               e.resolved_data() === '='  ? e /!define :
+                                               e.resolved_data() === '@-' ? e /!js_evaluate :
+                                               e.resolved_data() === '=@' ? e /!js_define :
+                                               e.resolved_data() === '/-' ? e /!rewrite /!evaluate : e /!options.cc],
 
               options             = {} / defaults /-$.merge/ specified_options,
               js_macroexpand      = $(':all'),

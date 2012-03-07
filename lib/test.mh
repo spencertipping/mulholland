@@ -1,16 +1,16 @@
 _x.@group = '('.@unquote.@cons1 _x;
 _x.@new = 'new'.@unquote.@cons1 _x;
 
-(@jsii = (_x@0.@commas      = _x;                 _xs :> _y = function.@cons2 _xs.@commas.@group {/return _y};  !+ _x = 'u+'.@unquote.@cons1 _x;  !~ _x = 'u~'.@unquote.@cons1 _x;
-         _xs _x $. @commas = (_xs.@commas, _x);  _x  <: _y = '@='.@unquote.@cons2 _x _y;                       !- _x = 'u-'.@unquote.@cons1 _x;  !! _x = 'u!'.@unquote.@cons1 _x;
+#@jsii = (_x@0.@commas      = _x;                 _xs :> _y = function.@cons2 _xs.@commas.@group {/return _y};  !+ _x = 'u+'.@unquote.@cons1 _x;  !~ _x = 'u~'.@unquote.@cons1 _x;
+#         _xs _x $. @commas = (_xs.@commas, _x);  _x  <: _y = '@='.@unquote.@cons2 _x _y;                       !- _x = 'u-'.@unquote.@cons1 _x;  !! _x = 'u!'.@unquote.@cons1 _x;
 
-         (_x ? _y : _z) = '?'.@unquote.@cons3 _x _y _z));
+#         (_x ? _y : _z) = '?'.@unquote.@cons3 _x _y _z);
 
 _x $ _y = _x _y;
 
-_x@0.@unquote =@js parse.syntax $ parse.intern $ (match._x.resolved_data @).replace ("/^'(.*)'$/"r, '$1');
-_x@0.@quote   =@js parse.syntax $ parse.intern $ "'" + match._x.resolved_data @ + "'";
+_x@0.@unquote =@ parse.syntax $ parse.intern $ (match._x.resolved_data @).replace ("/^'(.*)'$/"r, '$1');
+_x@0.@quote   =@ parse.syntax $ parse.intern $ "'" + match._x.resolved_data @ + "'";
 
-_x@0.@cons1 _y       =@js parse.syntax (match._x.data, [match._y]);
-_x@0.@cons2 _y _z    =@js parse.syntax (match._x.data, [match._y, match._z]);
-_x@0.@cons3 _y _z _t =@js parse.syntax (match._x.data, [match._y, match._z, match._t])
+_x@0.@cons1 _y       =@ parse.syntax (match._x.data, [match._y]);
+_x@0.@cons2 _y _z    =@ parse.syntax (match._x.data, [match._y, match._z]);
+_x@0.@cons3 _y _z _t =@ parse.syntax (match._x.data, [match._y, match._z, match._t])

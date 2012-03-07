@@ -35,8 +35,8 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
 # treats any Unicode character as the beginning of an operator.
 
-          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join(' '),
-          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s\w()\[\]{}]*(?:\w+[^\s\w()\[\]{}]+)*|[()\[\]{}])/,
+          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n'),
+          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s\w()\[\]{}]*(?:\w*[^\s\w()\[\]{}]+)*|[()\[\]{}])/,
           lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
 
 # Symbol interning.
@@ -105,10 +105,8 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 # fundamentally a little bit misguided. As such, the operator "parse" step is fairly trivial.
 
           precedence_table          = '\\. $ # [~!\\\\`个不] [/*%⋅∩] $ [-+:&^∪≺≻] $ [|⋯] $ [<>≡∈⊂⊆⊃⊇是] [\\$] [∧¬⊕] $ [∨] [=?] [,] $ [;]'.qw *[new RegExp('^#{x}')] -seq,
-          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,
-          operator_lexer            = /^(\$*)(.+?)(\$*)$/.qf,
-          is_operator               = /^\W+(?:\w+[^\s\w()\[\]{}]+)*$/.qf,
-          is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),
+          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,        operator_lexer = /^(\$*)(.+?)(\$*)$/.qf,
+          is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),  is_operator    = /^[^"'\w@_]+(?:\w*[^\s\w()\[\]{}]+)*$/.qf,
 
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
@@ -125,14 +123,10 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
           empty_value               = new syntax('@'),
 
           parse(ts)                 = ts *parse_token *!observe -seq -then- apply_all()
-                              -where [values         = [],
-                                      operators      = [],
-                                      ev             = true,
+                              -where [values         = [],    right(t) = t.l & 1,
+                                      operators      = [],    value()  = values.pop() || empty_value,
+                                      ev             = true,  top()    = operators[operators.length - 1],
 
-                                      right(t)       = t.l & 1,
-
-                                      top()          = operators[operators.length - 1],
-                                      value()        = values.pop() || empty_value,
                                       precedence(t)  = apply() -then- precedence(t) -when [operators.length && (t /!right ? top().r < t.l : top().r <= t.l)],
                                       operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
@@ -144,6 +138,7 @@ caterwaul.module('mulholland.parser', 'js_all', function ($) {
 
                                       apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [value()])
                                                                : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = value(), y = value()],
+
                                       apply_closer() = apply() -then- apply_closer() -unless [!operators.length || top().o],
                                       apply_all()    = operators.length ? apply() -then- apply_all() : values[values.length - 1]]]});
 
