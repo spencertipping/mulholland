@@ -1,0 +1,8 @@
+High-level mulholland-caterwaul interface | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This file defines rewriting rules that make it more practical to write caterwaul code from inside mulholland. It requires the definitions in tree.mh.
+
+@jsii = (_x@0.@commas     = _x;                 _xs :> _y = function.@cons2 _xs.@commas.@group {return.@cons1 _y};
+         (_x _xs).@commas = (_xs.@commas, _x);  _x  <: _y = '@='.@unquote.@cons2 _x _y)

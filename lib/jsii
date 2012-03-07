@@ -1346,6 +1346,17 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::mh('jsii', <<'__');
+High-level mulholland-caterwaul interface | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+This file defines rewriting rules that make it more practical to write caterwaul code from inside mulholland. It requires the definitions in tree.mh.
+
+@jsii = (_x@0.@commas     = _x;                 _xs :> _y = function.@cons2 _xs.@commas.@group {return.@cons1 _y};
+         (_x _xs).@commas = (_xs.@commas, _x);  _x  <: _y = '@='.@unquote.@cons2 _x _y)
+
+__
 meta::mh('tree', <<'__');
 Mulholland syntax tree reflection | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1701,7 +1712,8 @@ my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
 meta::sdoc('index', <<'__');
-- pinclude mh::tree
+- pinclude mhi::tree
+- pinclude mh::jsii
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
