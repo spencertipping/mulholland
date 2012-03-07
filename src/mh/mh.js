@@ -63,11 +63,11 @@ return{c:$,context:this,parse:this.parse} } ,toplevel:$.mulholland.rewriter( [ ]
 return process.stderr.write( 'Mulholland compiler (repl mode), copyright 2012 Spencer Tipping\n' + 'Licensed under the terms of the MIT source code license\n' + 'http://github.com/spencertipping/mulholland\n' ) } ,mh=function() {;
 var result=function(s,specified_options) {;
 return(function( ) {var evaluate=function(t) {var e=c.toplevel(t) ;
-return(function(it) {return(e.resolved_data() === ';' ? (function(xs1) {var x1,x01,xi1,xl1,xr1;
+return e.resolved_data() === ';' ? (function(xs1) {var x1,x01,xi1,xl1,xr1;
 for(var xi1=0,xl1=xs1.length;
 xi1<xl1;
  ++xi1)x1=xs1[xi1] , (evaluate(x1) ) ;
-return xs1} ) .call(this,e.flatten_all( ';' ) ) :e.resolved_data() === '=' ?define(e) :e.resolved_data() === '@-' ?js_evaluate(e) :e.resolved_data() === '=@' ?js_define(e) :e.resolved_data() === '/-' ?evaluate(rewrite(e) ) :options.cc(e) ) } ) .call(this, (console.log( ( 'evaluating ' + (t) + '' ) ) ) ) } ,options=$.merge( { } ,defaults,specified_options) ,js_macroexpand=$( ':all' ) ,empty=new c.parse.syntax(c.parse.intern( '@' ) ) ,rewrite=function(t) {;
+return xs1} ) .call(this,e.flatten_all( ';' ) ) :e.resolved_data() === '=' ?define(e) :e.resolved_data() === '@-' ?js_evaluate(e) :e.resolved_data() === '=@' ?js_define(e) :e.resolved_data() === '/-' ?evaluate(rewrite(e) ) :options.cc(e) } ,options=$.merge( { } ,defaults,specified_options) ,js_macroexpand=$( ':all' ) ,empty=new c.parse.syntax(c.parse.intern( '@' ) ) ,rewrite=function(t) {;
 return c.toplevel.extend(t[1] .flatten_all( ';' ) ) (t[0] ) } ,js_evaluate=function(t) {;
 return options.cc( ( ($.compile(js_macroexpand(t[0] .as_js() .guarded() ) ,c.environment() ) ) || (empty) ) ) } ,js_define=function(equation) {;
 return c.toplevel= (c.toplevel) .extend( [js_evaluator(equation) ] ) } ,define=function(equation) {;
