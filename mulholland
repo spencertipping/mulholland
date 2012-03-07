@@ -2006,9 +2006,9 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
           is_opener(t)              = '([{'.indexOf(t) + 1,
           is_closer(t)              = ')]}'.indexOf(t) + 1,
 
-          parse_token(t)            = is_operator(t) ? parse_operator(t) : {l: 0, r: 0,       id: t /!intern, v: true},
-          parse_operator(t)         = is_opener(t)   ?                     {l: 0, r: 1 << 30, id: t /!intern, o: true, u: true, i: t === '('} :
-                                      is_closer(t)   ?                     {l: 0, r: 0,       id: t /!intern, c: true}                        : parse_regular_operator(t),
+          parse_token(t)            = is_operator(t) ? parse_operator(t) : {l: 0, r: 0, id: t /!intern, v: true},
+          parse_operator(t)         = is_opener(t)   ?                     {id: t /!intern, o: true, u: true, i: t === '('} :
+                                      is_closer(t)   ?                     {id: t /!intern, c: true}                        : parse_regular_operator(t),
 
           parse_regular_operator(t) = {l: real_left, r: precedence, id: pieces[2] /!intern, u: unary}
                               -where [pieces     = operator_lexer(t),                                                  unary     = pieces[2] /!is_unary,
@@ -2018,11 +2018,12 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
           empty_value               = new syntax('@'),
 
           parse(ts)                 = ts *parse_token *!observe -seq -then- apply_all()
+
                               -where [values         = [],    right(t) = t.l & 1,
                                       operators      = [],    value()  = values.pop() || empty_value,
                                       ev             = true,  top()    = operators[operators.length - 1],
 
-                                      precedence(t)  = apply() -then- precedence(t) -when [operators.length && (t /!right ? top().r < t.l : top().r <= t.l)],
+                                      precedence(t)  = apply() -then- precedence(t) -when [t /!right ? top().r < t.l : top().r <= t.l] -when- operators.length,
                                       operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
 
                                       observe(t)     = t.v ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
@@ -2032,7 +2033,7 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
                                                            : operator(t),
 
                                       apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [value()])
-                                                               : values /~push/ new syntax(operators.pop().id, [y, x]) /where [x = value(), y = value()],
+                                                               : values /~push/ new syntax(operators.pop().id, [y, x]) -where [x = value(), y = value()],
 
                                       apply_closer() = apply() -then- apply_closer() -unless [!operators.length || top().o],
                                       apply_all()    = operators.length ? apply() -then- apply_all() : values[values.length - 1]]]});

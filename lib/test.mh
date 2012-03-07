@@ -1,10 +1,10 @@
 _x.@group = '('.@unquote.@cons1 _x;
 _x.@new = 'new'.@unquote.@cons1 _x;
 
-#@jsii = (_x@0.@commas      = _x;                 _xs :> _y = function.@cons2 _xs.@commas.@group {/return _y};  !+ _x = 'u+'.@unquote.@cons1 _x;  !~ _x = 'u~'.@unquote.@cons1 _x;
-#         _xs _x $. @commas = (_xs.@commas, _x);  _x  <: _y = '@='.@unquote.@cons2 _x _y;                       !- _x = 'u-'.@unquote.@cons1 _x;  !! _x = 'u!'.@unquote.@cons1 _x;
+@jsii = (_x@0.@commas     = _x;                 _xs :> _y = function.@cons2 _xs.@commas.@group {return.@cons1 _y};  !+ _x = 'u+'.@unquote.@cons1 _x;  !~ _x = 'u~'.@unquote.@cons1 _x;
+         (_xs _x).@commas = (_xs.@commas, _x);  _x  <: _y = '@='.@unquote.@cons2 _x _y;                             !- _x = 'u-'.@unquote.@cons1 _x;  !! _x = 'u!'.@unquote.@cons1 _x;
 
-#         (_x ? _y : _z) = '?'.@unquote.@cons3 _x _y _z);
+         (_x ? _y : _z) = '?'.@unquote.@cons3 _x _y _z);
 
 _x $ _y = _x _y;
 
