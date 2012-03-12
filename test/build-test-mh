@@ -1,3 +1,0 @@
-#!/bin/bash
-../mh -c > test-mh
-chmod u+x test-mh

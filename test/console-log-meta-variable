@@ -1,3 +1,0 @@
-#!./test-mh
-# vim: set syntax=mh :
-/@js console.log foo -/- foo /= 'hello world'
