@@ -255,6 +255,7 @@ meta::define_form 'vim_highlighter', \&meta::bootstrap::implementation;
 
 __
 meta::alias('e', 'edit sdoc::index');
+meta::alias('er', 'edit sdoc::readme');
 meta::alias('ev', 'edit vim_highlighter::mh');
 meta::alias('r', 'repl sdoc::index');
 meta::bootstrap('html', <<'__');
@@ -631,6 +632,7 @@ meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^
 meta::function('render', <<'__');
 my @modules = grep s/^mh:://, sort keys %data;
 
+file::write('README.md', retrieve('markdown::readme'));
 file::write("$_.mh", retrieve("mh::$_"))           for @modules;
 file::write("$_.md", retrieve("markdown::mh::$_")) for @modules;
 compile('pp::sdoc::index', 'mh-jsii');
@@ -1349,6 +1351,20 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::mh('binding', <<'__');
+Global JSII native binding | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+I recently removed the =@ operator from mh. This has some subtle but significant implications for how native interfacing is done. The implications are subtle because you can easily preserve
+semantics by treating =@ as a regular = followed by !@ for the replacement. That is:
+
+| x =@ y ≡ x = !@ (y)   <- where ≡ denotes semantic equality at the term rewriting level, provided that y is pure under Javascript execution
+
+The snag is that y will be recompiled and evaluated (!) for every single match of x. This happens even for speculative expansion. While doing this is semantically valid for any pure Javascript
+expression, it causes a tremendous amount of overhead for what would otherwise be a trivial operation.
+
+__
 meta::mh('jsii', <<'__');
 High-level mulholland-caterwaul interface | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1736,8 +1752,15 @@ my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
 meta::sdoc('index', <<'__');
+- pinclude mhi::binding
 - pinclude mhi::tree
 - pinclude mh::jsii
+
+__
+meta::sdoc('readme', <<'__');
+Mulholland libraries.
+These are designed to modify the global environment in 'mh', primarily to make
+it easier to use Mulholland to write Javascript.
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
