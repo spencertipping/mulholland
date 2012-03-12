@@ -16,4 +16,10 @@ _x@0.@quote   =@ parse.syntax $ parse.intern $ "'" + match._x.resolved_data @ + 
 
 _x@0.@cons1 _y       =@ parse.syntax (match._x.data, [match._y]);
 _x@0.@cons2 _y _z    =@ parse.syntax (match._x.data, [match._y, match._z]);
-_x@0.@cons3 _y _z _t =@ parse.syntax (match._x.data, [match._y, match._z, match._t])
+_x@0.@cons3 _y _z _t =@ parse.syntax (match._x.data, [match._y, match._z, match._t]);
+
+_x@0.@gensym =@ parse.syntax (@$.gensym $ match._x.resolved_data @)
+
+Syntax node folding.
+
+#_x@0.@/il = _x :: @nil; (_op.@cons2 _x _y).@/il = 

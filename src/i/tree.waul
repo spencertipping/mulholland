@@ -19,7 +19,6 @@ caterwaul.module('mulholland.tree', 'js_all', function ($) {
   $.mulholland.syntax(parser, result.prototype / $.mulholland.syntax_common /-$.merge/ methods(parser),
                               result                                        /-$.merge/ statics(parser))
                      (data, xs) = this instanceof result ? (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this) : new result(data, xs),
-
   where [
 
   statics(parser) = wcapture [

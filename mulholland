@@ -2090,7 +2090,7 @@ example, this is a case where transitivity would apply:
                                                              transitive_limit(r)                               = [r[0], fixed_point()(r[1])],
 
                                                              uniq(rs)                                          = rs %!r[rs |[xi > ri && x[0] /~match/ r[0]], seq] -seq,
-                                                             current                                           = uniq(current + current *transitive_limit -seq),
+                                                             current                                           = uniq(seq in current + current *transitive_limit),
                                                              rewrite                                           = fixed_point()]});
 
 __
@@ -2116,7 +2116,6 @@ indexes into the symbol table.
   $.mulholland.syntax(parser, result.prototype / $.mulholland.syntax_common /-$.merge/ methods(parser),
                               result                                        /-$.merge/ statics(parser))
                      (data, xs) = this instanceof result ? (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this) : new result(data, xs),
-
   where [
 
   statics(parser) = wcapture [
@@ -2312,25 +2311,17 @@ Mulholland evaluation function.
 This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here.
 
     mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
-      -where [evaluate(t, e = c.toplevel(t)) = e.resolved_data() === ';'  ? e.flatten_all(';') *!evaluate -seq :
-                                               e.resolved_data() === '='  ? e /!define :
-                                               e.resolved_data() === '@-' ? e /!js_evaluate :
-                                               e.resolved_data() === '=@' ? e /!js_define :
-                                               e.resolved_data() === '/-' ? e /!rewrite /!evaluate : e /!options.cc,
+      -where [evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === ';'  ? e.flatten_all(';') *!evaluate -seq : d === '='  ? e /!define :
+                                                                      d === '@-' ? e /!js_evaluate :                    d === '=@' ? e /!js_define :
+                                                                      d === '/-' ? e /!rewrite /!evaluate                          : e /!options.cc,
 
               options             = {} / defaults /-$.merge/ specified_options,
-              js_macroexpand      = $(':all'),
 
-              empty               = new c.parse.syntax('@' /!c.parse.intern),
-              rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),
-              js_evaluate(t)      = t[0].as_js().guarded() /!js_macroexpand /-$.compile/ c.environment() /or [empty] /!options.cc,
-              js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],
-              define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],
-
-              replacer(js)        = '(function (match) {return match && (_body)})'.qs /~replace/ {_body: js},
-              js_evaluator(e)     = [e[0], js_marker(e[1])],
-              js_marker(t)        = new c.parse.syntax('<js native: #{t.as_js().guarded().toString()}>' /!c.parse.intern)
-                               -se [it.replace = t.as_js().guarded() /!replacer /!js_macroexpand /-$.compile/ c.environment()]]]
+              empty               = c.parse.syntax('@' /!c.parse.intern),                         js_macroexpand  = $(':all'),
+              rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),               compile(tree)   = tree /!js_macroexpand /-$.compile/ c.environment(),
+              js_evaluate(t)      = t[0].as_js().guarded() /!compile /or [empty] /!options.cc,    replacer(js)    = 'match -and- _body -given.match'.qse /~replace/ {_body: js} /!compile,
+              js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],  js_evaluator(e) = [e[0], js_marker(e[1])],
+              define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],                 js_marker(t)    = c.parse.syntax('<js>') -se [it.replace = t.as_js().guarded() /!replacer]]]
 
 Low-level bindings.
 These functions contain the mechanics of Mulholland's interface with the real world. They're not exposed in $.mulholland primarily because they aren't really relevant to what Mulholland does.
