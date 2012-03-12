@@ -263,6 +263,7 @@ meta::functor::editable 'waul', inherit => 1, extension => '.waul', default => '
 
 __
 meta::alias('er', 'edit sdoc::readme');
+meta::alias('erf', 'edit function::render');
 meta::alias('ev', 'edit vim_highlighter::mh');
 meta::bootstrap('html', <<'__');
 <html>
