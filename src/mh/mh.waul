@@ -109,7 +109,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
     mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
       -where [evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === ';'  ? e.flatten_all(';') *!evaluate -seq : d === '='  ? e /!define :
                                                                       d === '@-' ? e /!js_evaluate :                    d === '=@' ? e /!js_define :
-                                                                      d === '/-' ? e /!rewrite /!evaluate                          : e /~replace/ {} /!options.cc,
+                                                                      d === '/-' ? e /!rewrite /!evaluate                          : e /!options.cc,
 
               options             = {} / defaults /-$.merge/ specified_options,
 
@@ -117,7 +117,7 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
               rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),               compile(tree)   = tree /!js_macroexpand /-$.compile/ c.environment(),
               js_evaluate(t)      = t[0].as_js().guarded() /!compile /or [empty] /!options.cc,    replacer(js)    = 'match -and- _body -given.match'.qse /~replace/ {_body: js} /!compile,
               js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],  js_evaluator(e) = [e[0], js_marker(e[1])],
-              define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],                 js_marker(t)    = c.parse.syntax('@js') -se [it.replace = t.as_js().guarded() /!replacer]]]
+              define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],                 js_marker(t)    = c.parse.syntax('<js>') -se [it.replace = t.as_js().guarded() /!replacer]]]
 
 # Low-level bindings.
 # These functions contain the mechanics of Mulholland's interface with the real world. They're not exposed in $.mulholland primarily because they aren't really relevant to what Mulholland does.
