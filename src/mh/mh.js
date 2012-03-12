@@ -68,7 +68,7 @@ return d=== ';' ? (function(xs1) {var x1,x01,xi1,xl1,xr1;
 for(var xi1=0,xl1=xs1.length;
 xi1<xl1;
  ++xi1)x1=xs1[xi1] , (evaluate(x1) ) ;
-return xs1} ) .call(this,e.flatten_all( ';' ) ) :d=== '=' ?define(e) :d=== '@-' ?js_evaluate(e) :d=== '=@' ?js_define(e) :d=== '/-' ?evaluate(rewrite(e) ) :options.cc(e) } ,options=$.merge( { } ,defaults,specified_options) ,empty=c.parse.syntax(c.parse.intern( '@' ) ) ,js_macroexpand=$( ':all' ) ,rewrite=function(t) {;
+return xs1} ) .call(this,e.flatten_all( ';' ) ) :d=== '=' ?define(e) :d=== '!@' ?js_evaluate(e) :d=== '=@' ?js_define(e) :d=== '/-' ?evaluate(rewrite(e) ) :options.cc(e) } ,options=$.merge( { } ,defaults,specified_options) ,empty=c.parse.syntax(c.parse.intern( '@' ) ) ,js_macroexpand=$( ':all' ) ,rewrite=function(t) {;
 return c.toplevel.extend(t[1] .flatten_all( ';' ) ) (t[0] ) } ,compile=function(tree) {;
 return $.compile(js_macroexpand(tree) ,c.environment() ) } ,js_evaluate=function(t) {;
 return options.cc( ( (compile(t[0] .as_js() .guarded() ) ) || (empty) ) ) } ,replacer=function(js) {;
@@ -76,7 +76,8 @@ return compile( (qse) .replace( {_body:js} ) ) } ,js_define=function(equation) {
 return c.toplevel= (c.toplevel) .extend( [js_evaluator(equation) ] ) } ,js_evaluator=function(e) {;
 return[e[0] ,js_marker(e[1] ) ] } ,define=function(equation) {;
 return c.toplevel= (c.toplevel) .extend( [equation] ) } ,js_marker=function(t) {;
-return(function(it) {return(it.replace=replacer(t.as_js() .guarded() ) ) ,it} ) .call(this, (c.parse.syntax( '<js>' ) ) ) } ;
+return(function(it) {return(it.replace=replacer(t.as_js() .guarded() ) ,it.as_js=function() {;
+return this.replace( { } ) .as_js() } ) ,it} ) .call(this, (c.parse.syntax( '<js>' ) ) ) } ;
 return( (function(xs1) {var x1,x01,xi1,xl1,xr1;
 for(var xi1=0,xl1=xs1.length;
 xi1<xl1;

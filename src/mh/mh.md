@@ -14,7 +14,7 @@ Like waul, mh specifies a minimal toplevel execution context. This is used to de
 
     1. Global rewrite definition: foo = bar
     2. Local anonymous rewrite: foo /- (bar = bif)
-    3. Javascript evaluation: @- $ parse 'hello world'
+    3. Javascript evaluation: !@ parse 'hello world'
     4. Javascript equation definition: _x@0 ++ _y@0 =@ parse.syntax (match._x.resolved_data @ + match._y.resolved_data @)
     5. Composition of side-effects: foo = bar; bif = baz
 
@@ -116,8 +116,9 @@ instance is itself immutable, but internally it gets replaced with each new defi
 This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here.
 
         mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
+
           -where [evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === ';'  ? e.flatten_all(';') *!evaluate -seq : d === '='  ? e /!define :
-                                                                          d === '@-' ? e /!js_evaluate :                    d === '=@' ? e /!js_define :
+                                                                          d === '!@' ? e /!js_evaluate :                    d === '=@' ? e /!js_define :
                                                                           d === '/-' ? e /!rewrite /!evaluate                          : e /!options.cc,
 
                   options             = {} / defaults /-$.merge/ specified_options,
@@ -125,8 +126,9 @@ This is where Mulholland is biased by practical constraints. Toplevel operations
                   empty               = c.parse.syntax('@' /!c.parse.intern),                         js_macroexpand  = $(':all'),
                   rewrite(t)          = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),               compile(tree)   = tree /!js_macroexpand /-$.compile/ c.environment(),
                   js_evaluate(t)      = t[0].as_js().guarded() /!compile /or [empty] /!options.cc,    replacer(js)    = 'match -and- _body -given.match'.qse /~replace/ {_body: js} /!compile,
-                  js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],  js_evaluator(e) = [e[0], js_marker(e[1])],
-                  define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],                 js_marker(t)    = c.parse.syntax('<js>') -se [it.replace = t.as_js().guarded() /!replacer]]]
+                  js_define(equation) = c.toplevel = c.toplevel /~extend/ [equation /!js_evaluator],  js_evaluator(e) = [e[0], e[1] /!js_marker],
+                  define(equation)    = c.toplevel = c.toplevel /~extend/ [equation],                 js_marker(t)    = c.parse.syntax('<js>') -se [it.replace = t.as_js().guarded() /!replacer,
+                                                                                                                                                    it.as_js() = this.replace({}).as_js()]]]
 
 # Low-level bindings
 
