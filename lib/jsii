@@ -629,7 +629,10 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-file::write("$_.mh", retrieve("mh::$_")) for grep s/^mh:://, sort keys %data;
+my @modules = grep s/^mh:://, sort keys %data;
+
+file::write("$_.mh", retrieve("mh::$_"))           for @modules;
+file::write("$_.md", retrieve("markdown::mh::$_")) for @modules;
 compile('pp::sdoc::index', 'mh-jsii');
 
 __
@@ -702,12 +705,12 @@ sub comment    {my ($text, $s, $e) = @_; join "\n", map("$s $_$e", split /\n/, $
 
 sub paragraphs {map split(/((?:\n\h*){2,})/, $_), @_}
 
-my ($filename) = @_;
+my ($filename, $specified_extension) = @_;
 
 # Two possibilities here. One is that the filename is an attribute, in which case
 # we want to look up the extension in the transients table. The other is that
 # it's a real filename.
-my ($extension)       = $filename =~ /\.sdoc$/io ? $filename =~ /\.(\w+)\.sdoc$/igo : $filename =~ /\.(\w+)$/igo;
+my ($extension)       = $specified_extension || ($filename =~ /\.sdoc$/io ? $filename =~ /\.(\w+)\.sdoc$/igo : $filename =~ /\.(\w+)$/igo);
 my ($other_extension) = extension_for($filename);
 $other_extension =~ s/\.sdoc$//io;
 $other_extension =~ s/^\.//o;
@@ -1372,6 +1375,8 @@ Mulholland's pattern matching API is good for high-level declarative specificati
 get a wildcard to bind to a binary operator. If you want to do this, you'll need to use tree reflection to construct operator trees up-front. This library gives you a reasonable way to do
 that.
 
+@! (mulholland = mulholland || {});
+
 _x.@group = '('.@unquote.@cons1 _x;
 _x.@new = 'new'.@unquote.@cons1 _x;
 
@@ -1393,11 +1398,11 @@ meta::parent('../mh-object', <<'__');
 function::compile                                           51bbd6c69566343dae446e33570d911e
 function::repl                                              54eaffe967a927ca20ed3b5975dee8f4
 meta::type::mh                                              0b10222b800b45a0e3cb98e8d7607645
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  0cef7258a2449765557387e954ab76d0
+parent::/home/spencertipping/conjectures/perl-objects/sdoc  f3d52fcbfcf5cccc1413aad0c6a3ad88
 parent::preprocessor                                        4450ebbe2c9d3a70ada4050fcd567907
 parent::vim-highlighters                                    9f43562336f10d621ddefd326a989b1d
 retriever::mhi                                              72bbfd7e2a90f61e7500e38f4f700e79
-vim_highlighter::mh                                         27603218bc4c23ee00106ab3d4999823
+vim_highlighter::mh                                         5d70a791ade269df49a89899bdfc9e98
 
 __
 meta::parent('/home/spencertipping/bin/object', <<'__');
@@ -1520,15 +1525,16 @@ retriever::perl                         f41938e6dbad317f62abffc1e4d28cca
 
 __
 meta::parent('/home/spencertipping/conjectures/perl-objects/sdoc', <<'__');
-function::sdoc                           f0cea831720d18449455a8ed79181727
+function::sdoc                           b2f9066417ce3368f093796e1180e9b2
 function::sdoc-html                      b23152b3f5be696e5bae842ec43fc5a4
 function::sdoc-markdown                  a35a6441dd750466f2d0e636bee2b382
 function::sdocp                          c3d738d982ba87418a298ff58478a85b
 meta::type::sdoc                         22cd7315641d38c9d536344e83c36bed
 meta::type::slibrary                     95474943c4a5f8ff17d3cf66ddb7c386
 parent::/home/spencertipping/bin/object  1f1bf492b56b2f0196b2018b11b8c991
-retriever::html-sdoc                     2a5d5aa45e2d7576f79e045177d8705c
-retriever::markdown-sdoc                 20651301fffb3c018da926ede531f84c
+retriever::code-sdoc                     03b87ff8d1ecf7594db9ca0669fc69a1
+retriever::html-sdoc                     8ab7705d03276945b23a71677153233c
+retriever::markdown-sdoc                 67c34ba8223ec36a3ae018e411354db2
 retriever::sdoc                          662061e9e41491e2a1debd6862ccf1e7
 retriever::sdocp                         330694ea14a23bb04b65c761075cd946
 
@@ -1673,6 +1679,14 @@ meta::type::vim_highlighter  27990fddb6d7bd383b55dbdfee0d148d
 parent::object               1f1bf492b56b2f0196b2018b11b8c991
 
 __
+meta::retriever('code-sdoc', <<'__');
+# Lets you specify the SDoc extension manually. For instance:
+# code.js::sdoc::foo causes sdoc::foo to be SDoc-rendered using Javascript comments.
+my ($name) = @_;
+return undef unless $name =~ s/^code\.(\w+)::// and defined retrieve($name);
+sdoc($name, $1);
+
+__
 meta::retriever('file', '-f $_[0] ? file::read($_[0]) : undef;');
 meta::retriever('global', <<'__');
 # Returns the global data stashed at the end of this perl object
@@ -1681,14 +1695,14 @@ $_[0] eq 'self' ? $global_data : undef;
 __
 meta::retriever('html-sdoc', <<'__');
 my ($attribute) = @_;
-return undef unless $attribute =~ s/^html::/sdoc::/ and exists $data{$attribute};
+return undef unless $attribute =~ s/^html::/sdoc::/ and defined retrieve($attribute) || $attribute =~ s/^sdoc::// && defined retrieve($attribute);
 sdoc_html($attribute);
 
 __
 meta::retriever('id', '$_[0] =~ /^id::/ ? substr($_[0], 4) : undef;');
 meta::retriever('markdown-sdoc', <<'__');
 my ($attribute) = @_;
-return undef unless $attribute =~ s/^markdown::/sdoc::/ and exists $data{$attribute};
+return undef unless $attribute =~ s/^markdown::/sdoc::/ and defined retrieve($attribute) || $attribute =~ s/^sdoc::// && defined retrieve($attribute);
 sdoc_markdown($attribute);
 
 __
@@ -1776,14 +1790,12 @@ syn sync minlines=5
 syn match  mh_wildcard           /\<_[^[:space:].:,;()\[\]{}]\+/ contains=mh_arity_restriction
 syn match  mh_arity_restriction  /@\d/ contained
 syn match  mh_marker             /@[^[:cntrl:][:space:].:,;()\[\]{}]*/
-syn match  mh_op                 /[^[:space:][:cntrl:]_@[:alnum:].:,;()\[\]{}][^[:space:][:cntrl:].:,;()\[\]{}]*/ contains=mh_marker
+syn match  mh_op                 /[^[:space:][:cntrl:]_@[:alnum:].:,;()\[\]{}]\+\(\w\+[^[:space:][:cntrl:][:alnum:].:,;()\[\]{}]\+\)*/ contains=mh_marker
 syn match  mh_single_string      /'\([^'\\\n]\|\\.\)*'[^[:space:][:cntrl:].:,;()\[\]{}]*/
 syn match  mh_double_string      /"\([^"\\\n]\|\\.\)*"[^[:space:][:cntrl:].:,;()\[\]{}]*/
 
 syn match  mh_group              /[()\[\]{}]/
 syn match  mh_punctuation        /[,;.:]/
-
-syn region mh_qop                matchgroup=mh_q start=+\$\+[-/\\|=]\?\|\$*[-/\\|=]+ end=+$\|\s\|\.[-/\\|=]\d*+ contains=mh_marker
 
 syn region mh_line_comment       start=/#/ end=/$/
 syn region mh_sdoc_comment       start=/\(^$\n^\|\%^\)\s*[A-Z|]/ end=/^\s*$\|\%$/ contains=mh_sdoc_coerce,mh_sdoc_numbered_list,mh_sdoc_heading keepend
@@ -1802,7 +1814,6 @@ hi link mh_wildcard           Identifier
 hi link mh_arity_restriction  Keyword
 hi link mh_marker             Type
 hi link mh_op                 Operator
-hi link mh_qop                Operator
 hi link mh_q                  Special
 hi link mh_word_op            Type
 hi link mh_hinted_word_op     Special

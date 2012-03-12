@@ -6,6 +6,8 @@ Mulholland's pattern matching API is good for high-level declarative specificati
 get a wildcard to bind to a binary operator. If you want to do this, you'll need to use tree reflection to construct operator trees up-front. This library gives you a reasonable way to do
 that.
 
+@! (mulholland = mulholland || {});
+
 _x.@group = '('.@unquote.@cons1 _x;
 _x.@new = 'new'.@unquote.@cons1 _x;
 
@@ -16,9 +18,7 @@ _x@0.@quote   =@ parse.syntax $ parse.intern $ "'" + match._x.resolved_data @ + 
 
 _x@0.@cons1 _y       =@ parse.syntax (match._x.data, [match._y]);
 _x@0.@cons2 _y _z    =@ parse.syntax (match._x.data, [match._y, match._z]);
-_x@0.@cons3 _y _z _t =@ parse.syntax (match._x.data, [match._y, match._z, match._t]);
-
-_x@0.@gensym =@ parse.syntax (@$.gensym $ match._x.resolved_data @)
+_x@0.@cons3 _y _z _t =@ parse.syntax (match._x.data, [match._y, match._z, match._t])
 
 Syntax node folding.
 
