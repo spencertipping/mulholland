@@ -51,7 +51,13 @@ Rewrite rules can generate more rewrite rules:
     '10*2'
     mh>
 
-However, you cannot pattern-match against rewrite rules. That is, no pattern of the form `_x = _y` will ever be matched by input you write.
+You can also match against rewrite rules:
+
+    mh> (foo _x = _y) = (bar _x = _y)
+    mh> foo 5 = y + 1
+    mh> bar 5
+    'y+1'
+    mh>
 
 ## Replication
 

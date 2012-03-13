@@ -686,12 +686,6 @@ dangerous("bootstrapping mh-core (pass $_ of 2)", sub {
   chmod 0755, 'mh-core'}) for 1 .. 2;
 
 __
-meta::function('repl', <<'__');
-my $nontrivial = @_;
-with_exported(map("pp::$_", @_), sub {
-  sh($nontrivial ? "mh -i $_[0]" : 'mh -i')});
-
-__
 meta::function('rm', <<'__');
 around_hook('rm', @_, sub {
   exists $data{$_} or terminal::warning("$_ does not exist") for @_;
@@ -1564,11 +1558,10 @@ retriever::sdocp                         330694ea14a23bb04b65c761075cd946
 __
 meta::parent('mh-object', <<'__');
 function::compile                                           51bbd6c69566343dae446e33570d911e
-function::repl                                              54eaffe967a927ca20ed3b5975dee8f4
 meta::type::mh                                              0b10222b800b45a0e3cb98e8d7607645
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  f3d52fcbfcf5cccc1413aad0c6a3ad88
-parent::preprocessor                                        4450ebbe2c9d3a70ada4050fcd567907
-parent::vim-highlighters                                    9f43562336f10d621ddefd326a989b1d
+parent::/home/spencertipping/conjectures/perl-objects/sdoc  8137eebc7495850c86d8471b9c55b13e
+parent::preprocessor                                        69167db3b82b61dcb7c2bb9280acb87d
+parent::vim-highlighters                                    44488700b7bffc6ecab4b6a022e79f19
 retriever::mhi                                              72bbfd7e2a90f61e7500e38f4f700e79
 vim_highlighter::mh                                         5d70a791ade269df49a89899bdfc9e98
 
@@ -1841,7 +1834,13 @@ sources together into the `mh` script. `mh` is executable by [node.js](http://no
     '10*2'
     mh>
 
-  However, you cannot pattern-match against rewrite rules. That is, no pattern of the form `_x = _y` will ever be matched by input you write.
+  You can also match against rewrite rules:
+
+  | mh> (foo _x = _y) = (bar _x = _y)
+    mh> foo 5 = y + 1
+    mh> bar 5
+    'y+1'
+    mh>
 
   Replication.
   `mh` can replicate itself just like `waul`. This is useful for two purposes. First, you can load caterwaul modules using `mh -jmodule.js`. Second, you can preload mulholland source files.

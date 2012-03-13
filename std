@@ -644,12 +644,6 @@ unless ($$options{-M}) {
 }
 
 __
-meta::function('repl', <<'__');
-my $nontrivial = @_;
-with_exported(map("pp::$_", @_), sub {
-  sh($nontrivial ? "mh -i $_[0]" : 'mh -i')});
-
-__
 meta::function('rm', <<'__');
 around_hook('rm', @_, sub {
   exists $data{$_} or terminal::warning("$_ does not exist") for @_;
@@ -1364,16 +1358,16 @@ Licensed under the terms of the MIT source code license
 
 Introduction.
 mh doesn't provide any rule that extends the current toplevel context, so one of the first things to do is to write such a rule. There is an element of indirection here because we want to be
-able to use equality definitions as values. As a result, there are two separate equality operators. The first, _x = _y, is rewritten into the second, _x =@= _y. The second is a side-effecting
+able to use equality definitions as values. As a result, there are two separate equality operators. The first, _x = _y, is rewritten into the second, _x =@ _y. The second is a side-effecting
 operator that extends the current context.
 
-!@ (context.toplevel = context.toplevel.extend [parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y]]], parse '@');
+!@ (context.toplevel = context.toplevel.extend [parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y]]],
+    parse.syntax ('' + context.toplevel.current.length));
 (_x = _y) =@ (_x =@ _y)
 
 __
 meta::parent('/home/spencertipping/bin/mh-object', <<'__');
 function::compile                                           51bbd6c69566343dae446e33570d911e
-function::repl                                              54eaffe967a927ca20ed3b5975dee8f4
 meta::type::mh                                              0b10222b800b45a0e3cb98e8d7607645
 parent::/home/spencertipping/conjectures/perl-objects/sdoc  8137eebc7495850c86d8471b9c55b13e
 parent::preprocessor                                        69167db3b82b61dcb7c2bb9280acb87d
