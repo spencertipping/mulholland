@@ -3,3 +3,4 @@ modifying Perl file. The directory structure is:
 
 i/      the core Mulholland interpreter and Caterwaul bindings
 mh/     the mh compiler/REPL
+std/    the standard library, a collection of .mh files that use jsi
