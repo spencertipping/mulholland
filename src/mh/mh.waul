@@ -10,10 +10,8 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 # Mulholland module format.
 # Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you the following primitive operations:
 
-# | 1. Global rewrite definition: foo = bar
-#   2. Local anonymous rewrite: foo /- (bar = bif)
-#   3. Javascript evaluation: !@ parse 'hello world'
-#   4. Composition of side-effects: foo = bar; bif = baz
+# | 1. Javascript evaluation: !@ (console.log $ parse 'hello world')
+#   2. Composition of side-effects: !@ foo; !@ bar
 
 # Semantics.
 # Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
@@ -48,8 +46,8 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
   $.mulholland /-$.merge/ wcapture [
 
-    mh_main(argv)    = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl :
-                                            argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
+    mh_main(argv) = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl :
+                                         argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
 
 # Replicating compiler behavior.
 # This compiles a new 'mh' by asking Caterwaul to replicate itself. It also bundles in any source you give it after reading the corresponding files. This allows you to bake libraries into a 'mh'
@@ -103,18 +101,16 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
                                             'http://github.com/spencertipping/mulholland\n'),
 
 # Mulholland evaluation function.
-# This is where Mulholland is biased by practical constraints. Toplevel operations such as '=' and '/-' are defined here.
+# This defines a minimal set of operations that allow you to use jsi for extension. In particular, it provides an evaluator that understands ; composition and !@ compilation. Mulholland source
+# is used to define the other toplevel operators.
 
     mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
 
-      -where [evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === ';'  ? e.flatten_all(';') *!evaluate -seq : d === '='  ? e /!define :
-                                                                      d === '!@' ? e /!js_evaluate :                    d === '/-' ? e /!rewrite /!evaluate : e /!options.cc,
-
-              options        = {} / defaults /-$.merge/ specified_options,
-
-              empty          = c.parse.syntax('@' /!c.parse.intern),                       js_macroexpand   = $(':all'),
-              rewrite(t)     = c.toplevel.extend(t[1].flatten_all(';'))(t[0]),             compile(tree)    = tree /!js_macroexpand /-$.compile/ c.environment(),
-              js_evaluate(t) = t[0].as_js().guarded() /!compile /or [empty] /!options.cc,  define(equation) = c.toplevel = c.toplevel /~extend/ [equation]]]
+      -where [options                                               = {} / defaults /-$.merge/ specified_options,
+              evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === ';' ? e.flatten_all(';') *!evaluate -seq : d === '!@' ? e /!js_evaluate : e /!options.cc,
+              compile(tree)                                         = tree /-$.compile/ c.environment(),
+              empty                                                 = parse.syntax('@' /!parse.intern),
+              js_evaluate(t)                                        = t[0].as_js().guarded() /!compile /or [empty] /!options.cc]]
 
 # Low-level bindings.
 # These functions contain the mechanics of Mulholland's interface with the real world. They're not exposed in $.mulholland primarily because they aren't really relevant to what Mulholland does.
