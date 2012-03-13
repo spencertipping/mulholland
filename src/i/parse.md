@@ -137,12 +137,12 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
                                           ev             = true,  top()    = operators[operators.length - 1],
 
                                           precedence(t)  = apply() -then- precedence(t) -when [t /!right ? top().r < t.l : top().r <= t.l] -when- operators.length,
-                                          operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
+                                          operator(t)    = precedence(t) <then> operators /~push/ t -then- ev /eq.true -unless- t.i,
 
-                                          observe(t)     = t.v ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
-                                                         : t.o ? observe(join) /unless.ev -then [ev = true]  -then- operators /~push/ t
-                                                         : t.c ? apply_closer()           -then [ev = false] -then [top().i ? operators.pop() : apply()]
-                                                         : t.u ? observe(join) /unless.ev                    -then- operator(t)
+                                          observe(t)     = t.v ? observe(join) /unless.ev -then- ev /eq.false -then- values /~push/ new syntax(t.id)
+                                                         : t.o ? observe(join) /unless.ev -then- ev /eq.true  -then- operators /~push/ t
+                                                         : t.c ? apply_closer()           -then- ev /eq.false -then [top().i ? operators.pop() : apply()]
+                                                         : t.u ? observe(join) /unless.ev                     -then- operator(t)
                                                                : operator(t),
 
                                           apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [value()])

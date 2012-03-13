@@ -41,10 +41,10 @@ caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
                                                              change                                            = null,
 
                                                              pattern_complexity()                              = current /[0x10000000][x0 /-Math.min/ x[0].complexity()] -seq,
-                                                             rewrite_once(t)                                   = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change = change || it],
+                                                             rewrite_once(t)                                   = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change -oeq- it],
 
                                                              deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
-                                                             fixed_point(r = deep_rewriter(), fix = result)(t) = (change = null, r(t) -re [change ? fix(it) : it]),
+                                                             fixed_point(r = deep_rewriter(), fix = result)(t) = change -eq- null -then- r(t) -re [change ? fix(it) : it],
                                                              transitive_limit(r)                               = [r[0], fixed_point()(r[1])],
 
                                                              uniq(rs)                                          = rs %!r[rs |[xi > ri && x[0] /~match/ r[0]], seq] -seq,

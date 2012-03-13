@@ -4,8 +4,7 @@ Licensed under the terms of the MIT source code license
 # Introduction
 
 Mulholland uses interned strings rather than representing node data directly. As such, its syntax representation is a little different from Caterwaul's trees. It also has a different set of
-methods that it uses to detect the roles of various things. Finally, it uses node-level transformations to render Javascript and machine code from its syntactic representation. This happens
-with low-level Mulholland nodes, which are usually generated with @cps.
+methods that it uses to detect the roles of various things.
 
     caterwaul.module('mulholland.tree', 'js_all', function ($) {
 
@@ -26,7 +25,7 @@ indexes into the symbol table.
       statics(parser) = wcapture [
 
         constants      = {},
-        constant(s)    = Object.prototype.hasOwnProperty.call(constants, s) ? constants[s] : constants[s] = new this(s),
+        constant(s)    = constants['@' + s] -dcq- new this(s),
 
         create_bloom() = $.bloom(["_ * 5471".qf, "_ * 8707".qf], 8),
         empty_bloom    = create_bloom()],
@@ -46,8 +45,9 @@ indexes into the symbol table.
 These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
 ',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
 
-        flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
         flatten_all(op)   = this.resolved_data() === op ? this[0].flatten_all(op) /~concat/ this[1].flatten_all(op) : [this],
+
+        flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
         left_flatten(op)  = this.resolved_data() === op ? this[0].left_flatten(op) /~concat/ [this[1]]  : [this],
         right_flatten(op) = this.resolved_data() === op ? [this[0]] /~concat/ this[1].right_flatten(op) : [this],
 
@@ -61,9 +61,9 @@ identifier matches another. Mulholland supports the following cases:
     3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
     4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
 
-        is_wildcard()   = this._is_wildcard   === undefined ? this._is_wildcard   = /^_./.test(this.resolved_data())                            : this._is_wildcard,
-        match_arity()   = this._match_arity   === undefined ? this._match_arity   = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._match_arity,
-        without_arity() = this._without_arity === undefined ? this._without_arity = this.resolved_data().replace(/@(\d+)$/, '')                 : this._without_arity,
+        is_wildcard()   = this._is_wildcard   <dcq> /^_./.test(this.resolved_data()),
+        match_arity()   = this._match_arity   <dcq> /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]],
+        without_arity() = this._without_arity <dcq> this.resolved_data().replace(/@(\d+)$/, ''),
 
 # Bloom filters
 
@@ -79,14 +79,14 @@ things, most notably working with things like numbers (which shouldn't be hashed
 is unreliable because Bloom filters have false positives and your lie might therefore be ignored. The primary use case I see for Bloom erasure is to quickly allocate a constant node whose
 value is known to be irrelevant to the rewriting process.
 
-        erase_bloom()  = (this._bloom = this.constructor.empty_bloom, this),
+        erase_bloom() = this._bloom -eq- this.constructor.empty_bloom -then- this,
 
 # Complexity computation
 
 This is a fairly straightforward way to reject low-level leaf nodes in recursive match cases. Each tree has a total 'complexity', which is a measure of the number of descendants it has. A
 simple rule is that a pattern cannot have higher complexity than a target.
 
-        complexity() = this._complexity || (this._complexity = 1 + this /[0][x0 + x.complexity()] /seq),
+        complexity() = this._complexity <oeq> 1 + this /[0][x0 + x.complexity()] /seq,
 
 # Pattern matching and replacement
 
@@ -99,7 +99,7 @@ positives, we re-check at every match level.
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
-        match(t, m)            = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
+        match(t, m)            = this /~can_match/ t && this /~level_matches/ t && m -oeq- {_: t} &&
                                  !this.is_wildcard() -or- (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t) && this / t /~children_match/ m && m,
 
         replace(m)             = m && this.replace_children(m[this.resolved_data()], m) -or- this /~map/ "_.replace(m)".qf,

@@ -5,7 +5,7 @@ for(var x0= (0x10000000) ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,x0= (Math.min(x0,x[0] .complexity() ) ) ;
 return x0} ) .call(this,current) } ,rewrite_once=function(t) {;
-return(function(it) {return(change=change||it) ,it} ) .call(this, ( (function(xs) {var x,x0,xi,xl,xr;
+return(function(it) {return( ! !change|| (change=it) ) ,it} ) .call(this, ( (function(xs) {var x,x0,xi,xl,xr;
 for(var xl=xs.length,xi=xl-1,x=xs[xi] ,x1;
 xi>=0;
  --xi) {x=xs[xi] ;
@@ -13,7 +13,7 @@ if(x1= ( (x[1] ) .replace(x[0] .match(t) ) ) )return x1}return false} ) .call(th
 return function(t) {;
 return t.complexity() >=c? (t) .rmap(rewrite_once) :t} } ,fixed_point=function() {var r=deep_rewriter() ;
 var result=function(t) {;
-return(change=null, (function(it) {return(change?fix(it) :it) } ) .call(this, (r(t) ) ) ) } ;
+return(function(it) {return(change?fix(it) :it) } ) .call(this, ( ( (change=null) , (r(t) ) ) ) ) } ;
 var fix=result;
 return result} ,transitive_limit=function(r) {;
 return[r[0] ,fixed_point() (r[1] ) ] } ,uniq=function(rs) {;

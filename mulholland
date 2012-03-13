@@ -2038,12 +2038,12 @@ fundamentally a little bit misguided. As such, the operator "parse" step is fair
                                       ev             = true,  top()    = operators[operators.length - 1],
 
                                       precedence(t)  = apply() -then- precedence(t) -when [t /!right ? top().r < t.l : top().r <= t.l] -when- operators.length,
-                                      operator(t)    = precedence(t) -then- operators /~push/ t /then [ev = true] /unless [t.i],
+                                      operator(t)    = precedence(t) <then> operators /~push/ t -then- ev /eq.true -unless- t.i,
 
-                                      observe(t)     = t.v ? observe(join) /unless.ev -then [ev = false] -then- values /~push/ new syntax(t.id)
-                                                     : t.o ? observe(join) /unless.ev -then [ev = true]  -then- operators /~push/ t
-                                                     : t.c ? apply_closer()           -then [ev = false] -then [top().i ? operators.pop() : apply()]
-                                                     : t.u ? observe(join) /unless.ev                    -then- operator(t)
+                                      observe(t)     = t.v ? observe(join) /unless.ev -then- ev /eq.false -then- values /~push/ new syntax(t.id)
+                                                     : t.o ? observe(join) /unless.ev -then- ev /eq.true  -then- operators /~push/ t
+                                                     : t.c ? apply_closer()           -then- ev /eq.false -then [top().i ? operators.pop() : apply()]
+                                                     : t.u ? observe(join) /unless.ev                     -then- operator(t)
                                                            : operator(t),
 
                                       apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [value()])
@@ -2097,10 +2097,10 @@ example, this is a case where transitivity would apply:
                                                              change                                            = null,
 
                                                              pattern_complexity()                              = current /[0x10000000][x0 /-Math.min/ x[0].complexity()] -seq,
-                                                             rewrite_once(t)                                   = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change = change || it],
+                                                             rewrite_once(t)                                   = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change -oeq- it],
 
                                                              deep_rewriter(c = pattern_complexity())(t)        = t.complexity() >= c ? t /~rmap/ rewrite_once : t,
-                                                             fixed_point(r = deep_rewriter(), fix = result)(t) = (change = null, r(t) -re [change ? fix(it) : it]),
+                                                             fixed_point(r = deep_rewriter(), fix = result)(t) = change -eq- null -then- r(t) -re [change ? fix(it) : it],
                                                              transitive_limit(r)                               = [r[0], fixed_point()(r[1])],
 
                                                              uniq(rs)                                          = rs %!r[rs |[xi > ri && x[0] /~match/ r[0]], seq] -seq,
@@ -2114,8 +2114,7 @@ Licensed under the terms of the MIT source code license
 
 Introduction.
 Mulholland uses interned strings rather than representing node data directly. As such, its syntax representation is a little different from Caterwaul's trees. It also has a different set of
-methods that it uses to detect the roles of various things. Finally, it uses node-level transformations to render Javascript and machine code from its syntactic representation. This happens
-with low-level Mulholland nodes, which are usually generated with @cps.
+methods that it uses to detect the roles of various things.
 
 caterwaul.module('mulholland.tree', 'js_all', function ($) {
 
@@ -2135,7 +2134,7 @@ indexes into the symbol table.
   statics(parser) = wcapture [
 
     constants      = {},
-    constant(s)    = Object.prototype.hasOwnProperty.call(constants, s) ? constants[s] : constants[s] = new this(s),
+    constant(s)    = constants['@' + s] -dcq- new this(s),
 
     create_bloom() = $.bloom(["_ * 5471".qf, "_ * 8707".qf], 8),
     empty_bloom    = create_bloom()],
@@ -2154,8 +2153,9 @@ Transformations.
 These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
 ',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
 
-    flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
     flatten_all(op)   = this.resolved_data() === op ? this[0].flatten_all(op) /~concat/ this[1].flatten_all(op) : [this],
+
+    flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
     left_flatten(op)  = this.resolved_data() === op ? this[0].left_flatten(op) /~concat/ [this[1]]  : [this],
     right_flatten(op) = this.resolved_data() === op ? [this[0]] /~concat/ this[1].right_flatten(op) : [this],
 
@@ -2168,9 +2168,9 @@ identifier matches another. Mulholland supports the following cases:
   3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
   4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
 
-    is_wildcard()   = this._is_wildcard   === undefined ? this._is_wildcard   = /^_./.test(this.resolved_data())                            : this._is_wildcard,
-    match_arity()   = this._match_arity   === undefined ? this._match_arity   = /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]] : this._match_arity,
-    without_arity() = this._without_arity === undefined ? this._without_arity = this.resolved_data().replace(/@(\d+)$/, '')                 : this._without_arity,
+    is_wildcard()   = this._is_wildcard   <dcq> /^_./.test(this.resolved_data()),
+    match_arity()   = this._match_arity   <dcq> /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]],
+    without_arity() = this._without_arity <dcq> this.resolved_data().replace(/@(\d+)$/, ''),
 
 Bloom filters.
 Trees are annotated with Bloom filters that indicate which constants they contain. This optimizes rewriting by quickly eliminating subtrees that don't contain constants that are present in a
@@ -2185,13 +2185,13 @@ things, most notably working with things like numbers (which shouldn't be hashed
 is unreliable because Bloom filters have false positives and your lie might therefore be ignored. The primary use case I see for Bloom erasure is to quickly allocate a constant node whose
 value is known to be irrelevant to the rewriting process.
 
-    erase_bloom()  = (this._bloom = this.constructor.empty_bloom, this),
+    erase_bloom() = this._bloom -eq- this.constructor.empty_bloom -then- this,
 
 Complexity computation.
 This is a fairly straightforward way to reject low-level leaf nodes in recursive match cases. Each tree has a total 'complexity', which is a measure of the number of descendants it has. A
 simple rule is that a pattern cannot have higher complexity than a target.
 
-    complexity() = this._complexity || (this._complexity = 1 + this /[0][x0 + x.complexity()] /seq),
+    complexity() = this._complexity <oeq> 1 + this /[0][x0 + x.complexity()] /seq,
 
 Pattern matching and replacement.
 Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well. Unlike Caterwaul, a failed match returns the boolean value
@@ -2203,7 +2203,7 @@ positives, we re-check at every match level.
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
-    match(t, m)            = this /~can_match/ t && this /~level_matches/ t && (m || (m = {_: t})) &&
+    match(t, m)            = this /~can_match/ t && this /~level_matches/ t && m -oeq- {_: t} &&
                              !this.is_wildcard() -or- (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t) && this / t /~children_match/ m && m,
 
     replace(m)             = m && this.replace_children(m[this.resolved_data()], m) -or- this /~map/ "_.replace(m)".qf,
@@ -2248,24 +2248,21 @@ Command-line invocation.
 mh is designed to be used from the command line. The 'argv' passed into these functions is the list of net arguments; that is, no 'node' or 'mh'. You can get this from node by saying
 process.argv.slice(2); this eliminates node and the Javascript file. All options are parsed in short form; that is, a single dash. mh looks for these arguments:
 
-| -i  interactive mode: starts a REPL after loading all files
-  -r  compiles the given source output into Javascript statements and executes it immediately
+| -r  compiles the given source output into Javascript statements and executes it immediately
   -c  compiles a new 'mh' file with the given libraries bundled in and emits it to stdout
   -j  interprets the given file as Javascript, executing it immediately (useful to load caterwaul extensions)
 
 For example:
 
-| $ mh -i foo.mh                        # start a REPL after loading foo.mh
-  $ mh foo.mh                           # compile foo.mh to Javascript and print result to stdout
+| $ mh foo.mh                           # load foo.mh into the session and open a REPL
   $ mh -r foo.mh                        # compile foo.mh to Javascript and execute it immediately
-  $ mh -jfoo.js -jbar.js foo.mh         # load foo.js and bar.js side-effectfully, then compile foo.mh into Javascript and print to stdout
+  $ mh -jfoo.js -jbar.js foo.mh         # load foo.js and bar.js side-effectfully, then load foo.mh into session and open a REPL
   $ mh -c foo.mh                        # load foo.mh as a string, then write a new 'mh' instance that preloads it to stdout
   $ mh -c -jfoo.js foo.mh               # load foo.js as a Javascript module side-effectfully, then load foo.mh and write a new 'mh' instance that preloads both
 
   $.mulholland /-$.merge/ wcapture [
 
-    mh_main(argv) = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl :
-                                         argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
+    mh_main(argv) = argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_repl,
 
 Replicating compiler behavior.
 This compiles a new 'mh' by asking Caterwaul to replicate itself. It also bundles in any source you give it after reading the corresponding files. This allows you to bake libraries into a 'mh'
@@ -2287,16 +2284,6 @@ compiler for later use and simplifies the process of using 'mh' as a shebang-lin
                        reference_url  = '// Caterwaul modules: #{caterwaul.modules.join(" ")}\n// http://github.com/spencertipping/mulholland',
                        header         = '#!/usr/bin/env node\n#{license}\n#{reference_url}\n',
                        footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
-
-Offline compiler behavior.
-Look for expressions that are not equations and emit them to stdout after converting them to Javascript. Javascript conversion is done through Mulholland's jsi layer, but after any
-Mulholland-based rewrite rules have been applied. If -r is specified, expressions are compiled and executed immediately by Caterwaul instead of being emitted to stdout.
-
-    mh_offline(argv) = source_for(argv) *!mhc -seq
-               -where [mh          = $.mulholland.mh() -se- evaluate_js_modules(argv),
-                       cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
-                       environment = {c: $, mh: mh, require: require, process: process},
-                       mhc(t)      = mh(t, {cc: cc})],
 
 REPL behavior.
 Read and evaluate any files specified on the command line, then enter a REPL that emits results to stdout. Node's REPL module is used to do this. Because of its CPS API, I make sure to call
@@ -2335,7 +2322,7 @@ These functions contain the mechanics of Mulholland's interface with the real wo
 
   -where [source_for(argv)          = argv %![/^-/.test(x)] *read_file -seq,
           modules_for(argv)         = argv %~![/^-j/.test(x) && x.substr(2)] *read_file -seq,
-          evaluate_js_modules(argv) = modules_for(argv) *![$()('(function(){#{x}})()', {caterwaul: $, require: require})] -seq,
+          evaluate_js_modules(argv) = modules_for(argv) *![new $.opaque_ref('(function(){#{x}})()') /-compile/ {caterwaul: $, require: require}] -seq -where [compile = $()],
 
           contains_short(argv, o)   = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
 

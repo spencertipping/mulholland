@@ -34,24 +34,21 @@ Each mh() function manages its own state by using a context object. This context
 mh is designed to be used from the command line. The 'argv' passed into these functions is the list of net arguments; that is, no 'node' or 'mh'. You can get this from node by saying
 process.argv.slice(2); this eliminates node and the Javascript file. All options are parsed in short form; that is, a single dash. mh looks for these arguments:
 
-    -i  interactive mode: starts a REPL after loading all files
     -r  compiles the given source output into Javascript statements and executes it immediately
     -c  compiles a new 'mh' file with the given libraries bundled in and emits it to stdout
     -j  interprets the given file as Javascript, executing it immediately (useful to load caterwaul extensions)
 
 For example:
 
-    $ mh -i foo.mh                        # start a REPL after loading foo.mh
-    $ mh foo.mh                           # compile foo.mh to Javascript and print result to stdout
+    $ mh foo.mh                           # load foo.mh into the session and open a REPL
     $ mh -r foo.mh                        # compile foo.mh to Javascript and execute it immediately
-    $ mh -jfoo.js -jbar.js foo.mh         # load foo.js and bar.js side-effectfully, then compile foo.mh into Javascript and print to stdout
+    $ mh -jfoo.js -jbar.js foo.mh         # load foo.js and bar.js side-effectfully, then load foo.mh into session and open a REPL
     $ mh -c foo.mh                        # load foo.mh as a string, then write a new 'mh' instance that preloads it to stdout
     $ mh -c -jfoo.js foo.mh               # load foo.js as a Javascript module side-effectfully, then load foo.mh and write a new 'mh' instance that preloads both
 
       $.mulholland /-$.merge/ wcapture [
 
-        mh_main(argv) = argv.length === 0 || argv /-contains_short/ 'i' ? argv /!mh_repl :
-                                             argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_offline,
+        mh_main(argv) = argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_repl,
 
 # Replicating compiler behavior
 
@@ -74,17 +71,6 @@ compiler for later use and simplifies the process of using 'mh' as a shebang-lin
                            reference_url  = '// Caterwaul modules: #{caterwaul.modules.join(" ")}\n// http://github.com/spencertipping/mulholland',
                            header         = '#!/usr/bin/env node\n#{license}\n#{reference_url}\n',
                            footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
-
-# Offline compiler behavior
-
-Look for expressions that are not equations and emit them to stdout after converting them to Javascript. Javascript conversion is done through Mulholland's jsi layer, but after any
-Mulholland-based rewrite rules have been applied. If -r is specified, expressions are compiled and executed immediately by Caterwaul instead of being emitted to stdout.
-
-        mh_offline(argv) = source_for(argv) *!mhc -seq
-                   -where [mh          = $.mulholland.mh() -se- evaluate_js_modules(argv),
-                           cc          = argv /-contains_short/ 'r' ? "_.as_js().guarded() /-$.compile/ environment".qf : "_.as_js().guarded().toString() /!output".qf,
-                           environment = {c: $, mh: mh, require: require, process: process},
-                           mhc(t)      = mh(t, {cc: cc})],
 
 # REPL behavior
 
@@ -127,7 +113,7 @@ These functions contain the mechanics of Mulholland's interface with the real wo
 
       -where [source_for(argv)          = argv %![/^-/.test(x)] *read_file -seq,
               modules_for(argv)         = argv %~![/^-j/.test(x) && x.substr(2)] *read_file -seq,
-              evaluate_js_modules(argv) = modules_for(argv) *![$()('(function(){#{x}})()', {caterwaul: $, require: require})] -seq,
+              evaluate_js_modules(argv) = modules_for(argv) *![new $.opaque_ref('(function(){#{x}})()') /-compile/ {caterwaul: $, require: require}] -seq -where [compile = $()],
 
               contains_short(argv, o)   = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
 
