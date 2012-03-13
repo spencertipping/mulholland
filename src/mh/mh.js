@@ -69,7 +69,7 @@ for(var xi1=0,xl1=xs1.length;
 xi1<xl1;
  ++xi1)x1=xs1[xi1] , (evaluate(x1) ) ;
 return xs1} ) .call(this,e.flatten_all( ';' ) ) :d=== '!@' ?js_evaluate(e) :options.cc(e) } ,compile=function(tree) {;
-return $.compile(tree,c.environment() ) } ,empty=parse.syntax(parse.intern( '@' ) ) ,js_evaluate=function(t) {;
+return $.compile(tree,c.environment() ) } ,empty=c.parse.syntax(c.parse.intern( '@' ) ) ,js_evaluate=function(t) {;
 return options.cc( ( (compile(t[0] .as_js() .guarded() ) ) || (empty) ) ) } ;
 return( (function(xs1) {var x1,x01,xi1,xl1,xr1;
 for(var xi1=0,xl1=xs1.length;
