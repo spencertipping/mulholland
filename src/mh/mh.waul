@@ -61,12 +61,12 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 #   eof
 #   $
 
-    mh_compile(argv) = '#{header}\n#{resulting_tree}\n#{footer}' /!output
+    mh_compile(argv) = '#{header}\n#{resulting_tree};\n#{footer}' /!output
                -where [parser         = $.mulholland() -se- evaluate_js_modules(argv),
                        bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
                        resulting_tree = $.replicator().toString(),
-                       license        = '// Mulholland compiler (or derivative) | Spencer Tipping\n// Licensed under the terms of the MIT source code license',
-                       reference_url  = '// http://github.com/spencertipping/mulholland',
+                       license        = '// Mulholland compiler derivative | Spencer Tipping\n// Licensed under the terms of the MIT source code license',
+                       reference_url  = '// Caterwaul modules: #{caterwaul.modules.join(" ")}\n// http://github.com/spencertipping/mulholland',
                        header         = '#!/usr/bin/env node\n#{license}\n#{reference_url}\n',
                        footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
 
