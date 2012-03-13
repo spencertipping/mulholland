@@ -1,6 +1,0 @@
-Self-modifying Perl files containing design ideas for Mulholland. You can read
-these in two ways. One is to give them .html extensions and open them in a
-browser (look for note:: attributes); the other is to run them as Perl files:
-
-$ ./syntax ls note::
-$ ./syntax cat note::precedence
