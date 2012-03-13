@@ -15,6 +15,9 @@ transitively; so, for instance, if you write 'foo = bar' and then write 'foo', t
 rewriter determines this by transitive closure, and circular rewrites with no normal form will cause a stack overflow error. (This is why it is coded recursively, despite the fact that it
 could be written as a loop instead.)
 
+TODO: The current approach is misguided. Trees are not uniformly homomorphic across rewriting, and rewriting should probably be a monadic bind instead of a closed transform. The only catch is
+that the monad's value space needs to be homomorphic in enough ways that inlining is possible.
+
 Equations are symmetric because their left-hand terms can be normalized prior to rewriting. For example, you can see this behavior in mh:
 
     > foo = bar + bif
