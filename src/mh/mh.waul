@@ -95,7 +95,8 @@ caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
       -where [options                                               = {} / defaults /-$.merge/ specified_options,
               evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === ';' ? e.flatten_all(';') *!evaluate -seq : d === '!@' ? e /!js_evaluate : e /!options.cc,
-              compile(tree)                                         = tree /-$.compile/ c.environment(),
+              compiler                                              = $(':all'),
+              compile(tree)                                         = tree /!compiler /-$.compile/ c.environment(),
               empty                                                 = c.parse.syntax('@' /!c.parse.intern),
               js_evaluate(t)                                        = t[0].as_js().guarded() /!compile /or [empty] /!options.cc]]
 
