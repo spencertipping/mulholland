@@ -629,7 +629,7 @@ __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
 my ($options, @stuff) = separate_options(@_);
-my @modules = qw/eq/;
+my @modules = qw/extend semi eq/;
 file::write("src/std/$_.mh", retrieve("mh::$_"),           mkpath => 1) for @modules;
 file::write("src/std/$_.md", retrieve("markdown::mh::$_"), mkpath => 1) for @modules;
 
@@ -1361,9 +1361,29 @@ mh doesn't provide any rule that extends the current toplevel context, so one of
 able to use equality definitions as values. As a result, there are two separate equality operators. The first, _x = _y, is rewritten into the second, _x =@ _y. The second is a side-effecting
 operator that extends the current context.
 
-!@ (context.toplevel = context.toplevel.extend [parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y]]],
-    parse.syntax ('' + context.toplevel.rules.length));
+!@ context.extend (parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y]]);
 (_x = _y) =@ (_x =@ _y)
+
+__
+meta::mh('extend', <<'__');
+Toplevel extension | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+Because mulholland rewriters are immutable, the toplevel must be replaced to be extended. This module provides a straightforward way to do that.
+
+!@ (context.extend (lhs, rhs) = (context.toplevel = context.toplevel.extend [lhs, rhs], parse.syntax ('' + context.toplevel.rules.length)))
+
+__
+meta::mh('semi', <<'__');
+Semicolon distributivity | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+Introduction.
+The semicolon is a function composition over interpreter transformations. For example, 'foo = bar; bif = baz' first runs 'foo = bar', then 'bif = baz' on the interpreter, returning the
+interpreter after the second state.
+
+!@ context.extend (parse '_x; _y', given.match.[this.toplevel match._x, this.toplevel match._y])
 
 __
 meta::parent('/home/spencertipping/bin/mh-object', <<'__');

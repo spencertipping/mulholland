@@ -10,24 +10,8 @@ as_js() method, and then either evaluating or serializing the tree. It provides 
 
 # Mulholland module format
 
-Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you the following primitive operations:
-
-    1. Javascript evaluation: !@ (console.log $ parse 'hello world')
-    2. Composition of side-effects: !@ foo; !@ bar
-
-# Semantics
-
-Mulholland goes to some lengths to make the global semantics sensible. In particular, no rewrite will have side-effects unless you evaluate a side-effecting Javascript expression somewhere,
-and you shouldn't do this. The reason purity is so important here is that Mulholland's rewriter tries to find the transitive closure of every expression it rewrites; so when you have an
-equation like 'foo = bar', even though no 'foo' exists at the moment, it is free to construct a 'foo' and test the rewrite rule to see whether it can inline something.
-
-All of this in mind, here is how Mulholland manages to provide a stateful interpreter and maintain a pure rewriter at the same time:
-
-    1. Start with a blank toplevel rewriter.
-    2. For each global rewrite in the file, replace (!) the current toplevel rewriter with a new one that contains an additional rewriting rule.
-    3. For each toplevel thing that isn't a rewrite, emit its compiled output after rewriting.
-
-Each mh() function manages its own state by using a context object. This context object contains a parser and a rewriter, and the rewriter is updated for each global definition.
+Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you just the !@ operator, which uses jsi to
+compile the given expression to Javascript and then executes it using a caterwaul :all compiler.
 
 # Command-line invocation
 
@@ -96,13 +80,13 @@ instance is itself immutable, but internally it gets replaced with each new defi
 
 # Mulholland evaluation function
 
-This defines a minimal set of operations that allow you to use jsi for extension. In particular, it provides an evaluator that understands ; composition and !@ compilation. Mulholland source
-is used to define the other toplevel operators.
+This defines a minimal set of operations that allow you to use jsi for extension. In particular, it provides an evaluator that understands !@ compilation. Mulholland source and jsi are used to
+define the other toplevel operators.
 
         mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
 
           -where [options                                               = {} / defaults /-$.merge/ specified_options,
-                  evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === ';' ? e.flatten_all(';') *!evaluate -seq : d === '!@' ? e /!js_evaluate : e /!options.cc,
+                  evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === '!@' ? e /!js_evaluate : e /!options.cc,
                   compiler                                              = $(':all'),
                   compile(tree)                                         = tree /!compiler /-$.compile/ c.environment(),
                   empty                                                 = c.parse.syntax('@' /!c.parse.intern),
