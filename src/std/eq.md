@@ -8,5 +8,5 @@ able to use equality definitions as values. As a result, there are two separate 
 operator that extends the current context.
 
     !@ (context.toplevel = context.toplevel.extend [parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y]]],
-        parse.syntax ('' + context.toplevel.current.length));
+        parse.syntax ('' + context.toplevel.rules.length));
     (_x = _y) =@ (_x =@ _y)
