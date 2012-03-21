@@ -7,9 +7,6 @@
 
 caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
-  $.mh_tracer = catastrophe(),
-  $ /-$.mh_tracer.trace_module/ 'mulholland.rewrite',
-
 # Mulholland module format.
 # Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you just the !@ operator, which uses jsi to
 # compile the given expression to Javascript and then executes it using a caterwaul :all compiler.

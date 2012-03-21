@@ -8,9 +8,6 @@ as_js() method, and then either evaluating or serializing the tree. It provides 
 
     caterwaul.module('mulholland.mh', 'js_all', function ($) {
 
-      $.mh_tracer = catastrophe(),
-      $ /-$.mh_tracer.trace_module/ 'mulholland.rewrite',
-
 # Mulholland module format
 
 Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you just the !@ operator, which uses jsi to

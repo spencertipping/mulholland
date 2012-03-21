@@ -581,17 +581,12 @@ join "\n", map strip($_), split /\n/, table_display($external ? [grep length, @e
 __
 meta::function('minify-yui', <<'__');
 # Minify using YUI compressor
-my ($options, @filenames) = separate_options(@_);
-my $nomunge   = $$options{-m} ? '' : '--nomunge';
-my $linebreak = $$options{-B} ? '' : '--line-break 160';
+my ($filename) = @_;
+my $minified = $filename;
+$minified =~ s/\.js$/.min.js/;
 
-for my $filename (@filenames) {
-  my $minified = $filename;
-  $minified =~ s/\.js$/.min.js/;
-
-  terminal::info("minifying $filename");
-  file::write($minified, join '', qx(yuicompressor $nomunge $linebreak "$filename"));
-}
+terminal::info("minifying $filename");
+file::write($minified, join '', qx(yuicompressor --nomunge --line-break 160 "$filename"));
 
 __
 meta::function('mv', <<'__');
@@ -672,7 +667,6 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-my ($options, @stuff) = separate_options(@_);
 my @modules = qw|i i/tree i/parse i/rewrite i/jsi mh/mh|;
 
 file::write('README.md', retrieve('markdown::readme'));
@@ -686,12 +680,10 @@ sh("waul $files");
 file::write('mh-core', retrieve('pp::js::mh'));
 chmod 0755, 'mh-core';
 
-unless ($$options{-B}) {
-  dangerous("bootstrapping mh-core (pass $_ of 2)", sub {
-    my $mh = join '', qx|./mh-core -c|;
-    file::write('mh-core', $mh);
-    chmod 0755, 'mh-core'}) for 1 .. 2;
-}
+dangerous("bootstrapping mh-core (pass $_ of 2)", sub {
+  my $mh = join '', qx|./mh-core -c|;
+  file::write('mh-core', $mh);
+  chmod 0755, 'mh-core'}) for 1 .. 2;
 
 __
 meta::function('rm', <<'__');
@@ -1536,7 +1528,7 @@ retriever::perl                         f41938e6dbad317f62abffc1e4d28cca
 
 __
 meta::parent('/home/spencertipping/bin/waul-object', <<'__');
-function::minify-yui                                        6374d98eda8642e5cdebe4fb34f5419b
+function::minify-yui                                        dd0d6afd6be3108180637436f058a181
 function::waul                                              66b92f55d5db498934b487188a04b16d
 meta::type::waul                                            869b5820cd79178b94c3ccdd47dff9df
 parent::/home/spencertipping/conjectures/perl-objects/js    08631314298573e77850afe27d7d3003
@@ -1779,7 +1771,6 @@ Licensed under the terms of the MIT source code license
 - include deps/caterwaul.min.js
 - include deps/caterwaul.std.min.js
 - include deps/bloom.js
-- include deps/catastrophe-module.js
 
 - include src/i.js
 - include src/i/tree.js
@@ -2234,9 +2225,6 @@ The Mulholland compiler runs or precompiles Mulholland source. It does this by a
 as_js() method, and then either evaluating or serializing the tree. It provides a few builtin rewriting rules and compiler directives to bootstrap the process.
 
 caterwaul.module('mulholland.mh', 'js_all', function ($) {
-
-  $.mh_tracer = catastrophe(),
-  $ /-$.mh_tracer.trace_module/ 'mulholland.rewrite',
 
 Mulholland module format.
 Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you just the !@ operator, which uses jsi to

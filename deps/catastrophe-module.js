@@ -1,1 +1,0 @@
-../../catastrophe/catastrophe-module.js

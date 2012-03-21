@@ -1,5 +1,5 @@
 caterwaul.module( 'mulholland.rewrite' ,function($) {$.mulholland.rewriter=function(rules) {;
-return(function() {var current=Array.prototype.slice.call( (rules) ) ,change=null,pattern_complexity=function() {;
+return(function( ) {var current=Array.prototype.slice.call( (rules) ) ,change=null,pattern_complexity=function() {;
 return(function(xs) {var x,x0,xi,xl,xr;
 for(var x0= (0x10000000) ,xi=0,xl=xs.length;
 xi<xl;
