@@ -1,5 +1,5 @@
-caterwaul.module( 'mulholland.tree' ,function($) { (function( ) {var statics=function(parser) {;
-return(function( ) {var constants= { } ,constant=function(s) {;
+caterwaul.module( 'mulholland.tree' ,function($) { (function() {var statics=function(parser) {;
+return(function() {var constants= {} ,constant=function(s) {;
 return constants[ '@' +s] !==void 0?constants[ '@' +s] :constants[ '@' +s] =new this(s) } ,create_bloom=function() {;
 return $.bloom( [function(_) {return _*5471} ,function(_) {return _*8707} ] ,8) } ,empty_bloom=create_bloom() ;
 return( {constants:constants,constant:constant,create_bloom:create_bloom,empty_bloom:empty_bloom} ) } ) .call(this) } ,methods=function(parser) {;
@@ -49,7 +49,7 @@ for(var x0= (true) ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,x0= (x0&& (x) .match(t[xi] ,m) ) ;
 return x0} ) .call(this,this) } } } ;
-return($.mulholland.syntax_common= { } ,$.mulholland.syntax=function(parser) {;
+return($.mulholland.syntax_common= {} ,$.mulholland.syntax=function(parser) {;
 var result=function(data,xs) {;
 return this instanceof result? (this.data=data,this.length=0, ( (xs) && ( (function(xs) {var x,x0,xi,xl,xr;
 for(var xi=0,xl=xs.length;
