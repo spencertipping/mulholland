@@ -33,7 +33,7 @@ for(var x0= (this._bloom=this.self_bloom() ) ,xi=0,xl=xs.length;
 xi<xl;
  ++xi)x=xs[xi] ,x0= ( (x0) .merge(x.bloom() ) ) ;
 return x0} ) .call(this,this) } ,erase_bloom:function() {;
-return this._bloom=this.constructor.empty_bloom,this} ,complexity:function() {;
+return(this._bloom=this.constructor.empty_bloom,this) } ,complexity:function() {;
 return! !this._complexity|| (this._complexity=1+ (function(xs) {var x,x0,xi,xl,xr;
 for(var x0= (0) ,xi=0,xl=xs.length;
 xi<xl;

@@ -11,7 +11,7 @@ xi>=0;
  --xi) {x=xs[xi] ;
 if(x1= ( (x[1] ) .replace(x[0] .match(t) ) ) )return x1}return false} ) .call(this,current) ) ) } ,fixed_point=function() {;
 var result=function(t) {;
-return(function(it) {return change?fix(it) :it} ) .call(this, (change=null,rewrite_once(t) ||t) ) } ;
+return(function(it) {return change?fix(it) :it} ) .call(this, ( (change=null,rewrite_once(t) ||t) ) ) } ;
 var fix=result;
 return result} ,transitive_limit=function(r) {;
 return[r[0] ,fixed_point() (r[1] ) ] } ,uniq=function(rs) {;

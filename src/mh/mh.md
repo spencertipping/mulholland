@@ -62,7 +62,7 @@ Read and evaluate any files specified on the command line, then enter a REPL tha
 the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
 
         mh_repl(argv)    = source_for(argv) *!mh -seq -then- introduce() -then- require('repl').start('mh> ', undefined, evaluator)
-                   -where [mh                       = $.mulholland.mh() -se- evaluate_js_modules(argv),
+                   -where [mh                       = evaluate_js_modules(argv) -then- $.mulholland.mh(),
                            evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
                                                -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
 
@@ -83,7 +83,7 @@ instance is itself immutable, but internally it gets replaced with each new defi
 This defines a minimal set of operations that allow you to use jsi for extension. In particular, it provides an evaluator that understands !@ compilation. Mulholland source and jsi are used to
 define the other toplevel operators.
 
-        mh(c = result.context = context())(s, specified_options) = c.split(s) *!evaluate -seq
+        mh(c = result.context = context())(s, specified_options) = c.split(s) %[x] *!evaluate -seq
 
           -where [options                                               = {} / defaults /-$.merge/ specified_options,
                   evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === '!@' ? e /!js_evaluate : e /!options.cc,

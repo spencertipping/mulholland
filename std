@@ -644,6 +644,11 @@ unless ($$options{-M}) {
 }
 
 __
+meta::function('repl', <<'__');
+render();
+sh('./mh');
+
+__
 meta::function('rm', <<'__');
 around_hook('rm', @_, sub {
   exists $data{$_} or terminal::warning("$_ does not exist") for @_;
