@@ -6,5 +6,5 @@ Licensed under the terms of the MIT source code license
 Because mulholland rewriters are immutable, the toplevel must be replaced to be extended. This module provides a straightforward way to do that.
 
     !@ (context.extend (lhs, rhs) = (context.toplevel = context.toplevel.extend [[lhs, (rhs.constructor === Function) && parse '@js' / se.[it.replace = rhs] || rhs]],
-                                     parse.syntax ('' + context.toplevel.rules.length)),
+                                     parse 'null'),
         parse 'null')

@@ -41,7 +41,7 @@ example, this is a case where transitivity would apply:
     foo + bif = bar + bif                 <- this would be rewritten as foo + bif = 1 because bar + _x matches bar + bif
     bar + _x = 1
 
-      $.mulholland.rewriter(rules) = rewrite /-$.merge/ capture [rules = current,  extend(rs) = $.mulholland.rewriter(current + rs -seq)]
+      $.mulholland.rewriter(rules) = rewrite /-$.merge/ capture [rules = current,  extend(rs) = $.mulholland.rewriter(current + rs %[x] -seq)]
 
                                                          -where [current                      = +rules -seq,
                                                                  change                       = null,

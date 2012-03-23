@@ -8,4 +8,4 @@ return xr} ) .call(this,Array.prototype.slice.call( (this) ) ) ) } ,represents_a
 return t.resolved_data() === '.' &&t[1] .resolved_data() === '[' } ,mh_encode_literal=function(d) {var s=d.toString() ;
 return/\/./ .test(s) ? '"' +s.replace( /"/g , '\\"' ) + '"r' :s.replace( /^\$/ , '@$' ) } ,mh_decode_literal=function(d) {var s=d.toString() ;
 return/^".*"r$/ .test(s) ?s.replace( /^"\// , '/' ) .replace( /\\"/g , '"' ) .replace( /"r$/ , '' ) :s.replace( /^@(.)/ , '$1' ) } ;
-return( ($) .syntax_extend( {as_mh:as_mh} ) ,$.mulholland.syntax_common.as_js=as_js) } ) .call(this) } ) ;
+return($) .syntax_extend( {as_mh:as_mh} ) ,$.mulholland.syntax_common.as_js=as_js} ) .call(this) } ) ;

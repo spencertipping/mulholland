@@ -1361,7 +1361,7 @@ mh doesn't provide any rule that extends the current toplevel context, so one of
 able to use equality definitions as values. As a result, there are two separate equality operators. The first, _x = _y, is rewritten into the second, _x =@ _y. The second is a side-effecting
 operator that extends the current context.
 
-!@ context.extend (parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y]]);
+!@ context.extend (parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y], when.match]);
 (_x = _y) =@ (_x =@ _y)
 
 __
@@ -1373,7 +1373,7 @@ Introduction.
 Because mulholland rewriters are immutable, the toplevel must be replaced to be extended. This module provides a straightforward way to do that.
 
 !@ (context.extend (lhs, rhs) = (context.toplevel = context.toplevel.extend [[lhs, (rhs.constructor === Function) && parse '@js' / se.[it.replace = rhs] || rhs]],
-                                 parse.syntax ('' + context.toplevel.rules.length)),
+                                 parse 'null'),
     parse 'null')
 
 __
@@ -1385,7 +1385,7 @@ Introduction.
 The semicolon is a function composition over interpreter transformations. For example, 'foo = bar; bif = baz' first runs 'foo = bar', then 'bif = baz' on the interpreter, returning the
 interpreter after the second state.
 
-!@ context.extend (parse '_x; _y', given.match.[context.toplevel match._x, context.toplevel match._y])
+!@ context.extend (parse '_x; _y', given.match.[context.toplevel match._x, context.toplevel match._y, when.match])
 
 __
 meta::parent('/home/spencertipping/bin/mh-object', <<'__');

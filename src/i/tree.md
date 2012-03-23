@@ -99,7 +99,7 @@ positives, we re-check at every match level.
 
 Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
 
-        match(t, m)            = this.length <= t.length && this /~can_match/ t && this /~level_matches/ t && m -oeq- {_: t} &&
+        match(t, m)            = t && this /~can_match/ t && this /~level_matches/ t && m -oeq- {_: t} &&
                                  !this.is_wildcard() -or- (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t) && this / t /~children_match/ m && m,
 
         replace(m)             = m && this.replace_children(m[this.resolved_data()], m) -or- this /~map/ "_.replace(m)".qf,

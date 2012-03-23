@@ -7,5 +7,5 @@ mh doesn't provide any rule that extends the current toplevel context, so one of
 able to use equality definitions as values. As a result, there are two separate equality operators. The first, _x = _y, is rewritten into the second, _x =@ _y. The second is a side-effecting
 operator that extends the current context.
 
-    !@ context.extend (parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y]]);
+    !@ context.extend (parse '_x =@ _y', given.match.[context.toplevel = context.toplevel.extend [match._x, match._y], when.match]);
     (_x = _y) =@ (_x =@ _y)
