@@ -667,10 +667,10 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-my @modules = qw|i i/tree i/parse i/rewrite i/jsi mh/mh|;
+my @modules = qw|i/tree i/parse i/rewrite i/jsi mh/mh|;
 
 file::write('README.md', retrieve('markdown::readme'));
-file::write("src/$_.waul", retrieve("waul::$_"))                 for @modules;
+file::write("src/$_.waul", retrieve("waul::$_"), mkpath => 1)    for @modules;
 file::write("src/$_.md",   retrieve("markdown::sdoc::waul::$_")) for @modules;
 
 my $files = join ' ', glob 'src/*.waul src/*/*.waul';
