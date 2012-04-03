@@ -1816,11 +1816,23 @@ my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
 meta::section('contexts', <<'__');
-- sc Contexts | sec:contexts
+- sc Contexts
+  Mulholland uses contexts to dictate how terms should be rewritten. Generally these contexts are stored by name by modifying the toplevel context; this is similar to Lisp's global macro
+  table. This behavior is produced by a few toplevel rewriting rules:\footnote{Parentheses are included here to show the cons structure, but they aren't necessary in the resulting program.}
+
+  - align << end
+    x \vdash (P_x = y)                      & = y \\
+    x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
+  - end
+
+  Here, $P_x$ represents any pattern that matches and destructures $x$. Lisp implements $P_x$ such that $x_1:y_1$ matches $x_2:y_2$ iff $x_1 = x_2$. The resulting destructure data is, roughly,
+  an association list of $y_1$ zipped with $y_2$. Mulholland uses a more complex matching strategy that selects for arity and cons type and allows for recursive destructuring of subterms.
+
+  - s1 Patterns
 
 __
 meta::section('introduction', <<'__');
-- sc Introduction
+\chapter*{Introduction}
   Mulholland is a term-rewriting language that arose from the idea that abstractions should be erased at compile-time as an optimization measure. Unlike a lot of languages that do this,
   Mulholland enables the compiler to perform representation abstraction; that is, the data structures and function calls modeled in source code may be completely changed in the compiled
   result.
@@ -1897,15 +1909,20 @@ meta::section('polymorphic-consing', <<'__');
     This means that evaluation is (nominally) transparent across function arguments, an interpretation that allows arguments to be forced prior to the invocation. Second, the {\tt car} is
     recursively evaluated under $E$ but not under $M$.
 
-    Macro bodies have a predictable evaluation scheme:
+    Macroexpansion and evaluation are convertible:\footnote{I'm being imprecise here. {\tt macroexpand} does not expand sublists; it just expands the toplevel cons cell.}
     - align << end
-      E[(\texttt{defmacro}:name:formals:body:\texttt{nil})] & \Rightarrow (name \rightarrow E[body])
+      E[\texttt{defmacro}:name:formals:body:\texttt{nil}] & \rightarrow (M[name:formals] = E[body]) \\
+      E[\texttt{macroexpand}:x:\texttt{nil}]              & = M[x] \\
+      E[\texttt{eval}:x:\texttt{nil}]                     & = E[M[x]]
     - end
 
-    This is crucial; it effectively provides $body$ with a way to use $M$.
+    The $M \rightarrow E$ relationship in the first equation is crucial; it effectively gives the macro body access to both the $M[]$ and $E[]$ transformations. Put differently, it adds the
+    stronger evaluation homomorphism structure to the replacement term.
 
-  - s1 Tree homomorphism in Mulholland
-    
+  - s1 Tree homomorphisms in Mulholland
+    Mulholland has a few significant differences from Lisp. First, there is no $E[]$ transformation available to code; terms exist only in their quoted forms. These quoted forms are then
+    erased in a structure-preserving way when the program is compiled. Second, the distributive nature of Mulholland trees is explicitly, not implicitly, indicated. Third, Mulholland rewriting
+    definitions are built entirely using piecewise combinations of destructuring binds; this is the only way to access argument structure.
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
