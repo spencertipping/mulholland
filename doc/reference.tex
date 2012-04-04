@@ -113,9 +113,4 @@ x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
   Here, $P_x$ represents any pattern that matches and destructures $x$. Lisp implements $P_x$ such that $x_1:y_1$ matches $x_2:y_2$ iff $x_1 = x_2$. The resulting destructure data is, roughly,
   an association list of $y_1$ zipped with $y_2$. Mulholland uses a more complex matching strategy that selects for arity and cons type and allows for recursive destructuring of subterms.
 
-\section{Patterns}
-    Patterns serve as decisions, and ideally are able to support Turing-complete match criteria. For example, a limit case is matching against a series of instructions that produce some given
-    output. Another constraint is that patterns should encode their own semantics for descent through a tree. Caterwaul-style wildcard matching breaks down here, as a given pattern term could
-    potentially match more than once.
-
 \end{document}
