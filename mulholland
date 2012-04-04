@@ -70,6 +70,30 @@ sub meta::externalize {
 }
 
 __
+meta::meta('externalize_template', <<'__');
+sub meta::externalize_template {
+  my ($name, $implementation) = @_;
+  meta::externalize "template::$name", "template::$name", $implementation;
+}
+__
+meta::meta('functor::code-templates', <<'__');
+package code;
+
+# Templates for generating named source files.
+sub template {
+  my ($name, $implementation) = @_;
+  $implementation ||= sub {
+    my ($line, $block) = @_;
+    my $append         = $line =~ s/^\h*>>\h*//o;
+
+    $line =~ s/\s+.*$//o;
+    file::write(&{'::source-directory'}() . "/$line", ($append && "\n") . $block, mkpath => 1, append => $append);
+    "\\lstset{caption={$line" . ($append && ' (continued)') . "},name={$line}}\\begin{${name}code}\n$block \\end{${name}code}";
+  };
+
+  meta::externalize_template $name, $implementation;
+}
+__
 meta::meta('functor::editable', <<'__');
 # An editable type. This creates a type whose default action is to open an editor
 # on whichever value is mentioned. This can be changed using different flags.
@@ -92,16 +116,65 @@ sub meta::functor::editable {
       return associate($attribute, @new_value ? join(' ', @new_value) : join('', <STDIN>)) if $command eq '=' or $command eq 'import' or $options{default} eq 'import' and not defined $command;
       return retrieve($attribute)}}}
 __
-meta::meta('functor::html-templates', <<'__');
-my @html_elements = qw/html head title meta script style link body div/;    # Very incomplete list
+meta::meta('functor::tex-templates', <<'__');
+package tex;
 
-for my $e (@html_elements) {
-  meta::externalize "template::$e", "template::$e", sub {
-    my ($line, $block) = @_;
-    "<$e $line>\n$block\n</$e>";
+# A wrapper for TeX templates. The idea is always the same, so I'm abstracting out the
+# common externalization logic here.
+sub template_for(&) {
+  my ($implementation) = @_;
+  sub {
+    my %names = @_;
+    for my $name (keys %names) {
+      ::meta::externalize_template $name, sub {
+        &$implementation($names{$name}, @_);
+      };
+    }
   };
 }
 
+sub id {
+  map {$_ => $_} @_;
+}
+
+# Creates a one-line or multiline template based on normal TeX syntax. It's a straight
+# transfer into TeX with no preprocessing.
+*template = template_for {
+  my ($name, $line, $block) = @_;
+  $block ? "\\begin{$name}\n$block\n\\end{$name}" : "\\$name\{$line\}";
+};
+
+# Creates a labeled one-line template. This is just like normal TeX, but assumes the
+# specification of a label name after a pipe character.
+*labeled_template = template_for {
+  my ($name, $line, undef) = @_;
+  my ($real_stuff, $label) = split /\h*\|\h*/, $line;
+  "\\$name\{$real_stuff\}" . ($label && "\\label{$label}");
+};
+__
+meta::meta('template::beamer', <<'__');
+tex::template tex::id(qw/frame pause item block alertblock exampleblock/);
+
+my $fframe_template = tex::template_for {
+  my ($name, $line, $block) = @_;
+  "\\begin{frame}[fragile]\n$block\n\\end{frame}\n";
+};
+&$fframe_template(tex::id('fframe'));
+__
+meta::meta('template::code', <<'__');
+code::template $_ for qw/java cpp asm javascript html resource perl ruby/;
+
+__
+meta::meta('template::document', 'tex::template tex::id(qw/document tableofcontents maketitle title author date abstract documentclass verbatim/);');
+meta::meta('template::enumeration', 'tex::template tex::id(qw/enumerate itemize description item/);');
+meta::meta('template::math', <<'__');
+tex::template align => 'align*', nalign => 'align';
+tex::template tex::id(qw/theorem proof lemma corollary conjecture definition proposition/);
+__
+meta::meta('template::quotations', 'tex::template tex::id(qw/quotation quote/);');
+meta::meta('template::sections', <<'__');
+tex::labeled_template(s1 => 'section', s2 => 'subsection', s3 => 'subsubsection', s4 => 'paragraph', s5 => 'subparagraph');
+tex::labeled_template(sc => 'chapter', sp => 'part');
 __
 meta::meta('type::alias', <<'__');
 meta::configure 'alias', inherit => 0;
@@ -179,10 +252,6 @@ meta::define_form 'internal_function', sub {
   *{$name} = meta::eval_in("sub {\n$value\n}", "internal_function::$name");
 };
 __
-meta::meta('type::js', <<'__');
-meta::functor::editable 'js', extension => '.js', inherit => 1;
-
-__
 meta::meta('type::library', <<'__');
 meta::configure 'library', extension => '.pl', inherit => 1;
 meta::define_form 'library', sub {
@@ -204,14 +273,11 @@ meta::meta('type::meta', <<'__');
 
 meta::configure 'meta', extension => '.pl', inherit => 1;
 __
-meta::meta('type::mh', <<'__');
-meta::functor::editable 'mh', inherit => 1, extension => '.mh', default => 'edit';
-
-__
 meta::meta('type::parent', <<'__');
 meta::define_form 'parent', \&meta::bootstrap::implementation;
 meta::configure 'parent', extension => '', inherit => 1;
 __
+meta::meta('type::resource', 'meta::functor::editable \'resource\', extension => \'.cltex\', inherit => 1, default => \'edit\';');
 meta::meta('type::retriever', <<'__');
 meta::configure 'retriever', extension => '.pl', inherit => 1;
 meta::define_form 'retriever', sub {
@@ -227,6 +293,7 @@ meta::functor::editable 'sdoc', inherit => 1, extension => sub {
   extension_for(attribute($_[0])) . '.sdoc';
 };
 __
+meta::meta('type::section', 'meta::functor::editable \'section\', extension => \'.cltex\', inherit => 0, default => \'edit\';');
 meta::meta('type::slibrary', <<'__');
 meta::configure 'slibrary', extension => '.pl.sdoc', inherit => 1;
 meta::define_form 'slibrary', sub {
@@ -258,13 +325,7 @@ meta::configure 'vim_highlighter', extension => '.vim', inherit => 1;
 meta::define_form 'vim_highlighter', \&meta::bootstrap::implementation;
 
 __
-meta::meta('type::waul', <<'__');
-meta::functor::editable 'waul', inherit => 1, extension => '.waul', default => 'edit';
-
-__
-meta::alias('er', 'edit sdoc::readme');
 meta::alias('erf', 'edit function::render');
-meta::alias('ev', 'edit vim_highlighter::mh');
 meta::bootstrap('html', <<'__');
 <html>
   <head>
@@ -351,11 +412,10 @@ run this script with the 'usage' argument.
 
 __
 meta::cache('parent-identification', <<'__');
+./sdoc a1e8480e579614c01dabeecf0f963bcc
 /home/spencertipping/bin/object 99aeabc9ec7fe80b1b39f5e53dc7e49e
-/home/spencertipping/bin/waul-object 4e04fdb8e560f4dd2ca4880b91a8e2ea
-/home/spencertipping/conjectures/perl-objects/js 246bc56c88e8e8daae3737dbb16a2a2c
-/home/spencertipping/conjectures/perl-objects/sdoc a1e8480e579614c01dabeecf0f963bcc
-mh-object 1c4e5c01fba8dd73fae05f53c8295b39
+/home/spencertipping/conjectures/perl-objects/tex-document d6b8b54aecc42ae92c7a8c570c5559fc
+git-integration 9fabb9b6f2f374c35ddcc26549ac2b65
 object 99aeabc9ec7fe80b1b39f5e53dc7e49e
 preprocessor 70dae4b46eb4e06798ec6f38d17d4c7b
 vim-highlighters 902333a0bd6ed90ff919fe8477cb4e69
@@ -418,11 +478,24 @@ for (grep length, @_) {
       file::write($_, serialize(), noclobber => 1);
       chmod(0700, $_)})})}
 __
-meta::function('compile', <<'__');
-my $result = pop;
-with_exported(map("pp::$_", @_), sub {
-  file::write($result, join '', qx|mh -c $_[0]|);
-  chmod 0700, $result});
+meta::function('compile-tex', <<'__');
+my ($options, @documents) = separate_options(@_);
+my $temporary_directory = temporary_name();
+
+my $tex = tex(@documents);
+my $toc = $tex =~ /\\tableofcontents/;
+
+mkdir $temporary_directory;
+file::write(my $filename = "$temporary_directory/document.tex", tex(@documents));
+
+my $destination = $$options{'--pdf'} || name() . '.pdf';
+my $output = $filename;
+$output =~ s/\.tex$/.pdf/;
+
+my $opts = "-output-directory=$temporary_directory";
+
+$toc ? sh("latex $opts $filename && latex $opts $filename && pdflatex $opts $filename && mv $output $destination && rm -r $temporary_directory")
+     : sh("pdflatex $opts $filename && mv $output $destination && rm -r $temporary_directory");
 
 __
 meta::function('cp', <<'__');
@@ -438,16 +511,7 @@ around_hook('create', $name, $value, sub {
   edit($name) unless defined $value});
 __
 meta::function('current-state', 'serialize(\'-pS\');');
-meta::function('d', <<'__');
-create('sdoc::waul::doc/' . join('-', @_));
-
-__
 meta::function('disable', 'hook(\'disable\', chmod_self(sub {$_[0] & 0666}));');
-meta::function('e', <<'__');
-my @keys = select_keys('--criteria' => '^sdoc::(?:waul|js)::(.*\W)?' . join('.*', @_));
-edit($keys[0]);
-
-__
 meta::function('edit', <<'__');
 my ($name, %options) = @_;
 my $extension = extension_for($name);
@@ -476,6 +540,31 @@ my $name = pop @_;
 file::write($name, join "\n", retrieve(@_));
 __
 meta::function('extern', '&{$_[0]}(retrieve(@_[1 .. $#_]));');
+meta::function('gU', <<'__');
+sh("git push @_");
+
+__
+meta::function('ga', <<'__');
+sh("git add @_");
+
+__
+meta::function('gc', <<'__');
+around_hook('git-commit', @_, sub {
+  my $message = join ' ', @_;
+  $message =~ s/'/\\'/g;
+  enable();
+  sh("git commit -a -m '$message'");
+  disable()});
+
+__
+meta::function('gd', <<'__');
+sh('git diff');
+
+__
+meta::function('gl', <<'__');
+sh("git log @_");
+
+__
 meta::function('grep', <<'__');
 # Looks through attributes for a pattern. Usage is grep pattern [options], where
 # [options] is the format as provided to select_keys.
@@ -505,6 +594,14 @@ unless ($$options{'-C'}) {
   s/^/\033[1;32m/o && s/$/\033[0;0m/o for @m_line_numbers}
 
 table_display([@m_attributes], [@m_line_numbers], [@m_lines]);
+__
+meta::function('gs', <<'__');
+sh('git status');
+
+__
+meta::function('gu', <<'__');
+sh("git pull @_");
+
 __
 meta::function('hash', 'fast_hash(@_);');
 meta::function('hook', <<'__');
@@ -544,15 +641,6 @@ around_hook('load-state', @_, sub {
   verify()});
 
 __
-meta::function('loc', <<'__');
-sub loc_single {(split ' ', qx|jsl $_[0]|)[1]}
-
-with_exported(grep(s/^sdoc::waul::/waul::/, sort keys %data), sub {
-  terminal::info("total LOC: " . loc_single $_[0]);
-  with_exported($_, sub {
-    terminal::info("$_: " . loc_single $_[0])}) for grep s/^sdoc::waul::/waul::/, sort keys %data});
-
-__
 meta::function('lock', 'hook(\'lock\', chmod_self(sub {$_[0] & 0555}));');
 meta::function('ls', <<'__');
 my ($options, @criteria) = separate_options(@_);
@@ -579,21 +667,12 @@ join "\n", map strip($_), split /\n/, table_display($external ? [grep length, @e
                                                     $sizes ? ([@sizes]) : (), $flags ? ([@flags]) : (), $hashes ? ([@hashes]) : (), $parent_hashes ? ([@parent_hashes]) : ());
 
 __
-meta::function('minify-yui', <<'__');
-# Minify using YUI compressor
-my ($filename) = @_;
-my $minified = $filename;
-$minified =~ s/\.js$/.min.js/;
-
-terminal::info("minifying $filename");
-file::write($minified, join '', qx(yuicompressor --nomunge --line-break 160 "$filename"));
-
-__
 meta::function('mv', <<'__');
 my ($from, $to) = @_;
 die "'$from' does not exist" unless exists $data{$from};
-associate($to, retrieve($from));
+associate($to, retrieve($from), execute => 1);
 rm($from);
+
 __
 meta::function('name', <<'__');
 my $name = $0;
@@ -602,8 +681,9 @@ $name;
 __
 meta::function('parents', 'join "\\n", grep s/^parent:://o, sort keys %data;');
 meta::function('perl', <<'__');
-my $result = eval(join ' ', @_);
-$@ ? terminal::error($@) : $result;
+my @result = eval(join ' ', @_);
+$@ ? terminal::error($@) : wantarray ? @result : $result[0];
+
 __
 meta::function('preprocess', <<'__');
 # Implements a simple preprocessing language.
@@ -667,23 +747,7 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-my @modules = qw|i/tree i/parse i/rewrite i/jsi mh/mh|;
-
-file::write('README.md', retrieve('markdown::readme'));
-file::write("src/$_.waul", retrieve("waul::$_"), mkpath => 1)    for @modules;
-file::write("src/$_.md",   retrieve("markdown::sdoc::waul::$_")) for @modules;
-
-my $files = join ' ', glob 'src/*.waul src/*/*.waul';
-terminal::info("waul-compiling $files to render mh-core");
-sh("waul $files");
-
-file::write('mh-core', retrieve('pp::js::mh'));
-chmod 0755, 'mh-core';
-
-dangerous("bootstrapping mh-core (pass $_ of 2)", sub {
-  my $mh = join '', qx|./mh-core -c|;
-  file::write('mh-core', $mh);
-  chmod 0755, 'mh-core'}) for 1 .. 2;
+compile_tex();
 
 __
 meta::function('rm', <<'__');
@@ -933,6 +997,11 @@ my $hash = fast_hash(fast_hash(scalar @keys) . join '|', @keys);
 $hash = fast_hash("$data{$_}|$hash") for @keys;
 $hash;
 __
+meta::function('tex', <<'__');
+my @documents = @_ ? @_ : qw/main/;
+join "\n\n", map preprocess(retrieve("section::$_")), @documents;
+
+__
 meta::function('touch', 'associate($_, \'\') for @_;');
 meta::function('unlock', 'hook(\'unlock\', chmod_self(sub {$_[0] | 0200}));');
 meta::function('update', <<'__');
@@ -956,12 +1025,12 @@ around_hook('update-from-invocation', separate_options(@_), sub {
   my @unknown_targets   = grep ! exists $data{"parent::$_"}, @targets;
   @targets = (@known_targets, @unknown_targets);
 
-  my $save_state        = ! ($$options{'-n'} || $$options{'--no-save'});
-  my $no_parents        =    $$options{'-P'} || $$options{'--no-parent'} || $$options{'--no-parents'};
-  my $force             =    $$options{'-f'} || $$options{'--force'};
-  my $clobber_divergent =    $$options{'-D'} || $$options{'--clobber-divergent'};
+  my $save_state        = $$options{'-s'} || $$options{'--save'};
+  my $no_parents        = $$options{'-P'} || $$options{'--no-parent'} || $$options{'--no-parents'};
+  my $force             = $$options{'-f'} || $$options{'--force'};
+  my $clobber_divergent = $$options{'-D'} || $$options{'--clobber-divergent'};
 
-  save_state('before-update') if $save_state;
+  save_state('before-update');
 
   for my $target (@targets) {
     dangerous("updating from $target", sub {
@@ -995,14 +1064,16 @@ around_hook('update-from-invocation', separate_options(@_), sub {
   cache('parent-identification', %parent_id_cache);
 
   if (verify()) {hook('update-from-succeeded', $options, @targets);
-                 terminal::info("Successfully updated. Run 'load-state before-update' to undo this change.") if $save_state}
+                 terminal::info("Successfully updated. Run 'load-state before-update' to undo this change.") if $save_state;
+                 rm('state::before-update') unless $save_state}
   elsif ($force) {hook('update-from-failed', $options, @targets);
                   terminal::warning('Failed to verify: at this point your object will not save properly, though backup copies will be created.',
-                                    'Run "load-state before-update" to undo the update and return to a working state.') if $save_state}
+                                    'Run "load-state before-update" to undo the update and return to a working state.')}
   else {hook('update-from-failed', $options, @targets);
         terminal::error('Verification failed after the upgrade was complete.');
-        terminal::info("$0 has been reverted to its pre-upgrade state.", "If you want to upgrade and keep the failure state, then run 'update-from $target --force'.") if $save_state;
-        return load_state('before-update') if $save_state}});
+        terminal::info("$0 has been reverted to its pre-upgrade state.", "If you want to upgrade and keep the failure state, then run 'update-from $target --force'.");
+        load_state('before-update');
+        rm('state::before-update')}});
 
 __
 meta::function('usage', '"Usage: $0 action [arguments]\\nUnique actions (run \'$0 ls\' to see all actions):" . ls(\'-u\');');
@@ -1019,22 +1090,8 @@ meta::function('vim', <<'__');
 # Installs VIM highlighters.
 file::write("$ENV{'HOME'}/.vim/syntax/$_.vim", retrieve("vim_highlighter::$_")) for grep s/^vim_highlighter:://o, keys %data;
 __
-meta::function('waul', <<'__');
-my ($name, %options) = @_;
-$name =~ s/^waul:://;
-my $output     = $options{output} || "$name.js";
-my $extensions = $options{extensions} ? join(' ', map "--extension '$_'", split /\s+/, $options{extensions}) : '';
-my $waul       = retrieve("waul::$name") =~ m-^#!/usr/bin/env (\S+)- ? $1 : 'waul';
-
-terminal::info("compiling waul::$name using $waul ($extensions)");
-
-with_exported("waul::$name", sub {
-  my ($exported) = @_;
-  sh("$waul --output '$output' $extensions $exported")});
-
-__
 meta::hook('before-shell::ad', <<'__');
-ad('sdoc::');
+ad('section::');
 
 __
 meta::indicator('cc', 'length ::retrieve(\'data::current-continuation\') ? "\\033[1;36mcc\\033[0;0m" : \'\';');
@@ -1386,7 +1443,8 @@ sub repl {
   my $autocomplete = $options{autocomplete} || sub {[sort(keys %data), grep !/-/, sort keys %externalized_functions]};
   my $prompt       = $options{prompt}       || \&prompt;
   my $parse        = $options{parse}        || sub {parse(tokenize(@_))};
-  my $command      = $options{command}      || sub {my ($command) = @_; ::around_hook('shell-command', $command, sub {print ::dangerous('', sub {execute($command)}), "\n"})};
+  my $output       = $options{output}       || sub {print join("\n", @_), "\n"};
+  my $command      = $options{command}      || sub {my ($command) = @_; ::around_hook('shell-command', $command, sub {&$output(::dangerous('', sub {execute($command)}))})};
 
   length $_ && &$command(&$parse($_)) while ($attribs->{completion_word} = &$autocomplete(), defined($_ = $term->readline(&$prompt())))}
 
@@ -1408,6 +1466,21 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::parent('./sdoc', <<'__');
+function::sdoc                           b2f9066417ce3368f093796e1180e9b2
+function::sdoc-html                      b23152b3f5be696e5bae842ec43fc5a4
+function::sdoc-markdown                  a35a6441dd750466f2d0e636bee2b382
+function::sdocp                          c3d738d982ba87418a298ff58478a85b
+meta::type::sdoc                         22cd7315641d38c9d536344e83c36bed
+meta::type::slibrary                     95474943c4a5f8ff17d3cf66ddb7c386
+parent::/home/spencertipping/bin/object  5e8c5be71d2d512cca8dfc1677f94466
+retriever::code-sdoc                     03b87ff8d1ecf7594db9ca0669fc69a1
+retriever::html-sdoc                     8ab7705d03276945b23a71677153233c
+retriever::markdown-sdoc                 67c34ba8223ec36a3ae018e411354db2
+retriever::sdoc                          662061e9e41491e2a1debd6862ccf1e7
+retriever::sdocp                         330694ea14a23bb04b65c761075cd946
+
+__
 meta::parent('/home/spencertipping/bin/object', <<'__');
 bootstrap::html                         f44dd03cb0c904b3a5f69fbda5f018d0
 bootstrap::initialization               d22fafa2938ecb0d4728e2958b54ed3d
@@ -1439,10 +1512,10 @@ function::is                            41564c8f21b12ab80824ac825266d805
 function::load-state                    b6cf278a1f351f316fa6e070359b6081
 function::lock                          5d8db258704e6a8623fac796f62fac02
 function::ls                            01a23d51d5b529e03943bd57e33f92df
-function::mv                            4a0e338a6edb89ad1e2c779d51d4d47b
+function::mv                            ccd000960db4cf627d9246c43d87ba4c
 function::name                          955ba2d1fe1d67cd78651a4042283b00
 function::parents                       3da9e63b5aae9e2f5dcc946a86d166aa
-function::perl                          a0f341ea54391b63b6195e7992b6a686
+function::perl                          9f9fd744f0ed225ad8fb3b79fa53dd9a
 function::rd                            2adb16d7e819d2e87a27201744a581e7
 function::reload                        1589f4cf8374e0011991cb8907afca3e
 function::rm                            6f6fd7a6c25558eb469d78ea888f8551
@@ -1460,7 +1533,7 @@ function::state                         8c68044dccae28f33244d0c7e9e9acfb
 function::touch                         3991b1b7c7187566f50e5e58ce01fa06
 function::unlock                        b4aac02f7f3fb700acf4acfd9b180ceb
 function::update                        ac391dc90e507e7586c81850e7c2ecdd
-function::update-from                   631721c4dc30e11b2023a6703cbcef52
+function::update-from                   06fef658374d482adb2e62fbeed9efb4
 function::usage                         5bdd370f5a56cfbf199e08d398091444
 function::verify                        0c0cc1dfeab7d705919df122f7850a4f
 indicator::cc                           3db7509c521ee6abfedd33d5f0148ed3
@@ -1497,7 +1570,7 @@ internal_function::table_display        d575f4dc873b2e0be5bd7352047fd904
 internal_function::temporary_name       6f548d101fc68356515ffd0fc9ae0c93
 internal_function::translate_backtrace  d77a56d608473b3cd8a3c6cb84185e10
 internal_function::with_exported        df345d5095d5ed13328ddd07ea922b36
-library::shell                          6b9f3befb61a01e9132a440601f8ea0a
+library::shell                          f561500cf223df1bf6daf43af93577a5
 library::terminal                       7e2d045782405934a9614fe04bcfe559
 message_color::cc                       2218ef0f7425de5c717762ffb100eb43
 message_color::state                    03621cd6ac0b1a40d703f41e26c5807f
@@ -1527,43 +1600,43 @@ retriever::object                       c7633990b4e01bdc783da7e545799f4f
 retriever::perl                         f41938e6dbad317f62abffc1e4d28cca
 
 __
-meta::parent('/home/spencertipping/bin/waul-object', <<'__');
-function::minify-yui                                        dd0d6afd6be3108180637436f058a181
-function::waul                                              66b92f55d5db498934b487188a04b16d
-meta::type::waul                                            869b5820cd79178b94c3ccdd47dff9df
-parent::/home/spencertipping/conjectures/perl-objects/js    08631314298573e77850afe27d7d3003
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  5ead79278263770b4bd3f4928f4b28aa
-parent::preprocessor                                        4450ebbe2c9d3a70ada4050fcd567907
+meta::parent('/home/spencertipping/conjectures/perl-objects/tex-document', <<'__');
+function::compile-tex          506fa19a7628ec4b2b0cb8c5865e24a0
+function::tex                  cd9adeb4311823387f359df3955f7c8c
+meta::externalize_template     ce51d3e099f0fad21cd01e5c53382e85
+meta::functor::code-templates  2b8880f05f983ce5b8a19a01688b6001
+meta::functor::tex-templates   6ac0ee994c9328fcfc41083083d97280
+meta::template::beamer         3b73fe6a7ef271112a603b110630ad01
+meta::template::code           d29e41eab67368411a09753d6722f88d
+meta::template::document       18688cac3eab39087165931beb4f82de
+meta::template::enumeration    67d1cf0bb0e8946fc3b48cc30a4f5fa4
+meta::template::math           057c8fe0d91c0b85138b01c1f6a1e3b3
+meta::template::quotations     f76a27311c8a9d09550dd669e98f9a7f
+meta::template::sections       25cb0a42bf1c2f403f8f9c2e1c5e4105
+meta::type::resource           c521d2de1dcd7f9f7ec4df3557572009
+meta::type::section            fb3b53eaebc1a2433c1763eccdb781c4
+parent::./sdoc                 6c74033abed05f398572ce8aeb848f08
+parent::preprocessor           803d46480e579c764e7704149fecd7cc
+parent::vim-highlighters       67c827cbb7bffc6ecab4b6a09dcc93a3
+resource::header               165b42e25edb90043f5d3b544adee521
+resource::header-languages     96d12558e40d0df64ff3176b767f4f3b
+resource::header-listings      712557f5989b12ca325bdd2cd36020ef
+resource::header-packages      323964d33482e6099b0248bb4eddf2ae
+resource::header-refs          e3999cbca586d5100eb782643071ee88
+resource::header-resource      a8df924fbb715de73b8e7518e0c9e0d6
+template::item[]               2c2041b4c3b6584b6ae3610f5ab68939
+vim_highlighter::cltex         40744d98b02b4b50fedb4d1e7e1fd151
 
 __
-meta::parent('/home/spencertipping/conjectures/perl-objects/js', <<'__');
-meta::type::js                           0377fcc438f3af85ec87d4770b8cd307
-parent::/home/spencertipping/bin/object  c086f2bf8be5433a968323892538feb6
-
-__
-meta::parent('/home/spencertipping/conjectures/perl-objects/sdoc', <<'__');
-function::sdoc                           b2f9066417ce3368f093796e1180e9b2
-function::sdoc-html                      b23152b3f5be696e5bae842ec43fc5a4
-function::sdoc-markdown                  a35a6441dd750466f2d0e636bee2b382
-function::sdocp                          c3d738d982ba87418a298ff58478a85b
-meta::type::sdoc                         22cd7315641d38c9d536344e83c36bed
-meta::type::slibrary                     95474943c4a5f8ff17d3cf66ddb7c386
-parent::/home/spencertipping/bin/object  c086f2bf8be5433a968323892538feb6
-retriever::code-sdoc                     03b87ff8d1ecf7594db9ca0669fc69a1
-retriever::html-sdoc                     8ab7705d03276945b23a71677153233c
-retriever::markdown-sdoc                 67c34ba8223ec36a3ae018e411354db2
-retriever::sdoc                          662061e9e41491e2a1debd6862ccf1e7
-retriever::sdocp                         330694ea14a23bb04b65c761075cd946
-
-__
-meta::parent('mh-object', <<'__');
-function::compile                                           51bbd6c69566343dae446e33570d911e
-meta::type::mh                                              0b10222b800b45a0e3cb98e8d7607645
-parent::/home/spencertipping/conjectures/perl-objects/sdoc  8137eebc7495850c86d8471b9c55b13e
-parent::preprocessor                                        69167db3b82b61dcb7c2bb9280acb87d
-parent::vim-highlighters                                    44488700b7bffc6ecab4b6a022e79f19
-retriever::mhi                                              72bbfd7e2a90f61e7500e38f4f700e79
-vim_highlighter::mh                                         5d70a791ade269df49a89899bdfc9e98
+meta::parent('git-integration', <<'__');
+function::gU                             f15ab8170ea981dd7b216c75af5d3f63
+function::ga                             505b3d9a22ca7cf04c60bda01ff3f140
+function::gc                             0378d3a25fad4fa0feff9cb50c0c5d89
+function::gd                             cff1e868c7c69780a2263c8c7fd75f90
+function::gl                             492e2750409588f8b61a8b8e339e42c1
+function::gs                             4ea8aeccb36ab83702062e4359e8600b
+function::gu                             fdd2e61e0ea981dda6d407df63c0e47e
+parent::/home/spencertipping/bin/object  5e8c5be71d2d512cca8dfc1677f94466
 
 __
 meta::parent('object', <<'__');
@@ -1597,10 +1670,10 @@ function::is                            41564c8f21b12ab80824ac825266d805
 function::load-state                    b6cf278a1f351f316fa6e070359b6081
 function::lock                          5d8db258704e6a8623fac796f62fac02
 function::ls                            01a23d51d5b529e03943bd57e33f92df
-function::mv                            4a0e338a6edb89ad1e2c779d51d4d47b
+function::mv                            ccd000960db4cf627d9246c43d87ba4c
 function::name                          955ba2d1fe1d67cd78651a4042283b00
 function::parents                       3da9e63b5aae9e2f5dcc946a86d166aa
-function::perl                          a0f341ea54391b63b6195e7992b6a686
+function::perl                          9f9fd744f0ed225ad8fb3b79fa53dd9a
 function::rd                            2adb16d7e819d2e87a27201744a581e7
 function::reload                        1589f4cf8374e0011991cb8907afca3e
 function::rm                            6f6fd7a6c25558eb469d78ea888f8551
@@ -1618,7 +1691,7 @@ function::state                         8c68044dccae28f33244d0c7e9e9acfb
 function::touch                         3991b1b7c7187566f50e5e58ce01fa06
 function::unlock                        b4aac02f7f3fb700acf4acfd9b180ceb
 function::update                        ac391dc90e507e7586c81850e7c2ecdd
-function::update-from                   631721c4dc30e11b2023a6703cbcef52
+function::update-from                   06fef658374d482adb2e62fbeed9efb4
 function::usage                         5bdd370f5a56cfbf199e08d398091444
 function::verify                        0c0cc1dfeab7d705919df122f7850a4f
 indicator::cc                           3db7509c521ee6abfedd33d5f0148ed3
@@ -1655,7 +1728,7 @@ internal_function::table_display        d575f4dc873b2e0be5bd7352047fd904
 internal_function::temporary_name       6f548d101fc68356515ffd0fc9ae0c93
 internal_function::translate_backtrace  d77a56d608473b3cd8a3c6cb84185e10
 internal_function::with_exported        df345d5095d5ed13328ddd07ea922b36
-library::shell                          6b9f3befb61a01e9132a440601f8ea0a
+library::shell                          f561500cf223df1bf6daf43af93577a5
 library::terminal                       7e2d045782405934a9614fe04bcfe559
 message_color::cc                       2218ef0f7425de5c717762ffb100eb43
 message_color::state                    03621cd6ac0b1a40d703f41e26c5807f
@@ -1687,25 +1760,57 @@ retriever::perl                         f41938e6dbad317f62abffc1e4d28cca
 __
 meta::parent('preprocessor', <<'__');
 function::preprocess           ab5526a02ff417d4c162357dc327e7c4
-meta::functor::html-templates  2771200f87e9cbfeecfb5f8a0f796f18
 meta::type::template           bc4b0c80b5efc716b19e99b832c22bf3
-parent::object                 c086f2bf8be5433a968323892538feb6
+parent::object                 5e8c5be71d2d512cca8dfc1677f94466
 retriever::pp                  3b5f5c5d30c5a04f72056dedaacfe7b7
 template::comment              dfe273d2dad3d8159b847545e4e5c309
 template::eval                 1a0e2124a05056be4abc11803883c294
 template::failing_conditional  e3a4523110dd859e828f342185de7c62
 template::include              47b5552d609d97fe7f2522d5c1027014
 template::pinclude             c07ff79bf8d642cceaa9ef844bfcb189
-template::script-include       76be051ad116449ddebd10e7c3729afd
-template::style-include        8e5a06b70e1b00379765f319bf6c8066
 
 __
 meta::parent('vim-highlighters', <<'__');
 function::vim                cf9e37026f6cd1499a6dd258fbbcd060
 meta::type::vim_highlighter  27990fddb6d7bd383b55dbdfee0d148d
-parent::object               c086f2bf8be5433a968323892538feb6
+parent::object               5e8c5be71d2d512cca8dfc1677f94466
 
 __
+meta::resource('header', <<'__');
+- include resource::header-packages
+- include resource::header-listings
+
+- include resource::header-refs
+
+- include resource::header-languages
+- include resource::header-resource
+__
+meta::resource('header-languages', <<'__');
+\lstnewenvironment{asmcode}       {}{}
+\lstnewenvironment{cppcode}       {\lstset{language=c++}}{}
+\lstnewenvironment{javacode}      {\lstset{language=java}}{}
+\lstnewenvironment{javascriptcode}{}{}
+\lstnewenvironment{htmlcode}      {\lstset{language=html}}{}
+\lstnewenvironment{perlcode}      {\lstset{language=perl}}{}
+\lstnewenvironment{rubycode}      {\lstset{language=ruby}}{}
+
+__
+meta::resource('header-listings', <<'__');
+\definecolor{gray}{rgb}{0.6,0.6,0.6}
+
+\usepackage{caption}
+\DeclareCaptionFormat{listing}{\llap{\color{gray}#1\hspace{10pt}}\tt{}#3}
+\captionsetup[lstlisting]{format=listing, singlelinecheck=false, margin=0pt, font={bf}}
+
+\lstset{columns=fixed,basicstyle={\tt},numbers=left,firstnumber=auto,basewidth=0.5em,showstringspaces=false,numberstyle={\color{gray}\scriptsize}}
+__
+meta::resource('header-packages', <<'__');
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm,pxfonts,listings,color}
+\usepackage[colorlinks]{hyperref}
+__
+meta::resource('header-refs', '\\newcommand{\\Ref}[2]{\\hyperref[#2]{#1 \\ref*{#2}}}');
+meta::resource('header-resource', '\\lstnewenvironment{resourcecode}{}{}');
 meta::retriever('code-sdoc', <<'__');
 # Lets you specify the SDoc extension manually. For instance:
 # code.js::sdoc::foo causes sdoc::foo to be SDoc-rendered using Javascript comments.
@@ -1733,13 +1838,6 @@ return undef unless $attribute =~ s/^markdown::/sdoc::/ and defined retrieve($at
 sdoc_markdown($attribute);
 
 __
-meta::retriever('mhi', <<'__');
-# Retrieves a Mulholland attribute with a trailing semicolon. This allows you
-# to combine multiple source attributes using the preprocessor.
-return undef unless $_[0] =~ /^mhi::(.*)$/ && exists $data{"mh::$1"};
-"\n\n" . retrieve("mh::$1") . "\n\n;";
-
-__
 meta::retriever('object', <<'__');
 # Fetch a property from another Perl object. This uses the 'cat' function.
 return undef unless $_[0] =~ /^object::(.*?)::(.*)$/ && -x $1 && qx|$1 is '$2'|;
@@ -1762,561 +1860,190 @@ meta::retriever('sdocp', <<'__');
 my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
-meta::sdoc('js::mh', <<'__');
-#!/usr/bin/env node
+meta::section('contexts', <<'__');
+- sc Contexts
+  Mulholland uses contexts to dictate how terms should be rewritten. Generally these contexts are stored by name by modifying the toplevel context; this is similar to Lisp's global macro
+  table. This behavior is produced by a few toplevel rewriting rules:\footnote{Parentheses are included here to show the cons structure, but they aren't necessary in the resulting program.}
+  - align << end
+    x \vdash (P_x = y)                      & = y \\
+    x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
+  - end
 
-Mulholland compiler (original) | Spencer Tipping
-Licensed under the terms of the MIT source code license
+  Here, $P_x$ represents any pattern that matches and destructures $x$. Lisp implements $P_x$ such that $x_1:y_1$ matches $x_2:y_2$ iff $x_1 = x_2$. The resulting destructure data is, roughly,
+  an association list of $y_1$ zipped with $y_2$.
 
-- include deps/caterwaul.min.js
-- include deps/caterwaul.std.min.js
-- include deps/bloom.js
+  - s1 Pattern locality
+    Lisp patterns have fixed locality; the {\tt car} of a list is the only match point. Caterwaul uses tree structure patterns with continuous paths of polymorphic conses terminated by either
+    constants or wildcards as leaves. Each of these languages assumes that:
 
-- include src/i.js
-- include src/i/tree.js
-- include src/i/parse.js
-- include src/i/rewrite.js
-- include src/i/jsi.js
+    - enumerate << end
+      - item Tree semantics are preserved only locally.
+      - item Semantic transformations that occur nonlocally are not generally structure-preserving with respect to the given rewrite rule.
+    - end
 
-- include src/mh/mh.js
+    In many cases these assumptions are unnecessarily conservative. Many of caterwaul's rewriting rules apply universally throughout the source tree, for example.\footnote{This is why
+    caterwaul {\tt rmap}s its macroexpander.} In other cases, the source tree can be partitioned into a known set of contexts, each of which supports nonlocal transformation.
 
-caterwaul.mulholland.mh_main(process.argv.slice(2));
-
-__
-meta::sdoc('readme', <<'__');
-Mulholland language.
-Mulholland is a practical [Havoc](http://github.com/spencertipping/havoc) implementation written in and using [Caterwaul](http://github.com/spencertipping/caterwaul). More usefully, it is an
-optimizing term rewriter that contains a native rewriting transformation from Mulholland source into Javascript.
-
-MIT licensed as usual.
-
-The core interpreter is implemented in `mulholland`, which is a [self-modifying Perl object](http://github.com/spencertipping/perl-objects) that contains caterwaul source. It uses the `waul`
-precompiler to convert the caterwaul source into Javascript, after which it uses a [preprocessor](http://spencertipping.com/perl-objects/preprocessor.html) to concatenate the Javascript
-sources together into the `mh` script. `mh` is executable by [node.js](http://nodejs.org) and can replicate itself in some useful ways, described below.
-
-  Mulholland internals.
-  Mulholland is very similar to caterwaul in a lot of ways, but its syntax is not compatible with Javascript and it compiles to Javascript only incidentally. Its syntax trees are optimized for
-  fast rewriting and destructuring binds; to do this they use a variety of heuristics to quickly reject large subtrees. This differs from caterwaul, which is optimized at a low level for
-  dynamic rewriting but doesn't do any static pattern analysis.
-
-  This project uses two significant optimizations that make it more scalable than caterwaul. First, rewrites are statically inlined. This means that if `foo = bar` and `bar = bif`, mulholland
-  replaces the first rewrite rule with `foo = bif` to skip the intermediate step. This eager rewriting makes it infeasible to define nonterminating rewrite rules, so mulholland as a rewriting
-  language is not Turing-complete.
-
-  The second optimization is that each syntax tree maintains a 256-bit [Bloom filter](http://en.wikipedia.org/wiki/Bloom_filter) index of the constants contained in that tree and any
-  descendants. Because the set of constants in a pattern must be a subset of the constants in any matching tree, a constant-time Bloom filter subset operation can exclude subtrees of arbitrary
-  size with a probability inversely proportional to the subtree's constant set size. False positives translate into extra work, but don't impact the correctness of the result.
-
-  Using `mh`.
-  `mh` is probably most useful as a REPL right now. I'm still figuring out what mulholland as a language needs to be, but you can see the rewriter in action like this:
-
-  | $ ./mh
-    mh> foo = bar
-    1           <- the number of unique rewrite rules
-    mh> bar = bif
-    2
-    mh> foo
-    'bif'
-    mh>
-
-  Pattern variables can be specified using an underscore prefix, just like caterwaul wildcards:
-
-  | mh> f _x = _x + 1
-    mh> f foo
-    'bif+1'
-    mh>
-
-  Rewrite rules can generate more rewrite rules:
-
-  | mh> define _name _value = _name = _value
-    mh> define (g _x) (_x * 2)
-    mh> g 10
-    '10*2'
-    mh>
-
-  You can also match against rewrite rules:
-
-  | mh> (foo _x = _y) = (bar _x = _y)
-    mh> foo 5 = y + 1
-    mh> bar 5
-    'y+1'
-    mh>
-
-  Replication.
-  `mh` can replicate itself just like `waul`. This is useful for two purposes. First, you can load caterwaul modules using `mh -jmodule.js`. Second, you can preload mulholland source files.
-  The option to replicate is `-c`:
-
-  | $ ./mh -c foo.mh            <- emits on stdout a mh compiler with foo.mh bundled in
-    $ ./mh -c -jmodule.js       <- emits on stdout a mh compiler whose caterwaul instance is configured with module.js
-
-  The `mh` in the root directory is the product of one such replication cycle; this process is governed by `mulholland`, which is a self-modifying Perl object that contains the authoritative
-  copies of mulholland's source in caterwaul.
+    Perhaps more interestingly, destructuring patterns are ways of encoding the instructions that perform a pattern match. Caterwaul and Lisp are both pragmatic by requiring that any pattern
+    executes in $O(n)$ in its size; this is in contrast to something like regular expressions, which can have linear-time subcomponents. Caterwaul and Lisp also both have the property that
+    trees are represented logically in memory; no representation optimization is performed in most cases.
 
 __
-meta::sdoc('waul::i', <<'__');
-Mulholland interpreter | Spencer Tipping
-Licensed under the terms of the MIT source code license
+meta::section('equations-and-normalization', <<'__');
+- sc Equations and normalization
+  Most equations do not indicate action. Instead, they indicate invariants that influence how Mulholland represents things. This means that many equations don't behave like rewrite rules even
+  if they might look that way. For example:
+  - align << end
+    x + y       & = y + x \\
+    x + (y + z) & = x + y + z
+  - end
 
-Introduction.
-This introduces the Mulholland property on Caterwaul.
+  These are not instructions for Mulholland to rewrite $+$ conses. It's a representation constraint for those conses that causes Mulholland to use a bag rather than a tree. Seen differently,
+  Mulholland is required to choose a representation for which every $x + y$ is semantically equivalent to $y + x$ {\em as it exists in memory}, and that $x + (y + z)$ is equivalent to $x + y +
+  z$. Adding the further constraint that $x + x = x$ causes Mulholland to use a set.
 
-caterwaul.module('mulholland', 'js_all', function ($) {
-  $.mulholland() = $.mulholland.parser.apply(this, arguments)});
+  You can use a set as a map by destructuring against pieces of the elements you store in it:
+  - align << end
+    \textrm{put}(k, v, (k, x) + xs) & = (k, v) + xs \\
+    \textrm{put}(k, v, xs)          & = (k, v) + xs \\
+    \textrm{get}(k, (k, v) + xs)    & = v
+  - end
 
-__
-meta::sdoc('waul::i/jsi', <<'__');
-Javascript <-> Mulholland interface | Spencer Tipping
-Licensed under the terms of the MIT source code license
+  - s1 Representation constraints
+    There are several heuristics Mulholland uses to choose a representation for a structure:
 
-Introduction.
-Mulholland is bidirectionally convertible to Javascript through Caterwaul source tree construction. This module provides a way to convert Caterwaul trees into Mulholland trees and back; this
-is useful for doing declarative rewrites on Javascript faster than Caterwaul would be able to do them. The basic mechanism is that we just prepend a / to each Javascript node type. Literals
-are transcribed directly, with the exception of things that start with $ (these are converted into @$). This transformation is invertible using the as_js() method of Mulholland source trees.
+    - enumerate << end
+      - item[] \bf Associativity
+        Causes Mulholland to find a monolithic structure to contain nested conses. Associativity means that elements are flattened into a uniform structure rather than preserving the
+        hierarchical nature of the original cons tree. Associativity alone causes Mulholland to use a linked list.
 
-There are some conversion rules used to help Mulholland and Caterwaul interoperate. They are:
+      - item[] \bf Commutativity
+        Enables Mulholland to use structural aspects of the values within the structure as indexes. Commutativity with associativity means that elements may be accessed independently of other
+        elements within a cons structure. Commutativity without associativity does not provide many useful properties that I'm aware of.
+    - end
 
-| 1. (# (_f) (_x))             <-> (() (_f) (_x))
-  2. (. (_f) ([ (_x)))         <-> ([] (_f) (_x))
-  3. (( @ (_x))                <-> (( _x)                       <- similar for quasi-unary [ and {
-  4. (@$_stuff)                <-> ($_stuff)                    <- conversion of $ in an operator position
-  5. ("/_string/_mods"r)       <-> (/_string/_mods)
+  - s1 Scoped constraints
+    Sometimes a constraint is not known when a data structure is first used. For example, consider a situation like this:
+    - align << end
+      x + (y + z) & = x + y + z \\
+      \textrm l   & = \textrm a + \textrm b + \textrm c + \textrm d \\
+      v \in xs    & = \textrm{in}(xs) \vdash \begin{cases}
+                                               x + y = y + x \\
+                                               \textrm{in}(xs') = \textrm{false} \rhd \textrm{in}(v + xs') = \textrm{true}
+                                             \end{cases}
+    - end
 
-It should be noted that this library doesn't make Caterwaul interfacing easy; it makes it possible. The standard library builds better abstractions on top of this.
+    At this point, $\textrm b \in \textrm l$ will cause the list $\textrm a + \textrm b + \textrm c + \textrm d$ to be folded into a bag (since it is being rewritten under a
+    context that supports commutativity), then the bag will be queried for the term in question. This generalizes gracefully for the ``contains-multiple'' case, as you could easily pass a cons
+    cell in as $v$ to do a bag-subset query: $\textrm d + \textrm b \in \textrm l$. This subset query is meaningful because the bag is associative.
 
-caterwaul.module('mulholland.jsi', 'js_all', function ($) {
-  $ /~syntax_extend/ {as_mh: as_mh},
-  $.mulholland.syntax_common.as_js = as_js,
+  - s1 Cons cell aliasing
+    Anytime you have a nonrecursive form that matches against one or more cons cells, a cons cell alias is established. This gives Mulholland the option to avoid allocating anything at all,
+    and simply making a function call. The definition of $\in$ above is one such alias. Generally speaking, anything of the form $x \in y$ would be interpreted as a function call instead of a
+    data structure allocation.
 
-  where [as_mh(p) = this.data === '()'     ? new p.syntax('#' /!p.intern, [this[0].as_mh(p), this[1].as_mh(p)]) :
-                    this.data === '[]'     ? new p.syntax('.' /!p.intern, [this[0].as_mh(p), new p.syntax('[' /!p.intern, [this[1].as_mh(p)])]) :
-                    this.data.length === 0 ? new p.syntax('@' /!p.intern) :
-                    this.length === 0      ? new p.syntax(this.data /!mh_encode_literal /!p.intern) :
-                                             new p.syntax(this.data /!mh_encode_literal /!p.intern, [this[0].as_mh(p), this[1].as_mh(p)]),
+    Cons cell aliases can be more complex than individual cells. For example:
+    - align << end
+      x \in y + z & = x \in y \vee x \in z \\
+      x \in y * z & = x \in y \wedge x \in z
+    - end
 
-         as_js()  = this.resolved_data() === '@' ? $.empty :
-                    this.resolved_data() === '#' ? new $.syntax('()', this[0].as_js(), this[1].as_js()) :
-                    this /!represents_a_slice    ? new $.syntax('[]', this[0].as_js(), this[1][0].as_js()) :
-                    this.length === 0            ? new $.syntax(this.resolved_data() /!mh_decode_literal) :
-                                                   new $.syntax(this.resolved_data() /!mh_decode_literal, +this %~![x.resolved_data() !== '@' && x.as_js()] -seq),
-
-         represents_a_slice(t) = t.resolved_data() === '.' && t[1].resolved_data() === '[',
-
-         mh_encode_literal(d, s = d.toString()) = /\/./.test(s) ? '"' + s.replace(/"/g, '\\"') + '"r' : s.replace(/^\$/, '@$'),
-         mh_decode_literal(d, s = d.toString()) = /^".*"r$/.test(s) ? s.replace(/^"\//, '/').replace(/\\"/g, '"').replace(/"r$/, '') : s.replace(/^@(.)/, '$1')]});
-
-__
-meta::sdoc('waul::i/parse', <<'__');
-Mulholland parser | Spencer Tipping
-Licensed under the terms of the MIT source code license
-
-Introduction.
-The parser is based on operator-precedence parsing using a regexp lexer. This should be very fast under recent Javascript VMs and should involve a minimal GC overhead. Symbols are interned
-into integers to accelerate access; the tree can be back-translated by dereferencing: tree.resolved_data(). This interning process is done before folding groups. Assigned numbers are coded
-according to their syntactic roles.
-
-Unlike the Caterwaul parser, this one uses a shunting yard algorithm to fold operators as the parse is running. We can get away with this because there are no special cases involving blocks
-and there are no patch-ups that need to be done. The algorithm is modified from the original shunting-yard algorithm in that it detects operator-value / value-value sequences so that it can
-parse implicit joins (e.g. f x = x + 1: in this case, 'f x' is an implicit join with high precedence).
-
-caterwaul.module('mulholland.parser', 'js_all', function ($) {
-  $.mulholland.parser(table = {}, table_i = {}, next = 0) = parser /-$.merge/ statics()
-
-Static data.
-You can access most of the internal state of a parser. You probably shouldn't poke around and change stuff, but you can at the very least inspect it and ask the parser questions. (For
-instance, you might want to know the precedence and associativity of a given operator.)
-
-  -where [parser    = "_.toString() /!sdoc /!lex /!parse".qf,
-          syntax    = $.mulholland.syntax(parser),
-          statics() = capture [syntax = syntax, intern = intern, extern = extern, transient_intern = transient_intern, lex = lex, sdoc = sdoc, parse_token = parse_token],
-
-Lexer and token types.
-Tokens are lexed independently of their position in the input stream. This can be done because Mulholland doesn't have lex-ambiguous tokens like Javascript's regular expressions. At a high
-level, Mulholland supports these types of tokens:
-
-| 1. Identifiers, which have the form /[_@A-Za-z0-9][^ \n\t\r.:,;()\[\]{}]*/
-  2. Strings with \ escapes and optional identifier suffixes of the form /[^ \n\t\r.:,;()\[\]{}]*/
-  3. Line comments that start with # and go until the next newline (these are, of course, removed from the token stream)
-  4. Operators, which are of the form /[^ \n\t\r()\[\]{}A-Za-z]+(\w+[^ \n\t\r()\[\]{}]+)*/ (they can contain letters, but those letters must be bounded on both sides by operator chars)
-  5. Micro-operators, which are of the form /[.:,;][^ \n\t\rA-Za-z@_()\[\]{}]*/
-  6. Grouping operators, which are of one of ( ) [ ] { }. Of these, parentheses are erased.
-
-It also supports SDoc-style paragraph comments. These are removed just like line comments. Mulholland treats all whitespace and comments as a single space. It is Unicode-capable but naively
-treats any Unicode character as the beginning of an operator.
-
-          sdoc(s) = s.split(/\n(?:\s*\n)+/) %![/^\s*[A-Z|]/.test(x)] -seq -re- it.join('\n'),
-          lexer   = /(#.*|(?:[@\w]|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")[^\s.:,;()\[\]{}]*|[.:,;][^\sA-Za-z@_()\[\]{}]*|[^\s.;,;()\[\]{}][^\s\w()\[\]{}]*(?:\w*[^\s\w()\[\]{}]+)*|[()\[\]{}])/,
-          lex(s)  = s.split(lexer) %[/^[^ \n\t\r#]/.test(x)] -seq,
-
-Symbol interning.
-Symbols are interned into integers for performance reasons. The overhead involved in doing this is relatively small and the speedup for rewrites is quite significant. These symbols are
-transparently rendered by the syntax nodes, whose constructor is already parameterized with the symbol table. Note, however, that this means you need to use the same parser for all trees that
-are backed by symbol tables, at least until you render them into regular Caterwaul syntax trees. On the bright side, the syntax node constructor contains a reference to the parser that created
-it; so generally speaking you don't have to worry about it.
-
-          intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : table_i[table[next] = s] = next++,
-          extern(n) = n.constructor === Number && Object.prototype.hasOwnProperty.call(table, n) ? table[n] : n,
-
-          transient_intern(s) = Object.prototype.hasOwnProperty.call(table_i, s) ? table_i[s] : s.toString(),
-
-Precedence groups.
-Mulholland uses a fairly normal precedence layout. From high to low precedence, these are the classes of operators it supports and their associativity (if you memorize the logical layers then
-most other things should be fairly straightforward):
-
-| Dot access             .                      left   2          <- first logical layer
-  Applicative            #                      left   4          <- second logical layer
-    Unary                ! ~ \ ` 个不           right  5
-  Multiplicative         / * % ⋅ ∩              left   6          <- third logical layer
-  Additive/bitwise       + - : & ^ ∪ ≻ ≺        left   8          <- fourth logical layer
-    Disjunction          | ⋯                    left   10
-  Relational             < > ≡ ∈ ⊂ ⊆ ⊃ ⊇ 是     left   12         <- fifth logical layer
-    Applicative          $                      right  13
-  Logical                ∧ ¬ ⊕                  left   14         <- sixth logical layer
-    Logical disjunction  ∨                      left   16
-  Ternary/assignment     = ?                    right  17         <- seventh logical layer
-  Tupling                ,                      left   18
-  Sequence               ;                      left   20
-
-This table has some important properties. First, all even precedence levels left-associate and all odd levels right-associate. This prevents the ambiguity that would arise if two operators had
-opposite associativity but equal precedence. Further, this property continues to hold even for operators which are not defined in the table above. This generality allows you to shift an
-operator's precedence and modify its associativity simultaneously.
-
-The parser still supports asymmetric operator precedence even though there is no way to use it. I may reintroduce the feature at some point in the future.
-
-Handling Unicode.
-Any Unicode characters are, admittedly erroneously, assumed to be parts of operators. This is important: it means that you can use any Unicode character as an adverb on an operator, but it can
-only be a suffix of a noun. (Remember that tokens are categorized based on what they start with.)
-
-Parser internals.
-The first stage involves "parsing" each token into a structure that describes its characteristics. These characteristics are:
-
-| 1. l  its left-facing precedence (greater is lower precedence)
-  2. r  its right-facing precedence
-  3. id the interned symbol ID of the canonical form of the token (after operator hint erasure; values are preserved verbatim)
-  4. v  truthy if the token is a value
-  5. u  truthy if the token represents a unary operator
-  6. o  truthy if the token opens a group
-  7. c  truthy if the token closes a group
-  8. i  truthy if the token is invisible; that is, it should not be consed into an operator node (this is used to implement parenthesis erasure)
-
-The values in these structures govern the parser's behavior. For instance, when we encounter an operator, we force the operator stack until the right-facing precedence of the stack top lines
-up with the left-facing precedence of the operator we've just seen. This is a fairly standard feature of shunting-yard operator precedence parsers, though generalized a bit to deal with
-precedence asymmetry.
-
-Some singularities of this particular implementation include its inference of joins and its modeling of operators with asymmetric precedence. Joins are inferred when the parser does not expect
-to see a value but encounters one anyway. For instance, if you parse 'foo + bar bif', a join is inferred between 'bar' and 'bif' because after 'bar' the parser expected to encounter an
-operator, not a value. A join is also generated when you have a unary operator where a binary operator is expected. This causes the parser to do the right thing for expressions such as
-'foo(bar)': a join is inferred after 'foo' and before '(bar)'.
-
-Operator modifiers.
-Previous versions of mulholland provided fully general operator modifiers, which allowed you to dynamically change the precedence of any operator without changing the operator itself. For
-example, you could use the / prefix to make an operator multiplicative-precedence: foo + bif /+ bar would be equivalent to foo + (bif + bar). This version does away with this because it's
-fundamentally a little bit misguided. As such, the operator "parse" step is fairly trivial.
-
-          precedence_table          = '\\. $ # [~!\\\\`个不] [/*%⋅∩] $ [-+:&^∪≺≻] $ [|⋯] $ [<>≡∈⊂⊆⊃⊇是] [\\$] [∧¬⊕] $ [∨] [=?] [,] $ [;]'.qw *[new RegExp('^#{x}')] -seq,
-          base_precedence(t)        = precedence_table |[x.test(t) && xi + 2] |seq,        operator_lexer = /^(\$*)(.+?)(\$*)$/.qf,
-          is_unary(t)               = precedence_table[3].test(t) || !base_precedence(t),  is_operator    = /^[^"'\w@_]+(?:\w*[^\s\w()\[\]{}]+)*$/.qf,
-
-          is_opener(t)              = '([{'.indexOf(t) + 1,
-          is_closer(t)              = ')]}'.indexOf(t) + 1,
-
-          parse_token(t)            = is_operator(t) ? parse_operator(t) : {l: 0,       r: 0,       id: t /!intern, v: true},
-          parse_operator(t)         = is_opener(t)   ?                     {l: 1 << 30, r: 1 << 30, id: t /!intern, o: true, u: true, i: t === '('} :
-                                      is_closer(t)   ?                     {l: 1 << 30, r: 1 << 30, id: t /!intern, c: true}                        : parse_regular_operator(t),
-
-          parse_regular_operator(t) = {l: real_left, r: precedence, id: pieces[2] /!intern, u: unary}
-                              -where [pieces     = operator_lexer(t),                                                  unary     = pieces[2] /!is_unary,
-                                      precedence = pieces[2] /!base_precedence + pieces[1].length - pieces[3].length,  real_left = unary ? 1 : precedence],
-
-          join                      = '#' /!parse_operator,
-          empty_value               = new syntax('@'),
-
-          parse(ts)                 = ts *parse_token *!observe -seq -then- apply_all()
-
-                              -where [values         = [],    right(t) = t.l & 1,
-                                      operators      = [],    value()  = values.pop() || empty_value,
-                                      ev             = true,  top()    = operators[operators.length - 1],
-
-                                      precedence(t)  = apply() -then- precedence(t) -when [t /!right ? top().r < t.l : top().r <= t.l] -when- operators.length,
-                                      operator(t)    = precedence(t) <then> operators /~push/ t -then- ev /eq.true -unless- t.i,
-
-                                      observe(t)     = t.v ? observe(join) /unless.ev -then- ev /eq.false -then- values /~push/ new syntax(t.id)
-                                                     : t.o ? observe(join) /unless.ev -then- ev /eq.true  -then- operators /~push/ t
-                                                     : t.c ? apply_closer()           -then- ev /eq.false -then [top().i ? operators.pop() : apply()]
-                                                     : t.u ? observe(join) /unless.ev                     -then- operator(t)
-                                                           : operator(t),
-
-                                      apply()        = top().u ? values /~push/ new syntax(operators.pop().id, [value()])
-                                                               : values /~push/ new syntax(operators.pop().id, [y, x]) -where [x = value(), y = value()],
-
-                                      apply_closer() = apply() -then- apply_closer() -unless [!operators.length || top().o],
-                                      apply_all()    = operators.length ? apply() -then- apply_all() : values[values.length - 1]]]});
+    In this case, the alias covers both the $\in$ and the $+$ or $*$; either form can be eagerly evaluated without allocating real cons cells.
 
 __
-meta::sdoc('waul::i/rewrite', <<'__');
-Mulholland rewriter | Spencer Tipping
-Licensed under the terms of the MIT source code license
+meta::section('introduction', <<'__');
+\chapter*{Introduction}
+  Mulholland is a term-rewriting language that arose from the idea that abstractions should be erased at compile-time as an optimization measure. Unlike a lot of languages that do this,
+  Mulholland enables the compiler to perform representation abstraction; that is, the data structures and function calls modeled in source code may be completely changed in the compiled
+  result.
 
-Introduction.
-Mulholland code needs to be rewritten into something runnable in order to be at all useful. This module implements a general-purpose optimizing rewriter for this purpose. It takes as input a
-series of rewrite rules and returns a function that will rewrite a tree accordingly.
+  Caterwaul has the ability to do things like this, but it has other shortcomings:
 
-caterwaul.module('mulholland.rewrite', 'js_all', function ($) {
+  - enumerate << end
+    - item Its broad interoperation with Javascript means that it is difficult to port to non-JS runtimes.
+    - item It generates unreadable output that makes debugging difficult.
+    - item Rewriting uses no static analysis and therefore is quite slow.
+    - item Rewriting is assumed to be tree-homomorphic (as is Lisp rewriting).
+    - item Its syntax trees are lower-level than is generally useful.
+  - end
 
-Mathematical properties of rewriting.
-Equations that you write are implicitly normalizing symmetric equivalence relations. This has a few consequences. First, terms are normalized towards the right-hand side of the equations
-transitively; so, for instance, if you write 'foo = bar' and then write 'foo', the result will be 'bar' because 'bar' is considered to be the most normalized form in its equivalence class. The
-rewriter determines this by transitive closure, and circular rewrites with no normal form will cause a stack overflow error. (This is why it is coded recursively, despite the fact that it
-could be written as a loop instead.)
-
-Rewriting is not assumed to be homomorphic across tree descendants. For example, 'foo _x = 10' and 'bar (foo _x) = 20' will not result in the identity 'bar 10 = 20'. Homomorphism must be
-explicitly indicated by an equivalence like this: 'bar _x /- _r = bar (_x /- _r)'. /- is already assumed to be homomorphic across ;.
-
-Equations are symmetric because their left-hand terms can be normalized prior to rewriting. For example, you can see this behavior in mh:
-
-| > foo = bar + bif
-  > foo = 5
-  > bar + bif
-  5
-  >
-
-This happens because the equation 'foo = 5' is rewritten prior to its definition; it is internally represented as its more normalized form, 'bar + bif = 5'. However, because bar + bif is a
-pattern, this is actually a denormalizing rewrite (since it requires a corresponding normalization operation for the term that matches it). For this reason, the equation 'foo = bar + bif' is
-semantically symmetric in its role as an equivalence relation.
-
-Note that if we then said 'foo = 6', Mulholland would conclude that 5 = 6. At this point, 'bar + bif', 'foo', and 5 would all normalize into 6.
-
-Rewriting optimizations.
-Most of the time Mulholland spends compiling things is taken up by the rewriting process, so a number of optimizations are implemented to make this fast. First, each rule is closed under
-transitivity with each other rule. This means that if x -> y and y -> z, then the rule 'x -> y' is replaced with 'x -> z'. This is quadratic in the number of rules that are present. For
-example, this is a case where transitivity would apply:
-
-| foo + bif = bar + bif                 <- this would be rewritten as foo + bif = 1 because bar + _x matches bar + bif
-  bar + _x = 1
-
-  $.mulholland.rewriter(rules) = rewrite /-$.merge/ capture [rules = current,  extend(rs) = $.mulholland.rewriter(current + rs %[x] -seq)]
-
-                                                     -where [current                      = +rules -seq,
-                                                             change                       = null,
-
-                                                             pattern_complexity()         = current /[0x10000000][x0 /-Math.min/ x[0].complexity()] -seq,
-                                                             rewrite_once(t)              = current |~![x[1] /~replace/ x[0].match(t)] |seq |se [change -oeq- it],
-
-                                                             fixed_point(fix = result)(t) = change -eq- null -then- rewrite_once(t) /or.t -re [change ? fix(it) : it],
-                                                             transitive_limit(r)          = [r[0], fixed_point()(r[1])],
-
-                                                             uniq(rs)                     = rs %!r[rs |[xi > ri && x[0] /~match/ r[0]], seq] -seq,
-                                                             current                      = uniq(seq in current + current *transitive_limit),
-                                                             rewrite                      = fixed_point()]});
+  Mulholland is, structurally, an infix Lisp with polymorphic consing. Operators have well-defined precedence based purely on their syntactic characteristics. Contexts are used to encapsulate
+  the rewriting process; this allows you to use destructuring binds to create rewrites. Tree-homomorphism is partial and explicitly specified, not tacitly assumed and universal as it is in
+  Lisp's macro system.
 
 __
-meta::sdoc('waul::i/tree', <<'__');
-Mulholland syntax trees | Spencer Tipping
-Licensed under the terms of the MIT source code license
+meta::section('main', <<'__');
+- documentclass report
+- include resource::header
 
-Introduction.
-Mulholland uses interned strings rather than representing node data directly. As such, its syntax representation is a little different from Caterwaul's trees. It also has a different set of
-methods that it uses to detect the roles of various things.
+- title  Mulholland reference
+- author Spencer Tipping
 
-caterwaul.module('mulholland.tree', 'js_all', function ($) {
+- document << end
+  - maketitle
+  - tableofcontents
 
-Idioms.
-These trees behave differently from Caterwaul syntax trees in a few ways. The overall structure is similar: each node has a 'data' and 'length' property along with zero or more
-numerically-indexed children. However, the constructor protocol differs significantly. Instead of a flexible constructor that supports copying, the constructor rigidly requires exactly two
-arguments. The first is the data, which is copied onto the node verbatim; the second is an array of children. The array of children can itself be a node. The data must be an integer that
-indexes into the symbol table.
-
-  $.mulholland.syntax_common = {},
-
-  $.mulholland.syntax(parser, result.prototype / $.mulholland.syntax_common /-$.merge/ methods(parser),
-                              result                                        /-$.merge/ statics(parser))
-                     (data, xs) = this instanceof result ? (this.data = data, this.length = 0, xs *![this /~push/ x] -seq -when.xs, this) : new result(data, xs),
-  where [
-
-  statics(parser) = wcapture [
-
-    constants      = {},
-    constant(s)    = constants['@' + s] -dcq- new this(s),
-
-    create_bloom() = $.bloom(["_ * 5471".qf, "_ * 8707".qf], 8),
-    empty_bloom    = create_bloom()],
-
-  methods(parser) = capture [
-
-    resolved_data() = parser.extern(this.data),
-    structure()     = '(#{this.resolved_data()}#{+this *[" " + x.structure()] -seq -re- it.join("")})',
-    toString()      = this.structure(),
-
-    push(x, this[this.length++] = x)             = this,
-    map(f, r = this *f -seq, r.data = this.data) = r,
-    rmap(f, ft = f(this))                        = ft || this /~map/ "_ /~rmap/ f".qf,
-
-Transformations.
-These are useful when analyzing syntax trees in non-interpretative ways. For example, rewriters often need a list of equations to use; this can easily be obtained by flattening a tree under
-',' or ';'. The flatten() method here is distinct from Caterwaul's flatten() method in that it returns arrays, not syntax nodes.
-
-    flatten_all(op)   = this.resolved_data() === op ? this[0].flatten_all(op) /~concat/ this[1].flatten_all(op) : [this],
-
-    flatten(op)       = parser.right_associative(op) ? this.right_flatten(op) : this.left_flatten(op),
-    left_flatten(op)  = this.resolved_data() === op ? this[0].left_flatten(op) /~concat/ [this[1]]  : [this],
-    right_flatten(op) = this.resolved_data() === op ? [this[0]] /~concat/ this[1].right_flatten(op) : [this],
-
-Attributes.
-Attributes arise from the structure of an identifier. These are orthogonal to syntactic roles, which determine parse behavior; attributes determine purely semantic things like whether one
-identifier matches another. Mulholland supports the following cases:
-
-| 1. Regular constant term; this matches only itself, and at its own arity.
-  2. Wildcard term; this matches any leaf or subtree. Wildcards start with '_' and are at least two characters long.
-  3. Leaf wildcard; matches any leaf but not a subtree. These start with '_' and end with '@0'.
-  4. Non-leaf wildcard; matches any subtree of arity n. These start with '_' and end with '@n', where 'n' is some integer. (This is actually a generalization of case 3.)
-
-    is_wildcard()   = this._is_wildcard   <dcq> /^_./.test(this.resolved_data()),
-    match_arity()   = this._match_arity   <dcq> /^_.*@(\d+)$/.exec(this.resolved_data()) -re [it && +it[1]],
-    without_arity() = this._without_arity <dcq> this.resolved_data().replace(/@(\d+)$/, ''),
-
-Bloom filters.
-Trees are annotated with Bloom filters that indicate which constants they contain. This optimizes rewriting by quickly eliminating subtrees that don't contain constants that are present in a
-pattern. For example, if your pattern is _x + foo, then its filter contains the constants '+' and 'foo'; target trees that don't contain these constants can't match the pattern.
-
-    create_bloom() = this.constructor.create_bloom(),
-    self_bloom()   = this.is_wildcard() ? this.create_bloom() : this.create_bloom() /~add/ this.data,
-    bloom()        = this._bloom || this /[this._bloom = this.self_bloom()][x0 /~merge/ x.bloom()] -seq,
-
-Bloom filters can be erased in some cases. This means that the node obtains an empty Bloom filter, so no constants it possesses are accounted for. This is actually really useful for some
-things, most notably working with things like numbers (which shouldn't be hashed in many cases). You could theoretically use this to lie about the set of constants in a tree, but this approach
-is unreliable because Bloom filters have false positives and your lie might therefore be ignored. The primary use case I see for Bloom erasure is to quickly allocate a constant node whose
-value is known to be irrelevant to the rewriting process.
-
-    erase_bloom() = this._bloom -eq- this.constructor.empty_bloom -then- this,
-
-Complexity computation.
-This is a fairly straightforward way to reject low-level leaf nodes in recursive match cases. Each tree has a total 'complexity', which is a measure of the number of descendants it has. A
-simple rule is that a pattern cannot have higher complexity than a target.
-
-    complexity() = this._complexity <oeq> 1 + this /[0][x0 + x.complexity()] /seq,
-
-Pattern matching and replacement.
-Caterwaul syntax trees have separate match() and replace() methods. Mulholland syntax trees support this mode of operation as well. Unlike Caterwaul, a failed match returns the boolean value
-false instead of null or undefined. This allows you to inspect its match variables, all of which will be undefined. If passed into the replace() function, 'false' causes false to be returned.
-This allows replacement to be closed over match failure.
-
-The toplevel match check is whether the pattern tree contains any symbols that are not present in the target tree. This would instantly disqualify the match. Because it might have false
-positives, we re-check at every match level.
-
-Note that match() forms a partial ordering over trees. In particular, it is transitive; if A.match(B) and B.match(C), then A.match(C).
-
-    match(t, m)            = t && this /~can_match/ t && this /~level_matches/ t && m -oeq- {_: t} &&
-                             !this.is_wildcard() -or- (m[this.without_arity()] ? m[this.without_arity()] /~match/ t : m[this.without_arity()] = t) && this / t /~children_match/ m && m,
-
-    replace(m)             = m && this.replace_children(m[this.resolved_data()], m) -or- this /~map/ "_.replace(m)".qf,
-    replace_children(t, m) = t && (this.length ? new this.constructor(t.data, this /~map/ "_.replace(m)".qf) : t),
-
-    can_match(t)           = this.complexity() <= t.complexity() && this.bloom() /~subset/ t.bloom(),
-    level_matches(t)       = this.is_wildcard() ? this.match_arity() === null || t.length === this.match_arity() && (!t.is_wildcard() || t.match_arity() === this.match_arity())
-                                                : this.data === t.data && this.length === t.length,
-    children_match(t, m)   = this /[true][x0 && x / t[xi] /~match/ m] -seq]]});
+  - include section::introduction
+  - include section::polymorphic-consing
+  - include section::contexts
+  - include section::equations-and-normalization
+- end
 
 __
-meta::sdoc('waul::mh/mh', <<'__');
-Mulholland compiler runtime | Spencer Tipping
-Licensed under the terms of the MIT source code license
+meta::section('polymorphic-consing', <<'__');
+- sc Polymorphic consing
+  Lisp's cons cells have two variables, their {\tt car} and their {\tt cdr}. Generally this is used to form trees where the {\tt car} is used to indicate the role of the {\tt cdr}; for
+  example, the list {\tt (foo bar bif)} is interpreted as a function or macro call to {\tt foo}. The cons cells themselves are transparent to this process.
 
-Introduction.
-The Mulholland compiler runs or precompiles Mulholland source. It does this by applying rewrite rules to the source code, transforming the result into a Javascript expression using the
-as_js() method, and then either evaluating or serializing the tree. It provides a few builtin rewriting rules and compiler directives to bootstrap the process.
+  Generally this works well. There are a few cases where, I think, it makes less sense, including arithmetic expressions. For this case, I think using the {\tt car} to encode the operation is
+  somewhat strange and indirect; better, in my opinion, is to use a different cons operator in the first place. Structurally, Lisp and Mulholland differ in this respect:
 
-caterwaul.module('mulholland.mh', 'js_all', function ($) {
+  - verbatim << end
+    ;; Lisp: monomorphic cons, polymorphism is implied and encoded
+    ;; in the head of the list
+    (cons '+ (cons 3 (cons 4 nil)))
 
-Mulholland module format.
-Like waul, mh specifies a minimal toplevel execution context. This is used to define extensions that can be used later on. The toplevel gives you just the !@ operator, which uses jsi to
-compile the given expression to Javascript and then executes it using a caterwaul :all compiler.
+    ;; Mulholland: polymorphic cons, polymorphism is universal and
+    ;; encoded as a variant of the cons itself
+    (cons-+ 3 4)
+  - end
 
-Command-line invocation.
-mh is designed to be used from the command line. The 'argv' passed into these functions is the list of net arguments; that is, no 'node' or 'mh'. You can get this from node by saying
-process.argv.slice(2); this eliminates node and the Javascript file. All options are parsed in short form; that is, a single dash. mh looks for these arguments:
+  Another significant difference here is that Lisp uses well-formed lists and Mulholland does not. There's a good reason for this having to do with list homomorphism. In Lisp, macros are
+  invoked by the {\tt car} of a list, meaning that {\tt (foo)} and {\tt ((foo))} mean two different things. The only reason these lists differ is that each layer of parentheses creates a
+  nontrivial element consed to a trivial {\tt nil}.
 
-| -r  compiles the given source output into Javascript statements and executes it immediately
-  -c  compiles a new 'mh' file with the given libraries bundled in and emits it to stdout
-  -j  interprets the given file as Javascript, executing it immediately (useful to load caterwaul extensions)
+  - s1 List homomorphisms in Lisp
+    There are a couple of things worth noting about Lisp's approach. First, all intent is left-focused; each cons cell's purpose is dictated by its {\tt car}, rarely by its {\tt cdr}. This is
+    baked into the macroexpander, and it is often used as a convention in Lisp libraries. Second, perhaps more interestingly, list homomorphism and evaluation have these equations, where
+    $M[x]$ represents the macroexpansion transformation and $E[x]$ represents evaluation:
+    - align << end
+      E[x:y]      & = E[x](E'[y]) \\
+      E'[(x:y):z] & = E[x:y]:E'[z] \\
+      M[x:y]      & = \begin{cases}
+                        x(y)    & \textrm{$x$ is a defined macro} \\
+                        x:M'[y] & \textrm{otherwise}
+                      \end{cases} \\
+      M'[(x:y):z] & = M[x:y]:M'[z]
+    - end
 
-For example:
+    There are two interesting differences between $E$ and $M$. First, $E$ evaluates lists from the inside out; by the time the function call happens, all of its arguments have been evaluated.
+    This means that evaluation is (nominally) transparent across function arguments, an interpretation that allows arguments to be forced prior to the invocation. Second, the {\tt car} is
+    recursively evaluated under $E$ but not under $M$.
 
-| $ mh foo.mh                           # load foo.mh into the session and open a REPL
-  $ mh -r foo.mh                        # compile foo.mh to Javascript and execute it immediately
-  $ mh -jfoo.js -jbar.js foo.mh         # load foo.js and bar.js side-effectfully, then load foo.mh into session and open a REPL
-  $ mh -c foo.mh                        # load foo.mh as a string, then write a new 'mh' instance that preloads it to stdout
-  $ mh -c -jfoo.js foo.mh               # load foo.js as a Javascript module side-effectfully, then load foo.mh and write a new 'mh' instance that preloads both
+    Macroexpansion and evaluation are convertible:\footnote{I'm being imprecise here. {\tt macroexpand} does not expand sublists; it just expands the toplevel cons cell.}
+    - align << end
+      E[\texttt{defmacro}:name:formals:body:\texttt{nil}] & \rightarrow (M[name:formals] = E[body]) \\
+      E[\texttt{macroexpand}:x:\texttt{nil}]              & = M[x] \\
+      E[\texttt{eval}:x:\texttt{nil}]                     & = E[M[x]]
+    - end
 
-  $.mulholland /-$.merge/ wcapture [
+    The $M \rightarrow E$ relationship in the first equation is crucial; it effectively gives the macro body access to both the $M[]$ and $E[]$ transformations. Put differently, it adds the
+    stronger evaluation homomorphism structure to the replacement term.
 
-    mh_main(argv) = argv /-contains_short/ 'c' ? argv /!mh_compile : argv /!mh_repl,
-
-Replicating compiler behavior.
-This compiles a new 'mh' by asking Caterwaul to replicate itself. It also bundles in any source you give it after reading the corresponding files. This allows you to bake libraries into a 'mh'
-compiler for later use and simplifies the process of using 'mh' as a shebang-line interpreter. For example:
-
-| $ mh -c foo.mh > foo-mh
-  $ chmod u+x foo-mh
-  $ cat > runnable.mh <<eof
-  #!./foo-mh -r
-  ...
-  eof
-  $
-
-    mh_compile(argv) = '#{header}\n#{resulting_tree};\n#{footer}' /!output
-               -where [parser         = $.mulholland() -se- evaluate_js_modules(argv),
-                       bundled_source = $.syntax.from_array(source_for(argv) *parser.sdoc *$.syntax.from_string -seq),
-                       resulting_tree = $.replicator().toString(),
-                       license        = '// Mulholland compiler derivative | Spencer Tipping\n// Licensed under the terms of the MIT source code license',
-                       reference_url  = '// Caterwaul modules: #{caterwaul.modules.join(" ")}\n// http://github.com/spencertipping/mulholland',
-                       header         = '#!/usr/bin/env node\n#{license}\n#{reference_url}\n',
-                       footer         = 'caterwaul.mulholland.mh_main(#{bundled_source}.concat(process.argv.slice(2)));'],
-
-REPL behavior.
-Read and evaluate any files specified on the command line, then enter a REPL that emits results to stdout. Node's REPL module is used to do this. Because of its CPS API, I make sure to call
-the returning continuation at least once if it isn't called inline during the mh() invocation. This way, the user isn't left without a prompt while the result is "computing".
-
-    mh_repl(argv)    = source_for(argv) *!mh -seq -then- introduce() -then- require('repl').start('mh> ', undefined, evaluator)
-               -where [mh                       = evaluate_js_modules(argv) -then- $.mulholland.mh(),
-                       evaluator(s, _1, _2, cc) = mh(s, {cc: "cc(null, v = _.as_js().guarded().toString())".qf}) -rescue- cc(e)
-                                           -then- cc(null, mh.context.toplevel.rules.length) /unless.v -where [v = null]],
-
-Toplevel mh context.
-The toplevel contains a parser, a toplevel split() function to pull individual statements from a stream, a compilation environment (for jsi-based evaluation), and a rewriter. The rewriter
-instance is itself immutable, but internally it gets replaced with each new definition. (This is one reason that definitions are expensive.)
-
-    context()        = capture [parse         = $.mulholland(),                            split(s) = this /~parse/ s /~flatten_all/ ';',
-                                environment() = {c: $, context: this, parse: this.parse},  toplevel = [] /!$.mulholland.rewriter],
-
-    introduce()      = process.stderr.write('Mulholland compiler (repl mode), copyright 2012 Spencer Tipping\n' +
-                                            'Licensed under the terms of the MIT source code license\n' +
-                                            'http://github.com/spencertipping/mulholland\n'),
-
-Mulholland evaluation function.
-This defines a minimal set of operations that allow you to use jsi for extension. In particular, it provides an evaluator that understands !@ compilation. Mulholland source and jsi are used to
-define the other toplevel operators.
-
-    mh(c = result.context = context())(s, specified_options) = c.split(s) %[x] *!evaluate -seq
-
-      -where [options                                               = {} / defaults /-$.merge/ specified_options,
-              evaluate(t, e = c.toplevel(t), d = e.resolved_data()) = d === '!@' ? e /!js_evaluate : e /!options.cc,
-              compiler                                              = $(':all'),
-              compile(tree)                                         = tree /!compiler /-$.compile/ c.environment(),
-              empty                                                 = c.parse.syntax('@' /!c.parse.intern),
-              js_evaluate(t)                                        = t[0].as_js().guarded() /!compile /or [empty] /!options.cc]]
-
-Low-level bindings.
-These functions contain the mechanics of Mulholland's interface with the real world. They're not exposed in $.mulholland primarily because they aren't really relevant to what Mulholland does.
-
-  -where [source_for(argv)          = argv %![/^-/.test(x)] *read_file -seq,
-          modules_for(argv)         = argv %~![/^-j/.test(x) && x.substr(2)] *read_file -seq,
-          evaluate_js_modules(argv) = modules_for(argv) *![new $.opaque_ref('(function(){#{x}})()') /-compile/ {caterwaul: $, require: require}] -seq -where [compile = $()],
-
-          contains_short(argv, o)   = argv |[pattern /~exec/ x] |seq |where [pattern = new RegExp('^-(?!-)\\w*#{o}')],
-
-          read_file(f)              = require('fs').readFileSync(f, 'utf8') -rescue- f,
-          output(t)                 = process.stdout.write(t + ';\n', 'utf8'),
-
-          defaults                  = {cc: output}]});
+  - s1 Tree homomorphisms in Mulholland
+    Mulholland has a few significant differences from Lisp. First, there is no $E[]$ transformation available to code; terms exist only in their quoted forms. These quoted forms are then
+    erased in a structure-preserving way when the program is compiled. Second, the distributive nature of Mulholland trees is explicitly, not implicitly, indicated. Third, Mulholland rewriting
+    definitions are built entirely using piecewise combinations of destructuring binds; this is the only way to access argument structure.
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
@@ -2336,6 +2063,7 @@ my ($commands) = @_;
 return '' if template::failing_conditional($commands);
 join "\n", map retrieve($_), split /\s+/, $commands;
 __
+meta::template('item[]', '"\\\\item[$_[0]]";');
 meta::template('pinclude', <<'__');
 # Just like the regular include, but makes sure to insert paragraph boundaries
 # (this is required for SDoc to function properly).
@@ -2345,61 +2073,56 @@ return '' if template::failing_conditional($commands);
 my $text = join "\n\n", map retrieve($_), split /\s+/, $commands;
 "\n\n$text\n\n";
 __
-meta::template('script-include', <<'__');
-my ($name) = @_;
-my $s      = 'script';
-my $script = retrieve($name);
-"<$s>\n$script\n</$s>";
+meta::vim_highlighter('cltex', <<'__');
+" Cleaner TeX
+" Maintainer: Spencer Tipping <spencer@spencertipping.com>
+" Language:   Cleaner TeX (a variant of LaTeX with support for a bunch of embedded languages)
 
-__
-meta::template('style-include', <<'__');
-my ($name) = @_;
-my $s      = 'style';
-my $style  = retrieve($name);
-"<$s>\n$style\n</$s>";
+if version < 600
+  syntax clear
+elseif exists("b:current_syntax")
+  finish
+endif
 
-__
-meta::vim_highlighter('mh', <<'__');
-" Mulholland programming language | Spencer Tipping
-" Licensed under the terms of the MIT source code license
+syn match   cltEofMarker   /<<\s*\w\+/ contained
+syn region  cltLineComment matchgroup=cltCode start=/^\s*- comment / end=/$/ contained
+syn match   cltLine        /^\s*- .*$/ contains=cltEofMarker,cltLineComment
+
+syn case match | syn include @cpp           syntax/cpp.vim        | unlet b:current_syntax
+syn case match | syn include @java          syntax/java.vim       | unlet b:current_syntax
+syn case match | syn include @asm           syntax/asm.vim        | unlet b:current_syntax
+syn case match | syn include @javascript    syntax/javascript.vim | unlet b:current_syntax
+syn case match | syn include @html          syntax/html.vim       | unlet b:current_syntax
+syn case match | syn include @perl          syntax/perl.vim       | unlet b:current_syntax
+syn case match | syn include @ruby          syntax/ruby.vim       | unlet b:current_syntax
 
 syn case match
-syn sync minlines=5
 
-syn match  mh_wildcard           /\<_[^[:space:].:,;()\[\]{}]\+/ contains=mh_arity_restriction
-syn match  mh_arity_restriction  /@\d/ contained
-syn match  mh_marker             /@[^[:cntrl:][:space:].:,;()\[\]{}]*/
-syn match  mh_op                 /[^[:space:][:cntrl:]_@[:alnum:].:,;()\[\]{}]\+\(\w\+[^[:space:][:cntrl:][:alnum:].:,;()\[\]{}]\+\)*/ contains=mh_marker
-syn match  mh_single_string      /'\([^'\\\n]\|\\.\)*'[^[:space:][:cntrl:].:,;()\[\]{}]*/
-syn match  mh_double_string      /"\([^"\\\n]\|\\.\)*"[^[:space:][:cntrl:].:,;()\[\]{}]*/
+syn region  cltCpp         matchgroup=cltCode start=/^\z(\s*\)- cpp .*<<\s*\z(\w\+\)$/        end=/^\z1- \z2$/ contains=@cpp
+syn region  cltJava        matchgroup=cltCode start=/^\z(\s*\)- java .*<<\s*\z(\w\+\)$/       end=/^\z1- \z2$/ contains=@java
+syn region  cltAsm         matchgroup=cltCode start=/^\z(\s*\)- asm .*<<\s*\z(\w\+\)$/        end=/^\z1- \z2$/ contains=@asm
+syn region  cltJavascript  matchgroup=cltCode start=/^\z(\s*\)- javascript .*<<\s*\z(\w\+\)$/ end=/^\z1- \z2$/ contains=@javascript
+syn region  cltHtml        matchgroup=cltCode start=/^\z(\s*\)- html .*<<\s*\z(\w\+\)$/       end=/^\z1- \z2$/ contains=@html
+syn region  cltPerl        matchgroup=cltCode start=/^\z(\s*\)- perl .*<<\s*\z(\w\+\)$/       end=/^\z1- \z2$/ contains=@perl
+syn region  cltRuby        matchgroup=cltCode start=/^\z(\s*\)- ruby .*<<\s*\z(\w\+\)$/       end=/^\z1- \z2$/ contains=@ruby
+syn region  cltResource    matchgroup=cltCode start=/^\z(\s*\)- resource .*<<\s*\z(\w\+\)$/   end=/^\z1- \z2$/
+syn region  cltComment     matchgroup=cltCode start=/^\z(\s*\)- comment .*<<\s*\z(\w\+\)$/    end=/^\z1- \z2$/
 
-syn match  mh_group              /[()\[\]{}]/
-syn match  mh_punctuation        /[,;.:]/
+syn cluster cltStuff       add=cltCpp,cltJava,cltAsm,cltJavascript,cltHtml,cltResource,cltComment,cltLine,cltPerl,cltRuby
 
-syn region mh_line_comment       start=/#/ end=/$/
-syn region mh_sdoc_comment       start=/\(^$\n^\|\%^\)\s*[A-Z|]/ end=/^\s*$\|\%$/ contains=mh_sdoc_coerce,mh_sdoc_numbered_list,mh_sdoc_heading keepend
-syn region mh_sdoc_numbered_list start=/^\s*|\s*\d\{1,2\}\.\s\{1,2\}[A-Za-z]/me=e-1 end=/^$\|\%$/ contains=mh_sdoc_numbered_item transparent
-syn match  mh_sdoc_numbered_item /^\s*|\?\s*\d\{1,2\}\.\s\{1,2\}/    contained
-syn match  mh_sdoc_heading       /\(^$\n^\|\%^\)\s*[A-Z].\{,60\}\.$/ contained
-syn match  mh_sdoc_coerce        /^\s*|\(\s\|$\)/                    contained
+syn region  cltDocument    start=/\%^/ end=/\%$/ contains=@cltStuff
 
-hi link mh_line_comment       Comment
-hi link mh_sdoc_comment       Comment
-hi link mh_sdoc_numbered_item Special
-hi link mh_sdoc_heading       Special
-hi link mh_sdoc_coerce        Special
+hi link cltLine            Special
+hi link cltKeyword         String
+hi link cltResource        String
+hi link cltEofMarker       String
 
-hi link mh_wildcard           Identifier
-hi link mh_arity_restriction  Keyword
-hi link mh_marker             Type
-hi link mh_op                 Operator
-hi link mh_q                  Special
-hi link mh_word_op            Type
-hi link mh_hinted_word_op     Special
-hi link mh_single_string      String
-hi link mh_double_string      String
-hi link mh_group              Special
-hi link mh_punctuation        Special
+hi link cltCode            Special
+hi link cltDocument        Comment
+hi link cltComment         Type
+hi link cltLineComment     Type
+
+let b:current_syntax = "cltex"
 
 __
 internal::main();
