@@ -1889,6 +1889,55 @@ meta::section('contexts', <<'__');
     trees are represented logically in memory; no representation optimization is performed in most cases.
 
 __
+meta::section('equations-and-normalization', <<'__');
+- sc Equations and normalization
+  Most equations do not indicate action. Instead, they indicate invariants that influence how Mulholland represents things. This means that many equations don't behave like rewrite rules even
+  if they might look that way. For example:
+  - align << end
+    x + y       & = y + x \\
+    x + (y + z) & = x + y + z
+  - end
+
+  These are not instructions for Mulholland to rewrite $+$ conses. It's a representation constraint for those conses that causes Mulholland to use a bag rather than a tree. Seen differently,
+  Mulholland is required to choose a representation for which every $x + y$ is semantically equivalent to $y + x$ {\em as it exists in memory}, and that $x + (y + z)$ is equivalent to $x + y +
+  z$. Adding the further constraint that $x + x = x$ causes Mulholland to use a set.
+
+  You can use a set as a map by destructuring against pieces of the elements you store in it:
+  - align << end
+    \textrm{put}(k, v, (k, x) + xs) & = (k, v) + xs \\
+    \textrm{put}(k, v, xs)          & = (k, v) + xs \\
+    \textrm{get}(k, (k, v) + xs)    & = v
+  - end
+
+  - s1 Representation constraints
+    There are several heuristics Mulholland uses to choose a representation for a structure:
+
+    - enumerate << end
+      - item[] \bf Associativity
+        Causes Mulholland to find a monolithic structure to contain nested conses. Associativity means that elements are flattened into a uniform structure rather than preserving the
+        hierarchical nature of the original cons tree. Associativity alone causes Mulholland to use a linked list.
+
+      - item[] \bf Commutativity
+        Enables Mulholland to use structural aspects of the values within the structure as indexes. Commutativity with associativity means that elements may be accessed independently of other
+        elements within a cons structure. Commutativity without associativity does not provide many useful properties that I'm aware of.
+    - end
+
+  - s1 Scoped constraints
+    Sometimes a constraint is not known when a data structure is first used. For example, consider a situation like this:
+    - align << end
+      x + (y + z)              & = x + y + z \\
+      \textrm l                & = \textrm a + \textrm b + \textrm c + \textrm d \\
+      \textrm{contains}(xs, v) & = xs \vdash \begin{cases}
+                                               x + y = y + x \\
+                                               xs' = \textrm{false} \rhd v + xs' = \textrm{true}
+                                             \end{cases}
+    - end
+
+    At this point, $\textrm{contains}(\textrm l, \textrm b)$ will cause the list $\textrm a + \textrm b + \textrm c + \textrm d$ to be folded into a bag (since it is being rewritten under a
+    context that supports commutativity), then the bag will be queried for the term in question. This generalizes gracefully for the ``contains-multiple'' case, as you could easily pass a cons
+    cell in as $v$ to do a bag-subset query: $\textrm{contains}(\textrm l, \textrm d + \textrm b)$. This subset query is meaningful because the bag is associative.
+
+__
 meta::section('introduction', <<'__');
 \chapter*{Introduction}
   Mulholland is a term-rewriting language that arose from the idea that abstractions should be erased at compile-time as an optimization measure. Unlike a lot of languages that do this,
@@ -1924,6 +1973,7 @@ meta::section('main', <<'__');
   - include section::introduction
   - include section::polymorphic-consing
   - include section::contexts
+  - include section::equations-and-normalization
 - end
 
 __
