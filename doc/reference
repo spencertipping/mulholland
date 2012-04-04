@@ -414,6 +414,7 @@ meta::cache('parent-identification', <<'__');
 ./sdoc a1e8480e579614c01dabeecf0f963bcc
 /home/spencertipping/bin/object 99aeabc9ec7fe80b1b39f5e53dc7e49e
 /home/spencertipping/conjectures/perl-objects/tex-document d6b8b54aecc42ae92c7a8c570c5559fc
+git-integration 9fabb9b6f2f374c35ddcc26549ac2b65
 object 99aeabc9ec7fe80b1b39f5e53dc7e49e
 preprocessor 70dae4b46eb4e06798ec6f38d17d4c7b
 vim-highlighters 902333a0bd6ed90ff919fe8477cb4e69
@@ -538,6 +539,31 @@ my $name = pop @_;
 file::write($name, join "\n", retrieve(@_));
 __
 meta::function('extern', '&{$_[0]}(retrieve(@_[1 .. $#_]));');
+meta::function('gU', <<'__');
+sh("git push @_");
+
+__
+meta::function('ga', <<'__');
+sh("git add @_");
+
+__
+meta::function('gc', <<'__');
+around_hook('git-commit', @_, sub {
+  my $message = join ' ', @_;
+  $message =~ s/'/\\'/g;
+  enable();
+  sh("git commit -a -m '$message'");
+  disable()});
+
+__
+meta::function('gd', <<'__');
+sh('git diff');
+
+__
+meta::function('gl', <<'__');
+sh("git log @_");
+
+__
 meta::function('grep', <<'__');
 # Looks through attributes for a pattern. Usage is grep pattern [options], where
 # [options] is the format as provided to select_keys.
@@ -567,6 +593,14 @@ unless ($$options{'-C'}) {
   s/^/\033[1;32m/o && s/$/\033[0;0m/o for @m_line_numbers}
 
 table_display([@m_attributes], [@m_line_numbers], [@m_lines]);
+__
+meta::function('gs', <<'__');
+sh('git status');
+
+__
+meta::function('gu', <<'__');
+sh("git pull @_");
+
 __
 meta::function('hash', 'fast_hash(@_);');
 meta::function('hook', <<'__');
@@ -1594,6 +1628,17 @@ template::item[]               2c2041b4c3b6584b6ae3610f5ab68939
 vim_highlighter::cltex         40744d98b02b4b50fedb4d1e7e1fd151
 
 __
+meta::parent('git-integration', <<'__');
+function::gU                             f15ab8170ea981dd7b216c75af5d3f63
+function::ga                             505b3d9a22ca7cf04c60bda01ff3f140
+function::gc                             0378d3a25fad4fa0feff9cb50c0c5d89
+function::gd                             cff1e868c7c69780a2263c8c7fd75f90
+function::gl                             492e2750409588f8b61a8b8e339e42c1
+function::gs                             4ea8aeccb36ab83702062e4359e8600b
+function::gu                             fdd2e61e0ea981dda6d407df63c0e47e
+parent::/home/spencertipping/bin/object  5e8c5be71d2d512cca8dfc1677f94466
+
+__
 meta::parent('object', <<'__');
 bootstrap::html                         f44dd03cb0c904b3a5f69fbda5f018d0
 bootstrap::initialization               d22fafa2938ecb0d4728e2958b54ed3d
@@ -1825,7 +1870,23 @@ meta::section('contexts', <<'__');
   - end
 
   Here, $P_x$ represents any pattern that matches and destructures $x$. Lisp implements $P_x$ such that $x_1:y_1$ matches $x_2:y_2$ iff $x_1 = x_2$. The resulting destructure data is, roughly,
-  an association list of $y_1$ zipped with $y_2$. Mulholland uses a more complex matching strategy that selects for arity and cons type and allows for recursive destructuring of subterms.
+  an association list of $y_1$ zipped with $y_2$.
+
+  - s1 Pattern locality
+    Lisp patterns have fixed locality; the {\tt car} of a list is the only match point. Caterwaul uses tree structure patterns with continuous paths of polymorphic conses terminated by either
+    constants or wildcards as leaves. Each of these languages assumes that:
+
+    - enumerate << end
+      - item Tree semantics are preserved only locally.
+      - item Semantic transformations that occur nonlocally are not generally structure-preserving with respect to the given rewrite rule.
+    - end
+
+    In many cases these assumptions are unnecessarily conservative. Many of caterwaul's rewriting rules apply universally throughout the source tree, for example.\footnote{This is why
+    caterwaul {\tt rmap}s its macroexpander.} In other cases, the source tree can be partitioned into a known set of contexts, each of which supports nonlocal transformation.
+
+    Perhaps more interestingly, destructuring patterns are ways of encoding the instructions that perform a pattern match. Caterwaul and Lisp are both pragmatic by requiring that any pattern
+    executes in $O(n)$ in its size; this is in contrast to something like regular expressions, which can have linear-time subcomponents. Caterwaul and Lisp also both have the property that
+    trees are represented logically in memory; no representation optimization is performed in most cases.
 
 __
 meta::section('introduction', <<'__');

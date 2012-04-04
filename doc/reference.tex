@@ -111,6 +111,22 @@ x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
 \end{align*}
 
   Here, $P_x$ represents any pattern that matches and destructures $x$. Lisp implements $P_x$ such that $x_1:y_1$ matches $x_2:y_2$ iff $x_1 = x_2$. The resulting destructure data is, roughly,
-  an association list of $y_1$ zipped with $y_2$. Mulholland uses a more complex matching strategy that selects for arity and cons type and allows for recursive destructuring of subterms.
+  an association list of $y_1$ zipped with $y_2$.
+
+\section{Pattern locality}
+    Lisp patterns have fixed locality; the {\tt car} of a list is the only match point. Caterwaul uses tree structure patterns with continuous paths of polymorphic conses terminated by either
+    constants or wildcards as leaves. Each of these languages assumes that:
+
+\begin{enumerate}
+\item{Tree semantics are preserved only locally.}
+\item{Semantic transformations that occur nonlocally are not generally structure-preserving with respect to the given rewrite rule.}
+\end{enumerate}
+
+    In many cases these assumptions are unnecessarily conservative. Many of caterwaul's rewriting rules apply universally throughout the source tree, for example.\footnote{This is why
+    caterwaul {\tt rmap}s its macroexpander.} In other cases, the source tree can be partitioned into a known set of contexts, each of which supports nonlocal transformation.
+
+    Perhaps more interestingly, destructuring patterns are ways of encoding the instructions that perform a pattern match. Caterwaul and Lisp are both pragmatic by requiring that any pattern
+    executes in $O(n)$ in its size; this is in contrast to something like regular expressions, which can have linear-time subcomponents. Caterwaul and Lisp also both have the property that
+    trees are represented logically in memory; no representation optimization is performed in most cases.
 
 \end{document}
