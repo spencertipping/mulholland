@@ -105,7 +105,6 @@ E[\texttt{eval}:x:\texttt{nil}]                     & = E[M[x]]
 \chapter{Contexts}
   Mulholland uses contexts to dictate how terms should be rewritten. Generally these contexts are stored by name by modifying the toplevel context; this is similar to Lisp's global macro
   table. This behavior is produced by a few toplevel rewriting rules:\footnote{Parentheses are included here to show the cons structure, but they aren't necessary in the resulting program.}
-
 \begin{align*}
 x \vdash (P_x = y)                      & = y \\
 x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
@@ -115,5 +114,8 @@ x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
   an association list of $y_1$ zipped with $y_2$. Mulholland uses a more complex matching strategy that selects for arity and cons type and allows for recursive destructuring of subterms.
 
 \section{Patterns}
+    Patterns serve as decisions, and ideally are able to support Turing-complete match criteria. For example, a limit case is matching against a series of instructions that produce some given
+    output. Another constraint is that patterns should encode their own semantics for descent through a tree. Caterwaul-style wildcard matching breaks down here, as a given pattern term could
+    potentially match more than once.
 
 \end{document}
