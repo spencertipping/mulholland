@@ -1925,17 +1925,30 @@ meta::section('equations-and-normalization', <<'__');
   - s1 Scoped constraints
     Sometimes a constraint is not known when a data structure is first used. For example, consider a situation like this:
     - align << end
-      x + (y + z)              & = x + y + z \\
-      \textrm l                & = \textrm a + \textrm b + \textrm c + \textrm d \\
-      \textrm{contains}(xs, v) & = xs \vdash \begin{cases}
+      x + (y + z) & = x + y + z \\
+      \textrm l   & = \textrm a + \textrm b + \textrm c + \textrm d \\
+      v \in xs    & = \textrm{in}(xs) \vdash \begin{cases}
                                                x + y = y + x \\
-                                               xs' = \textrm{false} \rhd v + xs' = \textrm{true}
+                                               \textrm{in}(xs') = \textrm{false} \rhd \textrm{in}(v + xs') = \textrm{true}
                                              \end{cases}
     - end
 
-    At this point, $\textrm{contains}(\textrm l, \textrm b)$ will cause the list $\textrm a + \textrm b + \textrm c + \textrm d$ to be folded into a bag (since it is being rewritten under a
+    At this point, $\textrm b \in \textrm l$ will cause the list $\textrm a + \textrm b + \textrm c + \textrm d$ to be folded into a bag (since it is being rewritten under a
     context that supports commutativity), then the bag will be queried for the term in question. This generalizes gracefully for the ``contains-multiple'' case, as you could easily pass a cons
-    cell in as $v$ to do a bag-subset query: $\textrm{contains}(\textrm l, \textrm d + \textrm b)$. This subset query is meaningful because the bag is associative.
+    cell in as $v$ to do a bag-subset query: $\textrm d + \textrm b \in \textrm l$. This subset query is meaningful because the bag is associative.
+
+  - s1 Cons cell aliasing
+    Anytime you have a nonrecursive form that matches against one or more cons cells, a cons cell alias is established. This gives Mulholland the option to avoid allocating anything at all,
+    and simply making a function call. The definition of $\in$ above is one such alias. Generally speaking, anything of the form $x \in y$ would be interpreted as a function call instead of a
+    data structure allocation.
+
+    Cons cell aliases can be more complex than individual cells. For example:
+    - align << end
+      x \in y + z & = x \in y \vee x \in z \\
+      x \in y * z & = x \in y \wedge x \in z
+    - end
+
+    In this case, the alias covers both the $\in$ and the $+$ or $*$; either form can be eagerly evaluated without allocating real cons cells.
 
 __
 meta::section('introduction', <<'__');
