@@ -747,7 +747,9 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-compile_tex();
+mkdir 'doc' unless -d 'doc';
+compile_tex('--pdf=doc/mulholland.pdf');
+file::write('doc/mulholland.tex', tex());
 
 __
 meta::function('rm', <<'__');
