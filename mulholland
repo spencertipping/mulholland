@@ -1888,6 +1888,88 @@ meta::section('contexts', <<'__');
     executes in $O(n)$ in its size; this is in contrast to something like regular expressions, which can have linear-time subcomponents. Caterwaul and Lisp also both have the property that
     trees are represented logically in memory; no representation optimization is performed in most cases.
 
+    I considered implementing some form of nonlocality natively in Mulholland, but I think it would be the wrong move. There are good reasons to limit the match distance of a given pattern,
+    and metaprogramming can be used to implement specific forms of nonlocality later on.
+
+  - s1 Wildcards
+    Lisp doesn't use wildcards because a symbol's role is inferred from its position. Caterwaul and Mulholland match against arbitrary trees and therefore need some way to indicate whether a
+    given pattern term is a constant or a bind variable. Caterwaul uses the convention that symbols beginning with underscores are interpreted as wildcards when matching trees. Because those
+    symbols are also legal Javascript identifiers, you can use a pattern to match against another pattern:
+
+    - verbatim << end
+      '_foo + _bar'.qs /~match/ '_x + _y * _z'.qs
+      // {_foo: '_x'.qs, _bar: '_y * _z'.qs}
+    - end
+
+    Mulholland does something similar, but the notation is an implementation detail of the reader. The reference implementation uses a colon prefix for variables, e.g.~{\tt :x + :y}. Constants
+    are written verbatim. In this PDF, variables are italicized: $\textrm{foo}(x, y)$ contains two variables, $x$ and $y$, and one symbol literal.
+
+    It is not possible to use a wildcard to select any polymorphic variant of cons while destructuring its children. That is, you can't construct a tree that has a wildcard in a cons position.
+    Doing this creates some ambiguity about intention, and is almost always an excessively broad way to select things. For instance, the intent behind these equations is unclear:
+    - align << end
+      (x + y)~\langle cons\rangle~z & = cons \\
+      x + y + z                     & = x~\langle y\rangle~z
+    - end
+
+    Most of the problems in these examples arises from the fact that cons symbols are always just symbols, whereas wildcards can match entire subtrees. The preferred way to match against
+    polymorphic cons trees is to use metaprogramming to build a list of monomorphic patterns and replacements.
+
+  - s1 Creating a context
+    Contexts are first-class values created using the $\vdash$ operator. $\vdash$ takes two cons forms; the left-hand side is a tree that should be rewritten, and the right-hand side is a
+    structure consisting of one or more equations separated either by $\wedge$ or by $\rhd$. $\wedge$ is used to indicate that both equations are simultaneously true; so, for instance, you
+    could use it to bind variables:
+    $$
+      \textrm x = 1 \wedge \textrm y = 5
+    $$
+
+    I should mention at this point that in this PDF, I generally imply a $\wedge$ by stacking equations:
+    - align << end
+      \textrm x & = 1 \\
+      \textrm y & = 5
+    - end
+
+    $\rhd$ is used when you want to define multiple cases for the same logical rewrite. For example, it would be misleading and incorrect to define a factorial function this way:
+    - align << end
+      \textrm{factorial}(0) & = 1 \\
+      \textrm{factorial}(n) & = n * \textrm{factorial}(n - 1)
+    - end
+
+    The problem is that the second equation covers the first case, so both equations aren't always true. The first equation is a special case of the second, so in Mulholland you use a domain
+    merge:
+    - align << end
+      \textrm{factorial}(n) & = n * \textrm{factorial}(n - 1) \rhd \textrm{factorial}(0) = 1
+    - end
+
+    $\rhd$ means, ``match the right-hand side first, then proceeding to the left-hand side if the match failed.'' Mulholland's standard library defines $\lhd$, which does what you'd expect.
+
+  - s1 Properties of $\wedge$ and $\rhd$
+    Equations are flattened out into a set of conjoined piecewise definitions by the following equivalences:
+    - align << end
+      a \wedge b            & = b \wedge a \\
+      a \wedge (b \wedge c) & = a \wedge b \wedge c \\
+      a \wedge a            & = a \\
+      a \rhd (b \rhd c)     & = a \rhd b \rhd c \\
+      a \rhd a              & = a
+    - end
+
+    Note that $=$ is not associative! This allows you to match against and rewrite equations: $(a = b + 1) = (a - 1 = b)$. $=$ is also not commutative because it specifies a normalization
+    gradient. The right-hand side of any equation is considered to be the ``more normal'' side, so in cases when the representation can't capture an equivalence the terms will be rewritten
+    from left to right.
+
+  - s1 Toplevel context
+    The toplevel context contains a few universal rewrite rules such as the ones defined above. Source code can be accessed in a variety of ways, but canonical loading can be done using {\tt
+    require}, which will return a syntax tree that you can later use in rewriting operations. For example:
+    - verbatim << end
+      # foo.mh: Define some basic stuff
+      x = 5,
+      y = 10
+    - end
+
+    - verbatim << end
+      # bar.mh: Load foo.mh and use it
+      main = print (x + y) /- require 'foo.mh'
+    - end
+
 __
 meta::section('equations-and-normalization', <<'__');
 - sc Equations and normalization
@@ -1920,7 +2002,13 @@ meta::section('equations-and-normalization', <<'__');
       - item[] \bf Commutativity
         Enables Mulholland to use structural aspects of the values within the structure as indexes. Commutativity with associativity means that elements may be accessed independently of other
         elements within a cons structure. Commutativity without associativity does not provide many useful properties that I'm aware of.
+
+      - item[] \bf Idempotence
+        Enables Mulholland to use idempotent indexing strategies for elements. Generally this is useful only for commutative and associative data structures, but idempotence also causes
+        Mulholland to not allocate cons cells in certain cases. For instance, if $\wedge$ is defined to be idempotent (which it is), then $x \wedge x$ will not allocate a $\wedge$ cons.
     - end
+
+    These are implemented in Mulholland itself, and you can add your own heuristics and implementations for application-specific optimization.
 
   - s1 Scoped constraints
     Sometimes a constraint is not known when a data structure is first used. For example, consider a situation like this:
@@ -1987,7 +2075,27 @@ meta::section('main', <<'__');
   - include section::polymorphic-consing
   - include section::contexts
   - include section::equations-and-normalization
+  - include section::metaprogramming
 - end
+
+__
+meta::section('metaprogramming', <<'__');
+- sc Metaprogramming
+  Mulholland is deeply metacircular. Because of representation constraints, Mulholland programs can use equation lists in two different ways. On one hand they can be matched against because
+  they are syntax trees, but they take on additional meaning when used with $\vdash$. This flexibility comes about primarily because the interpretation of each syntax tree is extrinsic, as it
+  is in Lisp.
+
+  - s1 Serialization
+    Every Mulholland value can be serialized because of its isomorphism to syntax trees. Similarly, any serialized value can be read into a different Mulholland interpreter and its semantics
+    can be replicated by entering a context that contains those values.
+
+  - s1 Optimization primitives
+    At the lowest level, Mulholland contains an operator that converts low-level syntax trees to machine code, writes the machine code to an executable region of memory, and executes that
+    memory. These optimization primitives are provided by the base runtime, and they're the only native functions that must be implemented by an interpreter. Ultimately these primitives are
+    how everything is executed.
+
+    The Mulholland interpreter core contains a series of rewriting rules that convert high-level syntax trees, including rewriting rules, into low-level machine code. These rewriting rules are
+    applied to themselves to create the Mulholland runtime environment that executes your program.
 
 __
 meta::section('polymorphic-consing', <<'__');
