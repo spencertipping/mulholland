@@ -99,8 +99,8 @@ E[\texttt{eval}:x:\texttt{nil}]                     & = E[M[x]]
 
 \section{Tree homomorphisms in Mulholland}
     Mulholland has a few significant differences from Lisp. First, there is no $E[]$ transformation available to code; terms exist only in their quoted forms. These quoted forms are then
-    erased in a structure-preserving way when the program is compiled. Second, the distributive nature of Mulholland trees is explicitly, not implicitly, indicated. Third, Mulholland rewriting
-    definitions are built entirely using piecewise combinations of destructuring binds; this is the only way to access argument structure.
+    erased in a structure-preserving way when the program is compiled. Second, Mulholland rewriting definitions are built entirely using piecewise combinations of destructuring binds; this is
+    the only way to access argument structure. Third, tree rewriting can be contextualized using marker symbols; this is in contrast to Lisp's global symbol namespace.
 
 \chapter{Contexts}
   Mulholland uses contexts to dictate how terms should be rewritten. Generally these contexts are stored by name by modifying the toplevel context; this is similar to Lisp's global macro
@@ -142,8 +142,8 @@ x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
 // {_foo: '_x'.qs, _bar: '_y * _z'.qs}
 \end{verbatim}
 
-    Mulholland does something similar, but the notation is an implementation detail of the reader. The reference implementation uses a colon prefix for variables, e.g.~{\tt :x + :y}. Constants
-    are written verbatim. In this PDF, variables are italicized: $\textrm{foo}(x, y)$ contains two variables, $x$ and $y$, and one symbol literal.
+    Mulholland does something similar, but the notation is an implementation detail of the reader. The reference implementation uses a colon prefix for constants, e.g.~{\tt :x + :y}. Variables
+    are written verbatim. In this PDF, variables are italicized: $\textrm{foo}(x, y)$ contains two variables, $x$ and $y$, and one constant symbol literal.
 
     It is not possible to use a wildcard to select any polymorphic variant of cons while destructuring its children. That is, you can't construct a tree that has a wildcard in a cons position.
     Doing this creates some ambiguity about intention, and is almost always an excessively broad way to select things. For instance, the intent behind these equations is unclear:
@@ -154,6 +154,38 @@ x + y + z                     & = x~\langle y\rangle~z
 
     Most of the problems in these examples arises from the fact that cons symbols are always just symbols, whereas wildcards can match entire subtrees. The preferred way to match against
     polymorphic cons trees is to use metaprogramming to build a list of monomorphic patterns and replacements.
+
+\section{Marker symbols}
+    Generally Mulholland relies on deliberate namespace collision to allow rewriting rules to match each other. However, sometimes collision needs to be avoided. For instance, when inspecting
+    a tree regardless of its semantics it's often useful to create markers to track state. Here's how that could be done to detect a sequence $\textrm a : \textrm b$ within a list:
+\begin{align*}
+\textrm{afterab}(xs) & = \textrm{nothing}(xs) \vdash \begin{cases}
+                                                       \textrm{nothing}(\textrm{nil})    & = \textrm{false} \\
+                                                       \textrm{nothing}(\textrm a : xs') & = \textrm{gota}(xs') \\
+                                                       \textrm{gota}(\textrm{nil})       & = \textrm{false} \\
+                                                       \textrm{gota}(\textrm b : xs')    & = xs'
+                                                     \end{cases}
+\end{align*}
+
+    Now suppose $xs$ contains the subsequence $\textrm a : \textrm b : \textrm{nothing}(\textrm{nil})$. The goal is not to rewrite this element into $\textrm{false}$, despite the fact that the
+    rewriting rules appear to imply that this should happen.
+
+    Put differently, we want to limit the scope of an equivalence to a given set of values. We don't want to say that every occurrence of $\textrm{gota}$ means the same thing; particularly,
+    the word $\textrm{gota}$ within the context of this particular $\vdash$ is not the same as any $\textrm{gota}$ that appears in $xs$.
+
+    The way to do this is to define $\textrm{nothing}$ and $\textrm{gota}$ as being unique. This is done at the context level:
+\begin{align*}
+\textrm{afterab}(xs) & = \textrm{nothing}(xs) \vdash \begin{cases}
+                                                       \exists \textrm{nothing} \\
+                                                       \exists \textrm{gota} \\
+                                                       \textrm{nothing}(\textrm{nil})    & = \textrm{false} \\
+                                                       \textrm{nothing}(\textrm a : xs') & = \textrm{gota}(xs') \\
+                                                       \textrm{gota}(\textrm{nil})       & = \textrm{false} \\
+                                                       \textrm{gota}(\textrm b : xs')    & = xs'
+                                                     \end{cases}
+\end{align*}
+
+    Using $\exists$ causes the symbols to be erased when the context is compiled. Those symbols will be specific to the $\vdash$ tree and will occur nowhere else in the program.
 
 \section{Creating a context}
     Contexts are first-class values created using the $\vdash$ operator. $\vdash$ takes two cons forms; the left-hand side is a tree that should be rewritten, and the right-hand side is a
