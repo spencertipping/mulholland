@@ -21,6 +21,8 @@
 \lstnewenvironment{rubycode}      {\lstset{language=ruby}}{}
 
 \lstnewenvironment{resourcecode}{}{}
+\def\rewrite {\vdash}
+
 
 \title{Mulholland reference}
 \author{Spencer Tipping}
@@ -106,8 +108,8 @@ E[\texttt{eval}:x:\texttt{nil}]                     & = E[M[x]]
   Mulholland uses contexts to dictate how terms should be rewritten. Generally these contexts are stored by name by modifying the toplevel context; this is similar to Lisp's global macro
   table. This behavior is produced by a few toplevel rewriting rules:\footnote{Parentheses are included here to show the cons structure, but they aren't necessary in the resulting program.}
 \begin{align*}
-x \vdash (P_x = y)                      & = y \\
-x \vdash ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
+x \rewrite (P_x = y)                      & = y \\
+x \rewrite ((P_x = y_1) \rhd (P_x = y_2)) & = y_2
 \end{align*}
 
   Here, $P_x$ represents any pattern that matches and destructures $x$. Lisp implements $P_x$ such that $x_1:y_1$ matches $x_2:y_2$ iff $x_1 = x_2$. The resulting destructure data is, roughly,
@@ -159,7 +161,7 @@ x + y + z                     & = x~\langle y\rangle~z
     Generally Mulholland relies on deliberate namespace collision to allow rewriting rules to match each other. However, sometimes collision needs to be avoided. For instance, when inspecting
     a tree regardless of its semantics it's often useful to create markers to track state. Here's how that could be done to detect a sequence $\textrm a : \textrm b$ within a list:
 \begin{align*}
-\textrm{afterab}(xs) & = \textrm{nothing}(xs) \vdash \begin{cases}
+\textrm{afterab}(xs) & = \textrm{nothing}(xs) \rewrite \begin{cases}
                                                        \textrm{nothing}(\textrm{nil})    & = \textrm{false} \\
                                                        \textrm{nothing}(\textrm a : xs') & = \textrm{gota}(xs') \\
                                                        \textrm{gota}(\textrm{nil})       & = \textrm{false} \\
@@ -171,24 +173,23 @@ x + y + z                     & = x~\langle y\rangle~z
     rewriting rules appear to imply that this should happen.
 
     Put differently, we want to limit the scope of an equivalence to a given set of values. We don't want to say that every occurrence of $\textrm{gota}$ means the same thing; particularly,
-    the word $\textrm{gota}$ within the context of this particular $\vdash$ is not the same as any $\textrm{gota}$ that appears in $xs$.
+    the word $\textrm{gota}$ within the context of this particular $\rewrite$ is not the same as any $\textrm{gota}$ that appears in $xs$.
 
-    The way to do this is to define $\textrm{nothing}$ and $\textrm{gota}$ as being unique. This is done at the context level:
-\begin{align*}
-\textrm{afterab}(xs) & = \textrm{nothing}(xs) \vdash \begin{cases}
-                                                       \exists \textrm{nothing} \\
-                                                       \exists \textrm{gota} \\
-                                                       \textrm{nothing}(\textrm{nil})    & = \textrm{false} \\
-                                                       \textrm{nothing}(\textrm a : xs') & = \textrm{gota}(xs') \\
-                                                       \textrm{gota}(\textrm{nil})       & = \textrm{false} \\
-                                                       \textrm{gota}(\textrm b : xs')    & = xs'
-                                                     \end{cases}
-\end{align*}
+    The way to do this is to define $\textrm{nothing}$ and $\textrm{gota}$ as being unique. This is done at the equation level because the erasure should happen before any values are
+    substituted into the right-hand side (otherwise the intent could be confused with metaprogramming):
+    $$
+    \left[ \textrm{afterab}(xs) = \textrm{nothing}(xs) \rewrite \begin{cases}
+                                                                  \textrm{nothing}(\textrm{nil})    & = \textrm{false} \\
+                                                                  \textrm{nothing}(\textrm a : xs') & = \textrm{gota}(xs') \\
+                                                                  \textrm{gota}(\textrm{nil})       & = \textrm{false} \\
+                                                                  \textrm{gota}(\textrm b : xs')    & = xs'
+                                                                \end{cases} \right] \ll \begin{cases} \textrm{nothing} \\ \textrm{gota} \end{cases}
+    $$
 
-    Using $\exists$ causes the symbols to be erased when the context is compiled. Those symbols will be specific to the $\vdash$ tree and will occur nowhere else in the program.
+    Using $\ll$ causes the symbols to be erased when the context is compiled. Those symbols will be specific to the $\rewrite$ tree and will occur nowhere else in the program.
 
 \section{Creating a context}
-    Contexts are first-class values created using the $\vdash$ operator. $\vdash$ takes two cons forms; the left-hand side is a tree that should be rewritten, and the right-hand side is a
+    Contexts are first-class values created using the $\rewrite$ operator. $\rewrite$ takes two cons forms; the left-hand side is a tree that should be rewritten, and the right-hand side is a
     structure consisting of one or more equations separated either by $\wedge$ or by $\rhd$. $\wedge$ is used to indicate that both equations are simultaneously true; so, for instance, you
     could use it to bind variables:
     $$
@@ -285,10 +286,10 @@ x + (y + z) & = x + y + z
 \begin{align*}
 x + (y + z) & = x + y + z \\
 \textrm l   & = \textrm a + \textrm b + \textrm c + \textrm d \\
-v \in xs    & = \textrm{in}(xs) \vdash \begin{cases}
-                                         x + y = y + x \\
-                                         \textrm{in}(xs') = \textrm{false} \rhd \textrm{in}(v + xs') = \textrm{true}
-                                       \end{cases}
+v \in xs    & = \textrm{in}(xs) \rewrite \begin{cases}
+                                           x + y = y + x \\
+                                           \textrm{in}(xs') = \textrm{false} \rhd \textrm{in}(v + xs') = \textrm{true}
+                                         \end{cases}
 \end{align*}
 
     At this point, $\textrm b \in \textrm l$ will cause the list $\textrm a + \textrm b + \textrm c + \textrm d$ to be folded into a bag (since it is being rewritten under a
@@ -310,8 +311,8 @@ x \in y * z & = x \in y \wedge x \in z
 
 \chapter{Metaprogramming}
   Mulholland is deeply metacircular. Because of representation constraints, Mulholland programs can use equation lists in two different ways. On one hand they can be matched against because
-  they are syntax trees, but they take on additional meaning when used with $\vdash$. This flexibility comes about primarily because the interpretation of each syntax tree is extrinsic, as it
-  is in Lisp.
+  they are syntax trees, but they take on additional meaning when used with $\rewrite$. This flexibility comes about primarily because the interpretation of each syntax tree is extrinsic, as
+  it is in Lisp.
 
 \section{Serialization}
     Every Mulholland value can be serialized because of its isomorphism to syntax trees. Similarly, any serialized value can be read into a different Mulholland interpreter and its semantics
