@@ -273,6 +273,7 @@ meta::meta('type::meta', <<'__');
 
 meta::configure 'meta', extension => '.pl', inherit => 1;
 __
+meta::meta('type::note', 'meta::functor::editable \'note\', extension => \'.sdoc\', inherit => 0, default => \'edit\';');
 meta::meta('type::parent', <<'__');
 meta::define_form 'parent', \&meta::bootstrap::implementation;
 meta::configure 'parent', extension => '', inherit => 1;
@@ -325,7 +326,9 @@ meta::configure 'vim_highlighter', extension => '.vim', inherit => 1;
 meta::define_form 'vim_highlighter', \&meta::bootstrap::implementation;
 
 __
+meta::alias('d', 'ad -c section::');
 meta::alias('erf', 'edit function::render');
+meta::alias('n', 'ad -c note::');
 meta::bootstrap('html', <<'__');
 <html>
   <head>
@@ -416,6 +419,7 @@ meta::cache('parent-identification', <<'__');
 /home/spencertipping/bin/object 99aeabc9ec7fe80b1b39f5e53dc7e49e
 /home/spencertipping/conjectures/perl-objects/tex-document d6b8b54aecc42ae92c7a8c570c5559fc
 git-integration 9fabb9b6f2f374c35ddcc26549ac2b65
+notes a9e5975593ed5d90d943ad98405c71e5
 object 99aeabc9ec7fe80b1b39f5e53dc7e49e
 preprocessor 70dae4b46eb4e06798ec6f38d17d4c7b
 vim-highlighters 902333a0bd6ed90ff919fe8477cb4e69
@@ -445,8 +449,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 __
 meta::function('ad', <<'__');
-return @{$transient{path}} = () unless @_;
-push @{$transient{path}}, @_;
+my ($options, @paths) = separate_options(@_);
+@{$transient{path}} = () if $$options{-c};
+return @{$transient{path}} = () unless @paths;
+push @{$transient{path}}, @paths;
 
 __
 meta::function('alias', <<'__');
@@ -679,6 +685,13 @@ my $name = $0;
 $name =~ s/^.*\///;
 $name;
 __
+meta::function('note', <<'__');
+# Creates a note with a given name, useful for jotting things down.
+my $name = join('-', @_);
+create("note::$name");
+
+__
+meta::function('notes', 'ls(\'-a\', \'^note::\');');
 meta::function('parents', 'join "\\n", grep s/^parent:://o, sort keys %data;');
 meta::function('perl', <<'__');
 my @result = eval(join ' ', @_);
@@ -747,9 +760,13 @@ else    {pop @{$transient{path}}}
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-mkdir 'doc' unless -d 'doc';
-compile_tex('--pdf=doc/mulholland.pdf');
-file::write('doc/mulholland.tex', tex());
+my ($options, @stuff) = separate_options(@_);
+
+unless ($$options{-D}) {
+  mkdir 'doc' unless -d 'doc';
+  compile_tex('--pdf=doc/mulholland.pdf');
+  file::write('doc/mulholland.tex', tex());
+}
 
 __
 meta::function('rm', <<'__');
@@ -1093,7 +1110,7 @@ meta::function('vim', <<'__');
 file::write("$ENV{'HOME'}/.vim/syntax/$_.vim", retrieve("vim_highlighter::$_")) for grep s/^vim_highlighter:://o, keys %data;
 __
 meta::hook('before-shell::ad', <<'__');
-ad('section::');
+ad('alias::');
 
 __
 meta::indicator('cc', 'length ::retrieve(\'data::current-continuation\') ? "\\033[1;36mcc\\033[0;0m" : \'\';');
@@ -1468,6 +1485,16 @@ __
 meta::message_color('cc', '36');
 meta::message_color('state', 'purple');
 meta::message_color('states', 'yellow');
+meta::note('anonymous-symbols', <<'__');
+Anonymous symbols.
+I'm having trouble figuring out what this means. I think it's some form of eager evaluation being used on the context itself; basically, we want the context to behave like an anonymous graph
+instead of a tree of rewriting rules. My main concerns are:
+
+| 1. Does this prevent context destructuring? That is, is the representation still compatible with the source trees, or do we lose information?
+  2. How is this evaluation forced?
+  3. Is it possible to link sub-contexts to super-context functions? (It probably is, but requires a full representation of the super-context so that inlining can happen.)
+
+__
 meta::parent('./sdoc', <<'__');
 function::sdoc                           b2f9066417ce3368f093796e1180e9b2
 function::sdoc-html                      b23152b3f5be696e5bae842ec43fc5a4
@@ -1639,6 +1666,13 @@ function::gl                             492e2750409588f8b61a8b8e339e42c1
 function::gs                             4ea8aeccb36ab83702062e4359e8600b
 function::gu                             fdd2e61e0ea981dda6d407df63c0e47e
 parent::/home/spencertipping/bin/object  5e8c5be71d2d512cca8dfc1677f94466
+
+__
+meta::parent('notes', <<'__');
+function::note    c6d52ffe73cd48cd95fdc561c59d9f63
+function::notes   7229b326ac8686b2db6de98496bc7527
+meta::type::note  f81bea58841a438e4ee34608ab4f54c0
+parent::object    5e8c5be71d2d512cca8dfc1677f94466
 
 __
 meta::parent('object', <<'__');
