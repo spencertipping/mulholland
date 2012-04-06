@@ -1,0 +1,22 @@
+Anonymous symbols.
+I'm having trouble figuring out what this means. I think it's some form of eager evaluation being used on the context itself; basically, we want the context to behave like an anonymous graph
+instead of a tree of rewriting rules. My main concerns are:
+
+| 1. Does this prevent context destructuring? That is, is the representation still compatible with the source trees, or do we lose information?
+  2. How is this evaluation forced?
+  3. Is it possible to link sub-contexts to super-context functions? (It probably is, but requires a full representation of the super-context so that inlining can happen.)
+
+Use cases.
+The main use case for anonymous symbols is forming a pattern that is too complex to be expressed normally. For example, (a|b) : (c|d) : ... cannot be expressed concisely using normal
+Mulholland pattern syntax. So returning the ... in this case involves using stages:
+
+got_nothing nil        = false />
+got_nothing (x' : xs') = got_nothing xs' />
+got_nothing (a  : xs') = got_first xs' />
+got_nothing (b  : xs') = got_first xs'
+
+got_first xs'          = got_nothing xs' />
+got_first (c : xs')    = xs' />
+got_first (d : xs')    = xs'
+
+In this case, got_nothing and got_first are adjectives; they need to be eagerly evaluated into a destructuring loop. Put differently, we've created a state machine over list elements.

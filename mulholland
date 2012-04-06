@@ -422,6 +422,7 @@ git-integration 9fabb9b6f2f374c35ddcc26549ac2b65
 notes a9e5975593ed5d90d943ad98405c71e5
 object 99aeabc9ec7fe80b1b39f5e53dc7e49e
 preprocessor 70dae4b46eb4e06798ec6f38d17d4c7b
+tex-document d6b8b54aecc42ae92c7a8c570c5559fc
 vim-highlighters 902333a0bd6ed90ff919fe8477cb4e69
 __
 meta::data('author', 'Spencer Tipping');
@@ -762,10 +763,13 @@ meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^
 meta::function('render', <<'__');
 my ($options, @stuff) = separate_options(@_);
 
+mkdir 'doc' unless -d 'doc';
+unlink <doc/note.*.sdoc>;
+file::write("doc/note.$_.sdoc", retrieve("note::$_")) for grep s/^note:://, sort keys %data;
+
 unless ($$options{-D}) {
-  mkdir 'doc' unless -d 'doc';
-  compile_tex('--pdf=doc/mulholland.pdf');
-  file::write('doc/mulholland.tex', tex());
+  compile_tex('--pdf=doc/mulholland.pdf', 'reference-manual');
+  file::write('doc/mulholland.tex', tex('reference-manual'));
 }
 
 __
@@ -1494,6 +1498,21 @@ instead of a tree of rewriting rules. My main concerns are:
   2. How is this evaluation forced?
   3. Is it possible to link sub-contexts to super-context functions? (It probably is, but requires a full representation of the super-context so that inlining can happen.)
 
+Use cases.
+The main use case for anonymous symbols is forming a pattern that is too complex to be expressed normally. For example, (a|b) : (c|d) : ... cannot be expressed concisely using normal
+Mulholland pattern syntax. So returning the ... in this case involves using stages:
+
+got_nothing nil        = false />
+got_nothing (x' : xs') = got_nothing xs' />
+got_nothing (a  : xs') = got_first xs' />
+got_nothing (b  : xs') = got_first xs'
+
+got_first xs'          = got_nothing xs' />
+got_first (c : xs')    = xs' />
+got_first (d : xs')    = xs'
+
+In this case, got_nothing and got_first are adjectives; they need to be eagerly evaluated into a destructuring loop. Put differently, we've created a state machine over list elements.
+
 __
 meta::parent('./sdoc', <<'__');
 function::sdoc                           b2f9066417ce3368f093796e1180e9b2
@@ -1502,7 +1521,7 @@ function::sdoc-markdown                  a35a6441dd750466f2d0e636bee2b382
 function::sdocp                          c3d738d982ba87418a298ff58478a85b
 meta::type::sdoc                         22cd7315641d38c9d536344e83c36bed
 meta::type::slibrary                     95474943c4a5f8ff17d3cf66ddb7c386
-parent::/home/spencertipping/bin/object  5e8c5be71d2d512cca8dfc1677f94466
+parent::/home/spencertipping/bin/object  0a03bcf29e1643817938372427e1c6c4
 retriever::code-sdoc                     03b87ff8d1ecf7594db9ca0669fc69a1
 retriever::html-sdoc                     8ab7705d03276945b23a71677153233c
 retriever::markdown-sdoc                 67c34ba8223ec36a3ae018e411354db2
@@ -1514,7 +1533,7 @@ meta::parent('/home/spencertipping/bin/object', <<'__');
 bootstrap::html                         f44dd03cb0c904b3a5f69fbda5f018d0
 bootstrap::initialization               d22fafa2938ecb0d4728e2958b54ed3d
 bootstrap::perldoc                      5793df44bdd2526bb461272924abfd4b
-function::ad                            77a05d9a6fef7871b2c3e8e94b56870a
+function::ad                            9220b9dc131f8f79878a6209adfe8ef2
 function::alias                         8eeeeb4e064ef3aba7edf8f254427bc2
 function::cat                           f684de6c8776617a437b76009114f52e
 function::cc                            12ea9176e388400704d823433c209b7a
@@ -1629,34 +1648,6 @@ retriever::object                       c7633990b4e01bdc783da7e545799f4f
 retriever::perl                         f41938e6dbad317f62abffc1e4d28cca
 
 __
-meta::parent('/home/spencertipping/conjectures/perl-objects/tex-document', <<'__');
-function::compile-tex          506fa19a7628ec4b2b0cb8c5865e24a0
-function::tex                  cd9adeb4311823387f359df3955f7c8c
-meta::externalize_template     ce51d3e099f0fad21cd01e5c53382e85
-meta::functor::code-templates  2b8880f05f983ce5b8a19a01688b6001
-meta::functor::tex-templates   6ac0ee994c9328fcfc41083083d97280
-meta::template::beamer         3b73fe6a7ef271112a603b110630ad01
-meta::template::code           d29e41eab67368411a09753d6722f88d
-meta::template::document       18688cac3eab39087165931beb4f82de
-meta::template::enumeration    67d1cf0bb0e8946fc3b48cc30a4f5fa4
-meta::template::math           057c8fe0d91c0b85138b01c1f6a1e3b3
-meta::template::quotations     f76a27311c8a9d09550dd669e98f9a7f
-meta::template::sections       25cb0a42bf1c2f403f8f9c2e1c5e4105
-meta::type::resource           c521d2de1dcd7f9f7ec4df3557572009
-meta::type::section            fb3b53eaebc1a2433c1763eccdb781c4
-parent::./sdoc                 6c74033abed05f398572ce8aeb848f08
-parent::preprocessor           803d46480e579c764e7704149fecd7cc
-parent::vim-highlighters       67c827cbb7bffc6ecab4b6a09dcc93a3
-resource::header               165b42e25edb90043f5d3b544adee521
-resource::header-languages     96d12558e40d0df64ff3176b767f4f3b
-resource::header-listings      712557f5989b12ca325bdd2cd36020ef
-resource::header-packages      323964d33482e6099b0248bb4eddf2ae
-resource::header-refs          e3999cbca586d5100eb782643071ee88
-resource::header-resource      a8df924fbb715de73b8e7518e0c9e0d6
-template::item[]               2c2041b4c3b6584b6ae3610f5ab68939
-vim_highlighter::cltex         40744d98b02b4b50fedb4d1e7e1fd151
-
-__
 meta::parent('git-integration', <<'__');
 function::gU                             f15ab8170ea981dd7b216c75af5d3f63
 function::ga                             505b3d9a22ca7cf04c60bda01ff3f140
@@ -1665,21 +1656,21 @@ function::gd                             cff1e868c7c69780a2263c8c7fd75f90
 function::gl                             492e2750409588f8b61a8b8e339e42c1
 function::gs                             4ea8aeccb36ab83702062e4359e8600b
 function::gu                             fdd2e61e0ea981dda6d407df63c0e47e
-parent::/home/spencertipping/bin/object  5e8c5be71d2d512cca8dfc1677f94466
+parent::/home/spencertipping/bin/object  0a03bcf29e1643817938372427e1c6c4
 
 __
 meta::parent('notes', <<'__');
 function::note    c6d52ffe73cd48cd95fdc561c59d9f63
 function::notes   7229b326ac8686b2db6de98496bc7527
 meta::type::note  f81bea58841a438e4ee34608ab4f54c0
-parent::object    5e8c5be71d2d512cca8dfc1677f94466
+parent::object    0a03bcf29e1643817938372427e1c6c4
 
 __
 meta::parent('object', <<'__');
 bootstrap::html                         f44dd03cb0c904b3a5f69fbda5f018d0
 bootstrap::initialization               d22fafa2938ecb0d4728e2958b54ed3d
 bootstrap::perldoc                      5793df44bdd2526bb461272924abfd4b
-function::ad                            77a05d9a6fef7871b2c3e8e94b56870a
+function::ad                            9220b9dc131f8f79878a6209adfe8ef2
 function::alias                         8eeeeb4e064ef3aba7edf8f254427bc2
 function::cat                           f684de6c8776617a437b76009114f52e
 function::cc                            12ea9176e388400704d823433c209b7a
@@ -1797,7 +1788,7 @@ __
 meta::parent('preprocessor', <<'__');
 function::preprocess           ab5526a02ff417d4c162357dc327e7c4
 meta::type::template           bc4b0c80b5efc716b19e99b832c22bf3
-parent::object                 5e8c5be71d2d512cca8dfc1677f94466
+parent::object                 0a03bcf29e1643817938372427e1c6c4
 retriever::pp                  3b5f5c5d30c5a04f72056dedaacfe7b7
 template::comment              dfe273d2dad3d8159b847545e4e5c309
 template::eval                 1a0e2124a05056be4abc11803883c294
@@ -1806,10 +1797,38 @@ template::include              47b5552d609d97fe7f2522d5c1027014
 template::pinclude             c07ff79bf8d642cceaa9ef844bfcb189
 
 __
+meta::parent('tex-document', <<'__');
+function::compile-tex          506fa19a7628ec4b2b0cb8c5865e24a0
+function::tex                  cd9adeb4311823387f359df3955f7c8c
+meta::externalize_template     ce51d3e099f0fad21cd01e5c53382e85
+meta::functor::code-templates  2b8880f05f983ce5b8a19a01688b6001
+meta::functor::tex-templates   6ac0ee994c9328fcfc41083083d97280
+meta::template::beamer         3b73fe6a7ef271112a603b110630ad01
+meta::template::code           d29e41eab67368411a09753d6722f88d
+meta::template::document       18688cac3eab39087165931beb4f82de
+meta::template::enumeration    67d1cf0bb0e8946fc3b48cc30a4f5fa4
+meta::template::math           057c8fe0d91c0b85138b01c1f6a1e3b3
+meta::template::quotations     f76a27311c8a9d09550dd669e98f9a7f
+meta::template::sections       25cb0a42bf1c2f403f8f9c2e1c5e4105
+meta::type::resource           c521d2de1dcd7f9f7ec4df3557572009
+meta::type::section            fb3b53eaebc1a2433c1763eccdb781c4
+parent::./sdoc                 ea233a1b017fac0bf8a663f76092f6f5
+parent::preprocessor           057bb9ff8f2b8b5c57d8e4079b3425e9
+parent::vim-highlighters       67c827cbb7bffc6ecab4b6a09dcc93a3
+resource::header               165b42e25edb90043f5d3b544adee521
+resource::header-languages     96d12558e40d0df64ff3176b767f4f3b
+resource::header-listings      712557f5989b12ca325bdd2cd36020ef
+resource::header-packages      323964d33482e6099b0248bb4eddf2ae
+resource::header-refs          e3999cbca586d5100eb782643071ee88
+resource::header-resource      a8df924fbb715de73b8e7518e0c9e0d6
+template::item[]               2c2041b4c3b6584b6ae3610f5ab68939
+vim_highlighter::cltex         40744d98b02b4b50fedb4d1e7e1fd151
+
+__
 meta::parent('vim-highlighters', <<'__');
 function::vim                cf9e37026f6cd1499a6dd258fbbcd060
 meta::type::vim_highlighter  27990fddb6d7bd383b55dbdfee0d148d
-parent::object               5e8c5be71d2d512cca8dfc1677f94466
+parent::object               0a03bcf29e1643817938372427e1c6c4
 
 __
 meta::resource('header', <<'__');
@@ -1949,37 +1968,6 @@ meta::section('contexts', <<'__');
 
     Most of the problems in these examples arises from the fact that cons symbols are always just symbols, whereas wildcards can match entire subtrees. The preferred way to match against
     polymorphic cons trees is to use metaprogramming to build a list of monomorphic patterns and replacements.
-
-  - s1 Marker symbols
-    Generally Mulholland relies on deliberate namespace collision to allow rewriting rules to match each other. However, sometimes collision needs to be avoided. For instance, when inspecting
-    a tree regardless of its semantics it's often useful to create markers to track state. Here's how that could be done to detect a sequence $\textrm a : \textrm b$ within a list:
-    - align << end
-      \textrm{afterab}(xs) & = \textrm{nothing}(xs) \rewrite \begin{cases}
-                                                             \textrm{nothing}(\textrm{nil})    & = \textrm{false} \\
-                                                             \textrm{nothing}(\textrm a : xs') & = \textrm{gota}(xs') \\
-                                                             \textrm{gota}(\textrm{nil})       & = \textrm{false} \\
-                                                             \textrm{gota}(\textrm b : xs')    & = xs'
-                                                           \end{cases}
-    - end
-
-    Now suppose $xs$ contains the subsequence $\textrm a : \textrm b : \textrm{nothing}(\textrm{nil})$. The goal is not to rewrite this element into $\textrm{false}$, despite the fact that the
-    rewriting rules appear to imply that this should happen.
-
-    Put differently, we want to limit the scope of an equivalence to a given set of values. We don't want to say that every occurrence of $\textrm{gota}$ means the same thing; particularly,
-    the word $\textrm{gota}$ within the context of this particular $\rewrite$ is not the same as any $\textrm{gota}$ that appears in $xs$.
-
-    The way to do this is to define $\textrm{nothing}$ and $\textrm{gota}$ as being unique. This is done at the equation level because the erasure should happen before any values are
-    substituted into the right-hand side (otherwise the intent could be confused with metaprogramming):
-    $$
-    \left[ \textrm{afterab}(xs) = \textrm{nothing}(xs) \rewrite \begin{cases}
-                                                                  \textrm{nothing}(\textrm{nil})    & = \textrm{false} \\
-                                                                  \textrm{nothing}(\textrm a : xs') & = \textrm{gota}(xs') \\
-                                                                  \textrm{gota}(\textrm{nil})       & = \textrm{false} \\
-                                                                  \textrm{gota}(\textrm b : xs')    & = xs'
-                                                                \end{cases} \right] \ll \begin{cases} \textrm{nothing} \\ \textrm{gota} \end{cases}
-    $$
-
-    Using $\ll$ causes the symbols to be erased when the context is compiled. Those symbols will be specific to the $\rewrite$ tree and will occur nowhere else in the program.
 
   - s1 Creating a context
     Contexts are first-class values created using the $\rewrite$ operator. $\rewrite$ takes two cons forms; the left-hand side is a tree that should be rewritten, and the right-hand side is a
@@ -2126,26 +2114,6 @@ meta::section('introduction', <<'__');
   Lisp's macro system.
 
 __
-meta::section('main', <<'__');
-- documentclass report
-- include resource::header
-- include section::mulholland-math-defs
-
-- title  Mulholland reference
-- author Spencer Tipping
-
-- document << end
-  - maketitle
-  - tableofcontents
-
-  - include section::introduction
-  - include section::polymorphic-consing
-  - include section::contexts
-  - include section::equations-and-normalization
-  - include section::metaprogramming
-- end
-
-__
 meta::section('metaprogramming', <<'__');
 - sc Metaprogramming
   Mulholland is deeply metacircular. Because of representation constraints, Mulholland programs can use equation lists in two different ways. On one hand they can be matched against because
@@ -2223,6 +2191,26 @@ meta::section('polymorphic-consing', <<'__');
     Mulholland has a few significant differences from Lisp. First, there is no $E[]$ transformation available to code; terms exist only in their quoted forms. These quoted forms are then
     erased in a structure-preserving way when the program is compiled. Second, Mulholland rewriting definitions are built entirely using piecewise combinations of destructuring binds; this is
     the only way to access argument structure. Third, tree rewriting can be contextualized using marker symbols; this is in contrast to Lisp's global symbol namespace.
+
+__
+meta::section('reference-manual', <<'__');
+- documentclass report
+- include resource::header
+- include section::mulholland-math-defs
+
+- title  Mulholland reference
+- author Spencer Tipping
+
+- document << end
+  - maketitle
+  - tableofcontents
+
+  - include section::introduction
+  - include section::polymorphic-consing
+  - include section::contexts
+  - include section::equations-and-normalization
+  - include section::metaprogramming
+- end
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
