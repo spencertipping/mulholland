@@ -2076,7 +2076,6 @@ meta::section('reference-manual', <<'__');
   - tableofcontents
 
   - include section::polymorphic-consing
-  - include section::rewriting
   - include section::equations-and-normalization
   - include section::metaprogramming
 - end
